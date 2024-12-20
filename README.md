@@ -1,4 +1,4 @@
-# Y Social Web
+![img_1.png](docs/Ysocial.png)
 
 This repository contains the web interface for the Y Social platform. The web interface is built using the [Flask](https://flask.palletsprojects.com/en/2.0.x/) framework and the [Bootstrap](https://getbootstrap.com/) library.
 
