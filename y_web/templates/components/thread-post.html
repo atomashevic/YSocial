@@ -1,0 +1,110 @@
+<div id="feed-post-1" class="card is-post" style="margin-bottom: 0px;">
+<div class="comments-wrap">
+<div class="comments-body has-slimscroll">
+
+    <div class="media is-comment">
+
+                <div class="media-left">
+                  <div class="image">
+                    <img
+                      src="https://via.placeholder.com/300x300"
+                      data-demo-src="{{ url_for('static', filename='assets/img/users/'+ str(thread['author_id']) +'.png') }}"
+                      data-user-popover="1"
+                      alt=""
+                    />
+                  </div>
+                </div>
+
+                <div class="media-content">
+                  <a href="/profile/{{ thread['author_id'] }}/recent/1">{{ thread["author"] }}</a>
+                  <span class="time">Day {{ thread["day"] }} - {{thread["hour"]}}:00</span>
+                  <p>
+                    {{ thread["post"]|safe }}
+                  </p>
+
+                  <div class="card-footer_inner">
+                      <div class="likers-text">
+                  {% if len(thread['emotions']) > 0 %}
+                    <p>Emotions</p>
+                      {% for em in  thread['emotions'] %}
+                      <a class="mdi {{ em[1] }}" title="{{ em[0] }}" href="/emotion/{{ em[2] }}/1"></a>
+                      {% endfor %}
+                  {%  endif  %}
+              </div>
+                  </div>
+                  <div class="controls">
+
+                    <div class="like-count" id="like-count-{{ thread["post_id"] }}">
+                      <i data-feather="thumbs-up" {% if not bool(thread["is_liked"]) %}style="stroke: #69a2e6;"{% endif %}></i>
+                      <span {% if not bool(thread["is_liked"]) %}style="color: #69a2e6;"{% endif %}>{{  thread["likes"]  }}</span>
+                    </div>
+                      <div class="dislike-count" id="dislike-count-{{ thread["post_id"] }}">
+                      <i data-feather="thumbs-down" {% if not bool(thread["is_disliked"]) %}style="stroke: #69a2e6;"{% endif %} ></i>
+                      <span {% if not bool(thread["is_disliked"]) %}style="color: #69a2e6;"{% endif %}>{{  thread["dislikes"]  }}</span>
+                    </div>
+
+                  </div>
+                    {% if len(thread['children'])>0 %}
+                        <div class="reply" style="text-align: left">
+                    <a class="child_sub" val="{{ thread['post_id'] }}">Less</a>
+                        </div>
+                    {% endif %}
+                <div class="reply" style="text-align: right">
+                      <a id='{{ thread["post_id"] }}' onClick="editLink(this.id)">Reply</a>
+                </div>
+                 <p id="message-{{ thread["post_id"] }}"></p>
+                <form class="comment_form" id="comment_form-{{ thread["post_id"] }}">
+                <textarea rows="3"  class="reply_comment" id="comment-{{ thread["post_id"] }}">@{{ thread["author"] }} </textarea>
+                    <button
+                  id="add_comment"
+                  type="button"
+                  class="button is-solid accent-button is-fullwidth"
+                  val="{{ thread["post_id"] }}"
+                >
+                  Comment
+                </button>
+                </form>
+                </div>
+
+                <div class="media-right">
+
+                  <div class="dropdown is-spaced is-right is-neutral dropdown-trigger">
+                    <div>
+                      <div class="button">
+                        <i data-feather="more-vertical"></i>
+                      </div>
+                    </div>
+                    <div class="dropdown-menu" role="menu">
+                      <div class="dropdown-content">
+
+                           {% if thread['author_id'] == logged_id %}
+                    <a class="dropdown-item" id="delete_post" val="{{ thread['post_id'] }}">
+                      <div class="media" >
+                        <i data-feather="bell"></i>
+                        <div class="media-content" >
+                          <h3 val="{{ thread['post_id'] }}">Delete</h3>
+                          <small></small>
+                        </div>
+                      </div>
+                    </a>
+                    <hr class="dropdown-divider" />
+                      {% endif %}
+
+                        <a href="#" class="dropdown-item">
+                          <div class="media">
+                            <i data-feather="flag"></i>
+                            <div class="media-content">
+                              <h3>Report</h3>
+                              <small>Report this comment.</small>
+                            </div>
+                          </div>
+                        </a>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+              </div>
+</div>
+</div>
+</div>

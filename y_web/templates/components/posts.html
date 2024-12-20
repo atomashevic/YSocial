@@ -1,0 +1,360 @@
+{% for index, item in enumerate(items) %}
+        <div id="feed-post-1" class="card is-post">
+
+          <div class="content-wrap" id="post-{{ item['post_id'] }}">
+            <!-- Post header -->
+            <div class="card-heading">
+              <!-- User meta -->
+              <div class="user-block">
+                <div class="image">
+                  <img
+                    src="https://via.placeholder.com/300x300"
+                    data-demo-src="{{ url_for('static', filename='assets/img/users/'+ str(item['author_id']) +'.png') }}"
+                    data-user-popover="1"
+                    alt=""
+                  />
+                </div>
+                <div class="user-info">
+                  <a href="/profile/{{ item['author_id'] }}/recent/1">{{ item["author"] }}</a>
+                  <span class="time">Day {{ item["day"] }} - {{item["hour"]}}:00</span>
+                </div>
+              </div>
+              <!-- Right side dropdown -->
+              <!-- /partials/pages/feed/dropdowns/feed-post-dropdown.html -->
+              <div class="dropdown is-spaced is-right is-neutral dropdown-trigger">
+                <div>
+                  <div class="button">
+                    <i data-feather="more-vertical"></i>
+                  </div>
+                </div>
+                <div class="dropdown-menu" role="menu">
+                  <div class="dropdown-content">
+                   <a href="/thread/{{ item['post_id'] }}" class="dropdown-item" >
+                      <div class="media">
+                        <i data-feather="bookmark"></i>
+                        <div class="media-content">
+                          <h3>Discussion</h3>
+                          <small>See full discussion thread</small>
+                        </div>
+                      </div>
+                    </a>
+                      {% if item['author_id'] == user_id %}
+                    <a class="dropdown-item" id="delete_post" val="{{ item['post_id'] }}">
+                      <div class="media" >
+                        <i data-feather="bell"></i>
+                        <div class="media-content" >
+                          <h3 val="{{ item['post_id'] }}">Delete</h3>
+                          <small></small>
+                        </div>
+                      </div>
+                    </a>
+                    <hr class="dropdown-divider" />
+                      {% endif %}
+                    <a href="#" class="dropdown-item">
+                      <div class="media">
+                        <i data-feather="flag"></i>
+                        <div class="media-content">
+                          <h3>Flag</h3>
+                          <small>In case of inappropriate content.</small>
+                        </div>
+
+                      </div>
+                    </a>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <!-- /Post header -->
+
+            <!-- Post body -->
+            <div class="card-body">
+              <!-- Post body text -->
+              <div class="post-text">
+                <p>
+                  {{ item["post"]|safe }}
+
+                    {% if item["article"] != 0 %}
+
+                        <div class="media-body-news" style="padding-top: 15px; padding-left: 4px; padding-right: 4px;">
+                        <h7 style="text-align: right">News</h7><br>
+
+                        <!--<object data="{{ item['article']['url'] }}" width="100%" height="300" type="text/html"> -->
+                            <h7><a href="{{ item['article']['url'] }}">{{ item["article"]["title"] }}</a> </h7>
+                            <p class="card-text text-justify" style="font-size: 80%;">{{ item["article"]["summary"] }}</p>
+                        <!-- </object> -->
+                        </div>
+                        <div class="col-md-12 p-1 text-right" style="font-size: 80%; padding-top: 0; margin-bottom: 10px; ">
+                         ({{ item["article"]["source"] }})
+                        </div>
+
+                    {% endif %}
+                </p>
+              </div>
+              <!-- Featured image -->
+              <div class="post-image">
+                  <!--
+                <a
+                  data-fancybox="post1"
+                  data-lightbox-type="comments"
+                  data-thumb="{{ url_for('static', filename='assets/img/demo/unsplash/1.jpg') }}"
+                  href="https://via.placeholder.com/1600x900"
+                  data-demo-href="{{ url_for('static', filename='assets/img/demo/unsplash/1.jpg') }}"
+                >
+                  <img
+                    src="https://via.placeholder.com/1600x900"
+                    data-demo-src="{{ url_for('static', filename='assets/img/demo/unsplash/1.jpg') }}"
+                    alt=""
+                  />
+                </a>
+                -->
+                <!-- Action buttons -->
+                <!-- /partials/pages/feed/buttons/feed-post-actions.html -->
+                <!--<div class="like-wrapper" >
+                  <a href="javascript:void(0);" class="like-button" >
+                    <i class="mdi mdi-heart not-liked bouncy"></i>
+                    <i class="mdi mdi-heart is-liked bouncy"></i>
+                    <span class="like-overlay"></span>
+                  </a>
+                </div>
+
+                  <div class="dislike-wrapper" >
+                  <a href="javascript:void(0);" class="dislike-button" >
+                    <i class="mdi mdi-heart not-liked bouncy"></i>
+                    <i class="mdi mdi-heart is-liked bouncy"></i>
+                    <span class="dislike-overlay"></span>
+                  </a>
+                </div>-->
+                <!--
+                <div class="fab-wrapper is-share">
+                  <a
+                    href="javascript:void(0);"
+                    class="small-fab share-fab modal-trigger"
+                    data-modal="share-modal"
+                  >
+                    <i data-feather="link-2"></i>
+                  </a>
+                </div>
+                   -->
+               <!-- <div class="fab-wrapper is-comment">
+                  <a href="javascript:void(0);" class="small-fab">
+                    <i data-feather="message-circle"></i>
+                  </a>
+                </div>-->
+
+
+
+              </div>
+            </div>
+            <!-- /Post body -->
+
+            <!-- Post footer -->
+            <div class="card-footer">
+              <!-- Followers avatars -->
+
+              <!-- Followers text -->
+              <div class="likers-text">
+                          {% if len(item['emotions']) > 0 %}
+                    <p>Emotions</p>
+                      {% for em in  item['emotions'] %}
+                      <a class="mdi {{ em[1] }}" title="{{ em[0] }}" href="/emotion/{{ em[2] }}/1"></a>
+                      {% endfor %}
+                  {%  endif  %}
+                        </div>
+              <!-- Post statistics -->
+              <div class="social-count">
+                <div class="likes-count" id="likes-count-{{ item['post_id'] }}">
+                    <div class="like-wrapper" id="like-{{ item['post_id'] }}" >
+                        <a class="like-button" id="l{{ item['post_id'] }}" {% if not bool(item["is_liked"]) %}style="background: #6aa3e7;"{% endif %} >
+                      <i data-feather="thumbs-up" {% if not bool(item["is_liked"]) %}style="stroke: #ffffff;"{% endif %}></i>
+                      <span id="span-{{ item['post_id'] }}" {% if not bool(item["is_liked"]) %}style="color: #ffffff;"{% endif %}>{{  item["likes"]  }}</span> </a>
+                    </div>
+                </div>
+                  <div class="likes-count" id="dislikes-count-{{ item['post_id'] }}">
+                      <div class="dislike-wrapper" id="dislike-{{ item['post_id'] }}">
+                        <a class="dislike-button" id="d{{ item['post_id'] }}" {% if not bool(item["is_disliked"]) %}style="background: #6aa3e7;"{% endif %}>
+                            <i data-feather="thumbs-down" {% if not bool(item["is_disliked"]) %}style="stroke: #ffffff;"{% endif %}></i>
+                            <span id="span-{{ item['post_id'] }}" {% if not bool(item["is_disliked"]) %}style="color: #ffffff;"{% endif %}>{{  item["dislikes"]  }}</span>
+                        </a>
+                      </div>
+                </div>
+                <!--<div class="shares-count">
+                  <i data-feather="link-2"></i>
+                  <span>9</span>
+                </div> -->
+
+                <!--<div class="comments-count">-->
+
+                  <div class="fab-wrapper is-comment">
+                  <a href="javascript:void(0);" class="small-fab"><i data-feather="message-circle"></i>
+                      <span>{{  item["t_comments"]  }}</span></a>
+                    </div>
+
+              </div>
+            </div>
+            <!-- /Post footer -->
+          </div>
+          <!-- /Main wrap -->
+
+          <!-- Post #1 Comments -->
+
+          <div class="comments-wrap is-hidden">
+            <!-- Header -->
+            <div class="comments-heading">
+              <h4>Comments <small>({{  item["t_comments"]  }})</small></h4>
+              <div class="close-comments">
+                <i data-feather="x"></i>
+              </div>
+            </div>
+            <!-- /Header -->
+            <!-- Post  -->
+            <!-- Comments body -->
+            <div class="comments-body has-slimscroll">
+              <!-- Comment -->
+            <div class="original-post">
+                <div class="media-content">
+                    <a href="/profile/{{ item['author_id'] }}/recent/1">{{ item["author"] }}</a><br/>
+                    <span class="time">Day {{ item["day"] }} - {{item["hour"]}}:00</span>
+                    <div class="post-text">
+                        <p> {{ item["post"]|safe }}</p>
+                    </div>
+                    <div class="likers-text">
+                          {% if len(item['emotions']) > 0 %}
+                    <p>Emotions</p>
+                      {% for em in  item['emotions'] %}
+                      <a class="mdi {{ em[1] }}" title="{{ em[0] }}" href="/emotion/{{ em[2] }}/1"></a>
+                      {% endfor %}
+                  {%  endif  %}
+                        </div>
+
+                 <div class="reply" style="text-align: right">
+                      <a id='{{ item["post_id"] }}' onClick="editLink(this.id)">Reply</a>
+                </div>
+                 <p id="message-{{ item["post_id"] }}"></p>
+                <form class="comment_form" id="comment_form-{{ item["post_id"] }}">
+                <textarea rows="3"  class="reply_comment" id="comment-{{ item["post_id"] }}">@{{ item["author"] }} </textarea>
+                    <button
+                  id="add_comment"
+                  type="button"
+                  class="button is-solid accent-button is-fullwidth"
+                  val="{{ item["post_id"] }}"
+                >
+                  Comment
+                </button>
+                </form>
+
+                </div>
+                <hr>
+            </div>
+                {% for id1, cm in enumerate(item["comments"]) %}
+              <div class="media is-comment">
+                <!-- User image -->
+                <div class="media-left">
+                  <div class="image">
+                    <img
+                      src="https://via.placeholder.com/300x300"
+                      data-demo-src="{{ url_for('static', filename='assets/img/users/'+ str(cm['author_id']) +'.png') }}"
+                      data-user-popover="1"
+                      alt=""
+                    />
+                  </div>
+                </div>
+                <!-- Content -->
+                <div class="media-content">
+                  <a href="/profile/{{ cm['author_id'] }}/recent/1">{{ cm["author"] }}</a>
+                  <span class="time">Day {{ cm["day"] }} - {{cm["hour"]}}:00</span>
+                  <p>
+                    {{ cm["post"]|safe }}
+                  </p>
+                  <!-- Actions -->
+                  <div class="card-footer_inner">
+                      <div class="likers-text">
+                  {% if len(cm['emotions']) > 0 %}
+                    <p>Emotions</p>
+                      {% for em in  cm['emotions'] %}
+                      <a class="mdi {{ em[1] }}" title="{{ em[0] }}" href="/emotion/{{ em[2] }}/1"></a>
+                      {% endfor %}
+                  {%  endif  %}
+              </div>
+                  </div>
+                  <div class="controls">
+
+                    <div class="like-count" id="like-count-{{ cm["post_id"] }}">
+                      <i data-feather="thumbs-up" {% if not bool(cm["is_liked"]) %}style="stroke: #69a2e6;"{% endif %}></i>
+                      <span {% if not bool(cm["is_liked"]) %}style="color: #69a2e6;"{% endif %}>{{  cm["likes"]  }}</span>
+                    </div>
+                      <div class="dislike-count" id="dislike-count-{{ cm["post_id"] }}">
+                      <i data-feather="thumbs-down" {% if not bool(cm["is_disliked"]) %}style="stroke: #69a2e6;"{% endif %} ></i>
+                      <span {% if not bool(cm["is_disliked"]) %}style="color: #69a2e6;"{% endif %}>{{  cm["dislikes"]  }}</span>
+                    </div>
+                   <!-- <div class="reply" style="text-align: right">
+                      <a href="#">Reply</a>
+                    </div> -->
+                    <!-- <div class="edit">
+                      <a href="#">Edit</a>
+                    </div> -->
+                  </div>
+                <div class="reply" style="text-align: right">
+                      <a id='{{ cm["post_id"] }}' onClick="editLink(this.id)">Reply</a>
+                </div>
+                 <p id="message-{{ cm["post_id"] }}"></p>
+                <form class="comment_form" id="comment_form-{{ cm["post_id"] }}">
+                <textarea rows="3"  class="reply_comment" id="comment-{{ cm["post_id"] }}">@{{ cm["author"] }} </textarea>
+                    <button
+                  id="add_comment"
+                  type="button"
+                  class="button is-solid accent-button is-fullwidth"
+                  val="{{ cm["post_id"] }}"
+                >
+                  Comment
+                </button>
+                </form>
+                </div>
+                <!-- Right side dropdown -->
+                <div class="media-right">
+                  <!-- /partials/pages/feed/dropdowns/comment-dropdown.html -->
+                  <div class="dropdown is-spaced is-right is-neutral dropdown-trigger">
+                    <div>
+                      <div class="button">
+                        <i data-feather="more-vertical"></i>
+                      </div>
+                    </div>
+                    <div class="dropdown-menu" role="menu">
+                      <div class="dropdown-content">
+                       <!-- <a class="dropdown-item">
+                          <div class="media">
+                            <i data-feather="x"></i>
+                            <div class="media-content">
+                              <h3>Hide</h3>
+                              <small>Hide this comment.</small>
+                            </div>
+                          </div>
+                        </a>
+                        <div class="dropdown-divider"></div> -->
+                        <a href="#" class="dropdown-item">
+                          <div class="media">
+                            <i data-feather="flag"></i>
+                            <div class="media-content">
+                              <h3>Report</h3>
+                              <small>Report this comment.</small>
+                            </div>
+                          </div>
+                        </a>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+              </div>
+
+                    {% endfor %}
+
+
+              <!-- /Comment -->
+
+            </div>
+
+          </div>
+
+          <!-- /Post #1 Comments -->
+        </div>
+{% endfor %}
