@@ -3,6 +3,7 @@ from . import db
 
 
 class User_mgmt(UserMixin, db.Model):
+    __bind_key__ = "db_exp"
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(15), nullable=False, unique=True)
     email = db.Column(db.String(50), nullable=False, unique=True)
@@ -33,6 +34,7 @@ class User_mgmt(UserMixin, db.Model):
 
 
 class Post(db.Model):
+    __bind_key__ = "db_exp"
     id = db.Column(db.Integer, primary_key=True)
     tweet = db.Column(db.String(500), nullable=False)
     round = db.Column(db.Integer, nullable=False)
@@ -46,29 +48,34 @@ class Post(db.Model):
 
 
 class Hashtags(db.Model):
+    __bind_key__ = "db_exp"
     id = db.Column(db.Integer, primary_key=True)
     hashtag = db.Column(db.String(20), nullable=False)
 
 
 class Emotions(db.Model):
+    __bind_key__ = "db_exp"
     id = db.Column(db.Integer, primary_key=True)
     emotion = db.Column(db.String(20), nullable=False)
     icon = db.Column(db.String(20), nullable=False)
 
 
 class Post_emotions(db.Model):
+    __bind_key__ = "db_exp"
     id = db.Column(db.Integer, primary_key=True)
     post_id = db.Column(db.Integer, db.ForeignKey("post.id"), nullable=False)
     emotion_id = db.Column(db.Integer, db.ForeignKey("emotions.id"), nullable=False)
 
 
 class Post_hashtags(db.Model):
+    __bind_key__ = "db_exp"
     id = db.Column(db.Integer, primary_key=True)
     post_id = db.Column(db.Integer, db.ForeignKey("post.id"), nullable=False)
     hashtag_id = db.Column(db.Integer, db.ForeignKey("hashtags.id"), nullable=False)
 
 
 class Mentions(db.Model):
+    __bind_key__ = "db_exp"
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey("user_mgmt.id"), nullable=False)
     post_id = db.Column(db.Integer, db.ForeignKey("post.id"), nullable=False)
@@ -77,6 +84,7 @@ class Mentions(db.Model):
 
 
 class Reactions(db.Model):
+    __bind_key__ = "db_exp"
     id = db.Column(db.Integer, primary_key=True)
     round = db.Column(db.Integer, nullable=False)
     user_id = db.Column(db.Integer, db.ForeignKey("user_mgmt.id"), nullable=False)
@@ -85,6 +93,7 @@ class Reactions(db.Model):
 
 
 class Follow(db.Model):
+    __bind_key__ = "db_exp"
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey("user_mgmt.id"), nullable=False)
     follower_id = db.Column(db.Integer, db.ForeignKey("user_mgmt.id"), nullable=False)
@@ -93,12 +102,14 @@ class Follow(db.Model):
 
 
 class Rounds(db.Model):
+    __bind_key__ = "db_exp"
     id = db.Column(db.Integer, primary_key=True)
     day = db.Column(db.Integer, nullable=False)
     hour = db.Column(db.Integer, nullable=False)
 
 
 class Recommendations(db.Model):
+    __bind_key__ = "db_exp"
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey("user_mgmt.id"), nullable=False)
     post_ids = db.Column(db.String(500), nullable=False)
@@ -106,6 +117,7 @@ class Recommendations(db.Model):
 
 
 class Articles(db.Model):
+    __bind_key__ = "db_exp"
     id = db.Column(db.Integer, primary_key=True)
     title = db.Column(db.String(200), nullable=False)
     summary = db.Column(db.String(500), nullable=False)
@@ -115,6 +127,7 @@ class Articles(db.Model):
 
 
 class Websites(db.Model):
+    __bind_key__ = "db_exp"
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(50), nullable=False)
     rss = db.Column(db.String(200), nullable=False)
@@ -126,6 +139,7 @@ class Websites(db.Model):
 
 
 class Voting(db.Model):
+    __bind_key__ = "db_exp"
     vid = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey("user_mgmt.id"), nullable=False)
     preference = db.Column(db.String(10), nullable=False)
@@ -135,11 +149,13 @@ class Voting(db.Model):
 
 
 class Interests(db.Model):
+    __bind_key__ = "db_exp"
     iid = db.Column(db.Integer, primary_key=True)
     interest = db.Column(db.String(20), nullable=False)
 
 
 class User_interest(db.Model):
+    __bind_key__ = "db_exp"
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey("user_mgmt.id"), nullable=False)
     interest_id = db.Column(db.Integer, db.ForeignKey("interests.iid"), nullable=False)
@@ -147,12 +163,14 @@ class User_interest(db.Model):
 
 
 class Post_topics(db.Model):
+    __bind_key__ = "db_exp"
     id = db.Column(db.Integer, primary_key=True)
     post_id = db.Column(db.Integer, db.ForeignKey("post.id"), nullable=False)
     topic_id = db.Column(db.Integer, db.ForeignKey("interests.iid"), nullable=False)
 
 
 class Images(db.Model):
+    __bind_key__ = "db_exp"
     id = db.Column(db.Integer, primary_key=True)
     url = db.Column(db.String(200), nullable=True)
     description = db.Column(db.String(400), nullable=True)
@@ -160,6 +178,28 @@ class Images(db.Model):
 
 
 class Article_topics(db.Model):
+    __bind_key__ = "db_exp"
     id = db.Column(db.Integer, primary_key=True)
     article_id = db.Column(db.Integer, db.ForeignKey("articles.id"), nullable=False)
     topic_id = db.Column(db.Integer, db.ForeignKey("interests.iid"), nullable=False)
+
+
+############################################################################################################
+
+class Admin_mgmt(UserMixin, db.Model):
+    #__bind_key__ = "db_admin"
+    id = db.Column(db.Integer, primary_key=True)
+    username = db.Column(db.String(15), nullable=False, unique=True)
+    email = db.Column(db.String(50), nullable=False, unique=True)
+    password = db.Column(db.String(80), nullable=False)
+    last_seen = db.Column(db.String(30), nullable=False)
+
+
+class Experiments(db.Model):
+    #__bind_key__ = "db_admin"
+    idexp = db.Column(db.Integer, primary_key=True)
+    exp_name = db.Column(db.String(50), nullable=False)
+    db_name = db.Column(db.String(50), nullable=False)
+    owner = db.Column(db.String(50), nullable=False)
+    exp_desc = db.Column(db.String(200), nullable=False)
+    status = db.Column(db.Integer, nullable=False)

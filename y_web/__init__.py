@@ -10,8 +10,12 @@ db = SQLAlchemy()
 app = Flask(__name__, static_url_path='/static')
 
 app.config['SECRET_KEY'] = '4323432nldsf'
-app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{BASE_DIR}/v1.db'
+app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{BASE_DIR}/admin.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
+app.config['SQLALCHEMY_BINDS'] = {
+        "db_exp": f'sqlite:///{BASE_DIR}/v1.db'
+}
 
 db.init_app(app)
 
