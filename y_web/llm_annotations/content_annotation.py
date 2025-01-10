@@ -47,7 +47,7 @@ class ContentAnnotator(object):
                 \n\n##START TEXT##\n\n{text}\n\n#END TEXT##""",
         )
 
-        res = self.handler.chat_messages[self.annotator][-1]['content']
+        res = self.handler.chat_messages[self.annotator][-1]["content"]
         emotions = self.__clean_emotion(res)
         return emotions
 
@@ -62,7 +62,7 @@ class ContentAnnotator(object):
                     \n\n##START TEXT##\n\n{text}\n\n#END TEXT##""",
         )
 
-        res = self.handler.chat_messages[self.annotator][-1]['content']
+        res = self.handler.chat_messages[self.annotator][-1]["content"]
 
         topics = re.findall(r"[#T]: \w+ \w+", res)
         topics = [x.split(": ")[1] for x in topics if "Topic" not in x]

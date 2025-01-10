@@ -1,15 +1,28 @@
 from flask import Blueprint
 from flask_login import login_required, current_user
 from . import db
-from .models import Follow, Rounds, Post, Hashtags, Post_hashtags, Emotions, Post_emotions, Mentions, User_mgmt, \
-    Interests, User_interest, Post_topics, Reactions
+from .models import (
+    Follow,
+    Rounds,
+    Post,
+    Hashtags,
+    Post_hashtags,
+    Emotions,
+    Post_emotions,
+    Mentions,
+    User_mgmt,
+    Interests,
+    User_interest,
+    Post_topics,
+    Reactions,
+)
 from flask import request
 from .llm_annotations import ContentAnnotator
 
-user = Blueprint('user_actions', __name__)
+user = Blueprint("user_actions", __name__)
 
 
-@user.route('/follow/<int:user_id>')
+@user.route("/follow/<int:user_id>")
 @login_required
 def follow(user_id):
 
@@ -17,17 +30,31 @@ def follow(user_id):
     current_round = Rounds.query.order_by(Rounds.id.desc()).first()
 
     # check
-    followed = Follow.query.filter_by(follower_id=user_id, user_id=current_user.id).order_by(Follow.id.desc()).first()
+    followed = (
+        Follow.query.filter_by(follower_id=user_id, user_id=current_user.id)
+        .order_by(Follow.id.desc())
+        .first()
+    )
 
     if followed:
         if followed.action == "follow":
-            new_follow = Follow(follower_id=user_id, user_id=current_user.id, action="unfollow", round=current_round.id)
+            new_follow = Follow(
+                follower_id=user_id,
+                user_id=current_user.id,
+                action="unfollow",
+                round=current_round.id,
+            )
             db.session.add(new_follow)
             db.session.commit()
             return {"message": "User unfollowed successfully", "status": 200}
 
     # add the user to the Follow table
-    new_follow = Follow(follower_id=user_id,  user_id=current_user.id, action="follow", round=current_round.id)
+    new_follow = Follow(
+        follower_id=user_id,
+        user_id=current_user.id,
+        action="follow",
+        round=current_round.id,
+    )
     db.session.add(new_follow)
     db.session.commit()
 
@@ -37,12 +64,14 @@ def follow(user_id):
 @user.route("/react_to_content")
 @login_required
 def react():
-    post_id = request.args.get('post_id')
-    action = request.args.get('action')
+    post_id = request.args.get("post_id")
+    action = request.args.get("action")
 
     current_round = Rounds.query.order_by(Rounds.id.desc()).first()
 
-    record = Reactions.query.filter_by(post_id=post_id, user_id=current_user.id, round=current_round.id).first()
+    record = Reactions.query.filter_by(
+        post_id=post_id, user_id=current_user.id, round=current_round.id
+    ).first()
 
     if record:
         if record.type == action:
@@ -58,22 +87,21 @@ def react():
             post_id=post_id,
             user_id=current_user.id,
             type=action,
-            round=current_round.id
+            round=current_round.id,
         )
 
         db.session.add(reaction)
         db.session.commit()
 
-
     return {"message": "Reaction added successfully", "status": 200}
 
 
-@user.route('/publish')
+@user.route("/publish")
 @login_required
 def publish_post():
-    text = request.args.get('post')
-    annotation = request.args.get('annotation')
-    url = request.args.get('url')
+    text = request.args.get("post")
+    annotation = request.args.get("annotation")
+    url = request.args.get("url")
 
     # get the last round id from Rounds
     current_round = Rounds.query.order_by(Rounds.id.desc()).first()
@@ -89,7 +117,7 @@ def publish_post():
     db.session.add(post)
     db.session.commit()
 
-    post.thread_id=post.id
+    post.thread_id = post.id
     db.session.commit()
 
     # @todo: add image support, link support and topic annotation
@@ -109,7 +137,9 @@ def publish_post():
 
         topic_id = res.iid
 
-        ui = User_interest(user_id=current_user.id, interest_id=topic_id, round_id=current_round.id)
+        ui = User_interest(
+            user_id=current_user.id, interest_id=topic_id, round_id=current_round.id
+        )
         db.session.add(ui)
         ti = Post_topics(post_id=post.id, topic_id=topic_id)
         db.session.add(ti)
@@ -161,11 +191,11 @@ def publish_post():
     return {"message": "Published successfully", "status": 200}
 
 
-@user.route('/publish_comment')
+@user.route("/publish_comment")
 @login_required
 def publish_comment():
-    text = request.args.get('post')
-    pid = request.args.get('parent')
+    text = request.args.get("post")
+    pid = request.args.get("parent")
 
     # get the last round id from Rounds
     current_round = Rounds.query.order_by(Rounds.id.desc()).first()
@@ -202,7 +232,9 @@ def publish_comment():
 
     if len(topics_id) > 0:
         for t in topics_id:
-            ui = User_interest(user_id=current_user.id, interest_id=t, round_id=current_round.id)
+            ui = User_interest(
+                user_id=current_user.id, interest_id=t, round_id=current_round.id
+            )
             db.session.add(ui)
             ti = Post_topics(post_id=post.id, topic_id=t)
             db.session.add(ti)
@@ -254,10 +286,10 @@ def publish_comment():
     return {"message": "Published successfully", "status": 200}
 
 
-@user.route('/delete_post')
+@user.route("/delete_post")
 @login_required
 def delete_post():
-    post_id = request.args.get('post_id')
+    post_id = request.args.get("post_id")
 
     post = Post.query.get(int(post_id))
     db.session.delete(post)
@@ -266,10 +298,10 @@ def delete_post():
     return {"message": "Reaction added successfully", "status": 200}
 
 
-@user.route('/cancel_notification')
+@user.route("/cancel_notification")
 @login_required
 def cancel_notification():
-    pid = request.args.get('post_id')
+    pid = request.args.get("post_id")
 
     # check if the comment is to answer a mention
     mention = Mentions.query.filter_by(post_id=pid, user_id=current_user.id).first()

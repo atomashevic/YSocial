@@ -1,0 +1,1 @@
+This directory contains the admin database and a dummy db needed for the first time setup. 

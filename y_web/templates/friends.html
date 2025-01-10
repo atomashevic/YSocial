@@ -1,27 +1,29 @@
 {%  include "header.html" %}
 
 
-    <div class="view-wrapper">
+<div class="view-wrapper">
 
-        <div class="options-nav no-shadow">
-            <div class="container is-fluid">
-                <div class="nav-inner is-friends">
+    <div class="options-nav no-shadow">
+        <div class="container is-fluid">
+            <div class="nav-inner is-friends">
 
-                    <div class="option-tabs is-friends">
-                         <a class="option-tab is-active" href="{{ url_for('main.profile')}}/{{ user_id }}/recent/1" ><span>Profile</span></a>
+                <div class="option-tabs is-friends">
+                    <a class="option-tab is-active" href="{{ url_for('main.profile')}}/{{ user_id }}/recent/1"><span>Profile</span></a>
 
 
-                        <a class="option-tab is-active" data-tab="all-friends">
-                            <span>Followers</span>
-                        </a>
-                        <a class="option-tab" data-tab="starred-friends">
-                            <span>Followee</span>
-                        </a>
-                        <div class="option-naver"></div>
+                    <a class="option-tab is-active" data-tab="all-friends">
+                        <span>Followers</span>
+                    </a>
+                    <a class="option-tab" data-tab="starred-friends">
+                        <span>Followee</span>
+                    </a>
+                    <div class="option-naver"></div>
 
+                </div>
+                <div class="end-group">
+                    <div class="nav-item is-friend-count"> Followers {{ number_followers }} - Followee {{
+                        number_followees }}
                     </div>
-                    <div class="end-group">
-                        <div class="nav-item is-friend-count"> Followers {{ number_followers }} - Followee {{ number_followees }}</div>
                 </div>
             </div>
         </div>
@@ -37,11 +39,13 @@
                 <div class="card-row">
 
                     <!--Friend-->
-                {%  if len(followers) > 0 %}
+                    {% if len(followers) > 0 %}
                     {% for follower in followers %}
                     <div class="card-flex friend-card">
                         <div class="img-container">
-                            <img class="avatar" src="{{ url_for('static', filename='assets/img/demo/unsplash/1.jpg') }}" data-demo-src="{{ url_for('static', filename='assets/img/users/'+ str(follower['id']) +'.png') }}" alt="" />
+                            <img class="avatar" src="{{ url_for('static', filename='assets/img/demo/unsplash/1.jpg') }}"
+                                 data-demo-src="{{ url_for('static', filename='assets/img/users/'+ str(follower['id']) +'.png') }}"
+                                 alt=""/>
                         </div>
                         <div class="friend-info">
                             <h3><a href="/profile/{{ follower['id'] }}/recent/1">{{ follower['username'] }}</a></h3>
@@ -62,7 +66,7 @@
                         </div>
                     </div>
                     {% endfor %}
-                {% endif %}
+                    {% endif %}
                 </div>
             </div>
 
@@ -72,12 +76,14 @@
                 <div class="card-row">
 
                     <!--Friend-->
-                {% if len(followees) > 0 %}
-                     {% for followee in followees %}
+                    {% if len(followees) > 0 %}
+                    {% for followee in followees %}
                     <div class="card-flex friend-card">
 
                         <div class="img-container">
-                            <img class="avatar" src="{{ url_for('static', filename='assets/img/demo/unsplash/1.jpg') }}" data-demo-src="{{ url_for('static', filename='assets/img/users/'+ str(followee['id']) +'.png') }}" alt="" />
+                            <img class="avatar" src="{{ url_for('static', filename='assets/img/demo/unsplash/1.jpg') }}"
+                                 data-demo-src="{{ url_for('static', filename='assets/img/users/'+ str(followee['id']) +'.png') }}"
+                                 alt=""/>
                         </div>
                         <div class="friend-info">
                             <h3><a href="/profile/{{ followee['id'] }}/recent/1">{{ followee['username'] }}</a></h3>
@@ -98,26 +104,26 @@
                         </div>
                     </div>
                     {% endfor %}
-                {% endif %}
+                    {% endif %}
+                </div>
+
+
             </div>
 
-
         </div>
 
-    </div>
-
-         <div class="load-more-wrap narrow-top has-text-centered">
-             {% if page-1>0 %}
+        <div class="load-more-wrap narrow-top has-text-centered">
+            {% if page-1>0 %}
             <a href="#" class="load-more-button"
-             onclick="window.location.href = '/friends/{{ user_id }}/{{ page-1 }}';">Previous Page</a>
+               onclick="window.location.href = '/friends/{{ user_id }}/{{ page-1 }}';">Previous Page</a>
             {% endif %}
-          <a href="#" class="load-more-button"
-             onclick="window.location.href = '/friends/{{ user_id }}/{{ page+1 }}';">Next Page</a>
+            <a href="#" class="load-more-button"
+               onclick="window.location.href = '/friends/{{ user_id }}/{{ page+1 }}';">Next Page</a>
         </div>
     </div>
 
-    </div>
- <!-- Concatenated js plugins and jQuery -->
+</div>
+<!-- Concatenated js plugins and jQuery -->
 
 <script src="{{ url_for('static', filename='assets/js/app.js') }}"></script>
 <script src="https://js.stripe.com/v3/"></script>
@@ -159,7 +165,7 @@
 <!-- stories js -->
 
 <!-- friends js -->
- <script src={{ url_for('static', filename='assets/js/friends.js') }}></script>
+<script src={{ url_for('static', filename='assets/js/friends.js') }}></script>
 
 <!-- questions js -->
 

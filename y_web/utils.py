@@ -1,6 +1,6 @@
 import re
 from html.parser import HTMLParser
-from .models import (User_mgmt, Hashtags)
+from .models import User_mgmt, Hashtags
 from io import StringIO
 
 
@@ -84,4 +84,3 @@ def strip_tags(html):
     s = MLStripper()
     s.feed(html)
     return s.get_data()
-

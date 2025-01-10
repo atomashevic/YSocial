@@ -1,6 +1,20 @@
-from .models import (User_mgmt, Post, Post_hashtags, Hashtags, Mentions,
-                     Emotions, Post_emotions, Reactions, Follow,
-                     Articles, Websites, Rounds, Interests, User_interest, Post_topics)
+from .models import (
+    User_mgmt,
+    Post,
+    Post_hashtags,
+    Hashtags,
+    Mentions,
+    Emotions,
+    Post_emotions,
+    Reactions,
+    Follow,
+    Articles,
+    Websites,
+    Rounds,
+    Interests,
+    User_interest,
+    Post_topics,
+)
 from sqlalchemy.sql.expression import func
 from sqlalchemy import desc
 from .utils import *
@@ -23,28 +37,28 @@ def get_user_recent_posts(user_id, page, per_page=10, mode="rf", current_user=No
     username = User_mgmt.query.filter_by(id=int(user_id)).first().username
     if mode == "recent":
         posts = (
-            Post.query.filter_by(user_id=int(user_id), comment_to=-1)
-            .order_by(desc(Post.id))
+            Post.query.filter_by(user_id=int(user_id), comment_to=-1).order_by(
+                desc(Post.id)
+            )
         ).paginate(page=page, per_page=per_page)
     elif mode == "comments":
         posts = (
-            Post.query.filter(Post.user_id == int(user_id), Post.comment_to != -1)
-            .order_by(desc(Post.id))
+            Post.query.filter(
+                Post.user_id == int(user_id), Post.comment_to != -1
+            ).order_by(desc(Post.id))
         ).paginate(page=page, per_page=per_page)
 
     elif mode == "liked":
         # get posts liked by the user
         posts = (
-            Post.query
-            .join(Reactions, Reactions.post_id == Post.id)
+            Post.query.join(Reactions, Reactions.post_id == Post.id)
             .filter(Reactions.type == "like", Reactions.user_id == int(user_id))
             .order_by(desc(Post.id))
-            ).paginate(page=page, per_page=per_page)
+        ).paginate(page=page, per_page=per_page)
 
     elif mode == "disliked":
         posts = (
-            Post.query
-            .join(Reactions, Reactions.post_id == Post.id)
+            Post.query.join(Reactions, Reactions.post_id == Post.id)
             .filter(Reactions.type == "dislike", Reactions.user_id == int(user_id))
             .order_by(desc(Post.id))
         ).paginate(page=page, per_page=per_page)
@@ -97,14 +111,20 @@ def get_user_recent_posts(user_id, page, per_page=10, mode="rf", current_user=No
                     "round": c.round,
                     "day": Rounds.query.filter_by(id=c.round).first().day,
                     "hour": Rounds.query.filter_by(id=c.round).first().hour,
-                    "likes": len(list(Reactions.query.filter_by(post_id=c.id, type="like"))),
+                    "likes": len(
+                        list(Reactions.query.filter_by(post_id=c.id, type="like"))
+                    ),
                     "dislikes": len(
                         list(Reactions.query.filter_by(post_id=c.id, type="dislike"))
                     ),
-                    "is_liked": Reactions.query.filter_by(post_id=c.id, user_id=current_user,
-                                                          type="like").first() is None,
-                    "is_disliked": Reactions.query.filter_by(post_id=c.id, user_id=current_user,
-                                                             type="dislike").first() is None,
+                    "is_liked": Reactions.query.filter_by(
+                        post_id=c.id, user_id=current_user, type="like"
+                    ).first()
+                    is None,
+                    "is_disliked": Reactions.query.filter_by(
+                        post_id=c.id, user_id=current_user, type="dislike"
+                    ).first()
+                    is None,
                     "emotions": emotions,
                 }
             )
@@ -143,14 +163,22 @@ def get_user_recent_posts(user_id, page, per_page=10, mode="rf", current_user=No
                 "round": post.round,
                 "day": day,
                 "hour": hour,
-                "likes": len(list(Reactions.query.filter_by(post_id=post.id, type="like").all())),
-                "dislikes": len(
-                    list(Reactions.query.filter_by(post_id=post.id, type="dislike").all())
+                "likes": len(
+                    list(Reactions.query.filter_by(post_id=post.id, type="like").all())
                 ),
-                "is_liked": Reactions.query.filter_by(post_id=post.id, user_id=current_user,
-                                                      type="like").first() is None,
-                "is_disliked": Reactions.query.filter_by(post_id=post.id, user_id=current_user,
-                                                         type="dislike").first() is None,
+                "dislikes": len(
+                    list(
+                        Reactions.query.filter_by(post_id=post.id, type="dislike").all()
+                    )
+                ),
+                "is_liked": Reactions.query.filter_by(
+                    post_id=post.id, user_id=current_user, type="like"
+                ).first()
+                is None,
+                "is_disliked": Reactions.query.filter_by(
+                    post_id=post.id, user_id=current_user, type="dislike"
+                ).first()
+                is None,
                 "comments": cms,
                 "t_comments": len(cms),
                 "emotions": emotions,
@@ -247,7 +275,14 @@ def get_top_user_hashtags(user_id, limit=10):
         .limit(limit)
     ).all()
 
-    ht = [{"hashtag": h[1], "count": h[2], "id": Hashtags.query.filter_by(hashtag=h[1]).first().id} for h in ht]
+    ht = [
+        {
+            "hashtag": h[1],
+            "count": h[2],
+            "id": Hashtags.query.filter_by(hashtag=h[1]).first().id,
+        }
+        for h in ht
+    ]
 
     return ht
 
@@ -265,19 +300,33 @@ def get_user_friends(user_id, limit=12, page=1):
         page = 1
 
     # get number
-    number_followees = len(list(Follow.query.filter_by(user_id=user_id).group_by(Follow.follower_id)
-        .having(func.count(Follow.follower_id) % 2 == 1)))
-    number_followers = len(list(Follow.query.filter_by(follower_id=user_id).group_by(Follow.user_id)
-        .having(func.count(Follow.user_id) % 2 == 1)))
+    number_followees = len(
+        list(
+            Follow.query.filter_by(user_id=user_id)
+            .group_by(Follow.follower_id)
+            .having(func.count(Follow.follower_id) % 2 == 1)
+        )
+    )
+    number_followers = len(
+        list(
+            Follow.query.filter_by(follower_id=user_id)
+            .group_by(Follow.user_id)
+            .having(func.count(Follow.user_id) % 2 == 1)
+        )
+    )
     followee_list = []
     followers_list = []
 
-    if number_followers - page*limit < -limit and number_followees - page*limit < -limit:
-        return get_user_friends(user_id, limit=12, page=page-1)
+    if (
+        number_followers - page * limit < -limit
+        and number_followees - page * limit < -limit
+    ):
+        return get_user_friends(user_id, limit=12, page=page - 1)
 
-    if page*limit - number_followees < limit:
+    if page * limit - number_followees < limit:
         followee = (
-            Follow.query.filter_by(user_id=user_id).group_by(Follow.follower_id)
+            Follow.query.filter_by(user_id=user_id)
+            .group_by(Follow.follower_id)
             .having(func.count(Follow.follower_id) % 2 == 1)
             .join(User_mgmt, Follow.follower_id == User_mgmt.id)
             .add_columns(User_mgmt.username, User_mgmt.id)
@@ -285,12 +334,27 @@ def get_user_friends(user_id, limit=12, page=1):
         )
 
         for f in followee.items:
-            followee_list.append({"id": f.id, "username": f.username, "number_reactions": len(list(Reactions.query.filter_by(user_id=f.id))),
-                                  "number_followers": len(list(Follow.query.filter_by(user_id=f.id, action="follow"))), "number_followees": len(list(Follow.query.filter_by(follower_id=f.id, action="follow")))})
+            followee_list.append(
+                {
+                    "id": f.id,
+                    "username": f.username,
+                    "number_reactions": len(
+                        list(Reactions.query.filter_by(user_id=f.id))
+                    ),
+                    "number_followers": len(
+                        list(Follow.query.filter_by(user_id=f.id, action="follow"))
+                    ),
+                    "number_followees": len(
+                        list(Follow.query.filter_by(follower_id=f.id, action="follow"))
+                    ),
+                }
+            )
 
-    if number_followers - page*limit < limit:
+    if number_followers - page * limit < limit:
         followers = (
-            Follow.query.filter_by(follower_id=user_id).filter_by(follower_id=user_id).group_by(Follow.user_id)
+            Follow.query.filter_by(follower_id=user_id)
+            .filter_by(follower_id=user_id)
+            .group_by(Follow.user_id)
             .having(func.count(Follow.user_id) % 2 == 1)
             .join(User_mgmt, Follow.user_id == User_mgmt.id)
             .add_columns(User_mgmt.username, User_mgmt.id)
@@ -298,8 +362,21 @@ def get_user_friends(user_id, limit=12, page=1):
         )
 
         for f in followers.items:
-            followers_list.append({"id": f.id, "username": f.username, "number_reactions": len(list(Reactions.query.filter_by(user_id=f.id))),
-                                   "number_followers": len(list(Follow.query.filter_by(user_id=f.id, action="follow"))), "number_followees": len(list(Follow.query.filter_by(follower_id=f.id, action="follow")))})
+            followers_list.append(
+                {
+                    "id": f.id,
+                    "username": f.username,
+                    "number_reactions": len(
+                        list(Reactions.query.filter_by(user_id=f.id))
+                    ),
+                    "number_followers": len(
+                        list(Follow.query.filter_by(user_id=f.id, action="follow"))
+                    ),
+                    "number_followees": len(
+                        list(Follow.query.filter_by(follower_id=f.id, action="follow"))
+                    ),
+                }
+            )
 
     return followers_list, followee_list, number_followers, number_followees
 
@@ -363,7 +440,14 @@ def get_trending_hashtags(limit=10, window=24):
         .limit(limit)
     ).all()
 
-    ht = [{"hashtag": h[1], "count": h[2], "id": Hashtags.query.filter_by(hashtag=h[1]).first().id} for h in ht]
+    ht = [
+        {
+            "hashtag": h[1],
+            "count": h[2],
+            "id": Hashtags.query.filter_by(hashtag=h[1]).first().id,
+        }
+        for h in ht
+    ]
 
     return ht
 
@@ -388,9 +472,16 @@ def get_trending_topics(limit=10, window=24):
         .limit(limit)
     ).all()
 
-    tp = [{"topic": t[1], "count": t[2], "id": Interests.query.filter_by(interest=t[1]).first().iid} for t in tp]
+    tp = [
+        {
+            "topic": t[1],
+            "count": t[2],
+            "id": Interests.query.filter_by(interest=t[1]).first().iid,
+        }
+        for t in tp
+    ]
 
-    #ht = [{"hashtag": h[1], "count": h[2], "id": Hashtags.query.filter_by(hashtag=h[1]).first().id} for h in ht]
+    # ht = [{"hashtag": h[1], "count": h[2], "id": Hashtags.query.filter_by(hashtag=h[1]).first().id} for h in ht]
     return tp
 
 
@@ -443,14 +534,20 @@ def get_posts_associated_to_hashtags(hashtag_id, page, per_page=10, current_user
                     "round": c.round,
                     "day": Rounds.query.filter_by(id=c.round).first().day,
                     "hour": Rounds.query.filter_by(id=c.round).first().hour,
-                    "likes": len(list(Reactions.query.filter_by(post_id=c.id, type="like"))),
+                    "likes": len(
+                        list(Reactions.query.filter_by(post_id=c.id, type="like"))
+                    ),
                     "dislikes": len(
                         list(Reactions.query.filter_by(post_id=c.id, type="dislike"))
                     ),
-                    "is_liked": Reactions.query.filter_by(post_id=c.id, user_id=current_user,
-                                                          type="like").first() is None,
-                    "is_disliked": Reactions.query.filter_by(post_id=c.id, user_id=current_user,
-                                                             type="dislike").first() is None,
+                    "is_liked": Reactions.query.filter_by(
+                        post_id=c.id, user_id=current_user, type="like"
+                    ).first()
+                    is None,
+                    "is_disliked": Reactions.query.filter_by(
+                        post_id=c.id, user_id=current_user, type="dislike"
+                    ).first()
+                    is None,
                     "emotions": emotions,
                 }
             )
@@ -489,14 +586,22 @@ def get_posts_associated_to_hashtags(hashtag_id, page, per_page=10, current_user
                 "round": post.round,
                 "day": day,
                 "hour": hour,
-                "likes": len(list(Reactions.query.filter_by(post_id=post.id, type="like").all())),
-                "dislikes": len(
-                    list(Reactions.query.filter_by(post_id=post.id, type="dislike").all())
+                "likes": len(
+                    list(Reactions.query.filter_by(post_id=post.id, type="like").all())
                 ),
-                "is_liked": Reactions.query.filter_by(post_id=post.id, user_id=current_user,
-                                                      type="like").first() is None,
-                "is_disliked": Reactions.query.filter_by(post_id=post.id, user_id=current_user,
-                                                         type="dislike").first() is None,
+                "dislikes": len(
+                    list(
+                        Reactions.query.filter_by(post_id=post.id, type="dislike").all()
+                    )
+                ),
+                "is_liked": Reactions.query.filter_by(
+                    post_id=post.id, user_id=current_user, type="like"
+                ).first()
+                is None,
+                "is_disliked": Reactions.query.filter_by(
+                    post_id=post.id, user_id=current_user, type="dislike"
+                ).first()
+                is None,
                 "comments": cms,
                 "t_comments": len(cms),
                 "emotions": emotions,
@@ -555,14 +660,20 @@ def get_posts_associated_to_interest(interest_id, page, per_page=10, current_use
                     "round": c.round,
                     "day": Rounds.query.filter_by(id=c.round).first().day,
                     "hour": Rounds.query.filter_by(id=c.round).first().hour,
-                    "likes": len(list(Reactions.query.filter_by(post_id=c.id, type="like"))),
+                    "likes": len(
+                        list(Reactions.query.filter_by(post_id=c.id, type="like"))
+                    ),
                     "dislikes": len(
                         list(Reactions.query.filter_by(post_id=c.id, type="dislike"))
                     ),
-                    "is_liked": Reactions.query.filter_by(post_id=c.id, user_id=current_user,
-                                                          type="like").first() is None,
-                    "is_disliked": Reactions.query.filter_by(post_id=c.id, user_id=current_user,
-                                                             type="dislike").first() is None,
+                    "is_liked": Reactions.query.filter_by(
+                        post_id=c.id, user_id=current_user, type="like"
+                    ).first()
+                    is None,
+                    "is_disliked": Reactions.query.filter_by(
+                        post_id=c.id, user_id=current_user, type="dislike"
+                    ).first()
+                    is None,
                     "emotions": emotions,
                 }
             )
@@ -599,14 +710,22 @@ def get_posts_associated_to_interest(interest_id, page, per_page=10, current_use
                 "round": post.round,
                 "day": day,
                 "hour": hour,
-                "likes": len(list(Reactions.query.filter_by(post_id=post.id, type="like").all())),
-                "dislikes": len(
-                    list(Reactions.query.filter_by(post_id=post.id, type="dislike").all())
+                "likes": len(
+                    list(Reactions.query.filter_by(post_id=post.id, type="like").all())
                 ),
-                "is_liked": Reactions.query.filter_by(post_id=post.id, user_id=current_user,
-                                                      type="like").first() is None,
-                "is_disliked": Reactions.query.filter_by(post_id=post.id, user_id=current_user,
-                                                         type="dislike").first() is None,
+                "dislikes": len(
+                    list(
+                        Reactions.query.filter_by(post_id=post.id, type="dislike").all()
+                    )
+                ),
+                "is_liked": Reactions.query.filter_by(
+                    post_id=post.id, user_id=current_user, type="like"
+                ).first()
+                is None,
+                "is_disliked": Reactions.query.filter_by(
+                    post_id=post.id, user_id=current_user, type="dislike"
+                ).first()
+                is None,
                 "comments": cms,
                 "t_comments": len(cms),
                 "emotions": emotions,
@@ -631,11 +750,12 @@ def get_posts_associated_to_emotion(emotion_id, page, per_page=10, current_user=
         page = 1
 
     # get posts associated to the emotion
-    posts = (Post.query.join(Post_emotions, Post.id == Post_emotions.post_id)
-             .filter(Post_emotions.emotion_id == emotion_id)
-             .order_by(desc(Post.id))
-             .paginate(page=page, per_page=per_page)
-            )
+    posts = (
+        Post.query.join(Post_emotions, Post.id == Post_emotions.post_id)
+        .filter(Post_emotions.emotion_id == emotion_id)
+        .order_by(desc(Post.id))
+        .paginate(page=page, per_page=per_page)
+    )
 
     res = []
     for post in posts.items:
@@ -665,14 +785,20 @@ def get_posts_associated_to_emotion(emotion_id, page, per_page=10, current_user=
                     "round": c.round,
                     "day": Rounds.query.filter_by(id=c.round).first().day,
                     "hour": Rounds.query.filter_by(id=c.round).first().hour,
-                    "likes": len(list(Reactions.query.filter_by(post_id=c.id, type="like"))),
+                    "likes": len(
+                        list(Reactions.query.filter_by(post_id=c.id, type="like"))
+                    ),
                     "dislikes": len(
                         list(Reactions.query.filter_by(post_id=c.id, type="dislike"))
                     ),
-                    "is_liked": Reactions.query.filter_by(post_id=c.id, user_id=current_user,
-                                                          type="like").first() is None,
-                    "is_disliked": Reactions.query.filter_by(post_id=c.id, user_id=current_user,
-                                                             type="dislike").first() is None,
+                    "is_liked": Reactions.query.filter_by(
+                        post_id=c.id, user_id=current_user, type="like"
+                    ).first()
+                    is None,
+                    "is_disliked": Reactions.query.filter_by(
+                        post_id=c.id, user_id=current_user, type="dislike"
+                    ).first()
+                    is None,
                     "emotions": emotions,
                 }
             )
@@ -709,14 +835,22 @@ def get_posts_associated_to_emotion(emotion_id, page, per_page=10, current_user=
                 "round": post.round,
                 "day": day,
                 "hour": hour,
-                "likes": len(list(Reactions.query.filter_by(post_id=post.id, type="like").all())),
-                "dislikes": len(
-                    list(Reactions.query.filter_by(post_id=post.id, type="dislike").all())
+                "likes": len(
+                    list(Reactions.query.filter_by(post_id=post.id, type="like").all())
                 ),
-                "is_liked": Reactions.query.filter_by(post_id=post.id, user_id=current_user,
-                                                      type="like").first() is None,
-                "is_disliked": Reactions.query.filter_by(post_id=post.id, user_id=current_user,
-                                                         type="dislike").first() is None,
+                "dislikes": len(
+                    list(
+                        Reactions.query.filter_by(post_id=post.id, type="dislike").all()
+                    )
+                ),
+                "is_liked": Reactions.query.filter_by(
+                    post_id=post.id, user_id=current_user, type="like"
+                ).first()
+                is None,
+                "is_disliked": Reactions.query.filter_by(
+                    post_id=post.id, user_id=current_user, type="dislike"
+                ).first()
+                is None,
                 "comments": cms,
                 "t_comments": len(cms),
                 "emotions": emotions,
@@ -744,14 +878,16 @@ def get_user_recent_interests(user_id, limit=5):
         User_interest.query.filter_by(user_id=user_id)
         .join(User_interest, Interests.iid == User_interest.interest_id)
         .add_columns(Interests.interest)
-        .filter(User_interest.round_id >= last_round-36)
+        .filter(User_interest.round_id >= last_round - 36)
         .group_by(Interests.interest)
         .add_columns(func.count(User_interest.interest_id))
         .order_by(desc(func.count(User_interest.interest_id)))
         .limit(limit)
     ).all()
 
-    res = [(interest[1], interest[0].interest_id, interest[2]) for interest in interests]
+    res = [
+        (interest[1], interest[0].interest_id, interest[2]) for interest in interests
+    ]
 
     return res
 
@@ -777,11 +913,12 @@ def get_unanswered_mentions(user_id):
     :return:
     """
 
-    res = (Mentions.query.
-           filter_by(user_id=user_id, answered=0).
-           join(Post, Post.id == Mentions.post_id).
-           join(User_mgmt, User_mgmt.id == Post.user_id)
-            .add_columns(User_mgmt.username, Post.user_id, Post.tweet).
-           all())
+    res = (
+        Mentions.query.filter_by(user_id=user_id, answered=0)
+        .join(Post, Post.id == Mentions.post_id)
+        .join(User_mgmt, User_mgmt.id == Post.user_id)
+        .add_columns(User_mgmt.username, Post.user_id, Post.tweet)
+        .all()
+    )
 
     return res

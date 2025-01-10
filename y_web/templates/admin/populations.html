@@ -8,9 +8,7 @@
 
             <div class="dashboard-body">
                 <div class="columns">
-                    <!--Dashboard column-->
-                    <div class="column is-8">
-                        <!--Dashboard box-->
+                    <div class="column is-12">
                         <div class="dashboard-box">
                             <h3 class="title is-5 is-thin">Available Populations</h3>
 
@@ -40,13 +38,13 @@
                                         columns: [
                                           { id: 'id', 'hidden': true },
                                           { id: 'name', name: 'Name', 'attributes': editableCellAttributes },
-                                          { id: 'description', name: 'Description' },
+                                          { id: 'descr', name: 'Description' },
                                             {id: 'details', name: 'Details', formatter: (cell, row) => {
                                                 return gridjs.html(`<a href="/admin/population/${row.cells[0].data}">Details</a>`);
                                             }},
                                         ],
                                         server: {
-                                          url: '/admin/agents_data',
+                                          url: '/admin/populations_data',
                                           then: results => results.data,
                                           total: results => results.total,
                                         },
@@ -63,7 +61,7 @@
                                           multiColumn: true,
                                           server: {
                                             url: (prev, columns) => {
-                                              const columnIds = ['id', 'name', 'description'];
+                                              const columnIds = ['id', 'name', 'descr'];
                                               const sort = columns.map(col => (col.direction === 1 ? '+' : '-') + columnIds[col.index]);
                                               return updateUrl(prev, {sort});
                                             },
@@ -90,7 +88,7 @@
                                       tableDiv.addEventListener('focusout', ev => {
                                         if (ev.target.tagName === 'TD') {
                                           if (savedValue !== ev.target.textContent) {
-                                            fetch('/admin/agents_data', {
+                                            fetch('/admin/populations_data', {
                                               method: 'POST',
                                               headers: {'Content-Type': 'application/json'},
                                               body: JSON.stringify({
@@ -119,6 +117,13 @@
 
                             </div>
                         </div>
+                    </div>
+                </div>
+
+                <div class="columns">
+                    <!--Dashboard column-->
+                    <div class="column is-8">
+                        <!--Dashboard box-->
 
                         <div class="dashboard-box">
                             <h3 class="title is-5 is-thin">Create Empty Population</h3>
@@ -126,7 +131,7 @@
                                 <img src="https://via.placeholder.com/1600x900" data-demo-src="assets/img/demo/unsplash/4.jpg" alt="" />
                             </div>
                             <div class="box-content">
-                                <form action="/admin/add_user" enctype="multipart/form-data" method="POST">
+                                <form action="/admin/create_population_empty" enctype="multipart/form-data" method="POST">
                                 <div class="box-lines">
 
                                     <div class="box-line">
@@ -153,7 +158,7 @@
                                 <img src="https://via.placeholder.com/1600x900" data-demo-src="assets/img/demo/unsplash/4.jpg" alt="" />
                             </div>
                             <div class="box-content">
-                                <form action="/admin/add_user" enctype="multipart/form-data" method="POST">
+                                <form action="/admin/create_population" enctype="multipart/form-data" method="POST">
                                 <div class="box-lines">
 
                                     <div class="box-line">
@@ -181,6 +186,32 @@
                                             </div>
                                     </div>
                                     <div class="box-line">
+                                        <span class="left">Content RecSys</span>
+                                        <div class="select">
+                                            <select name="recsys_type">
+                                                <option value="ContentRecSys">Random</option>
+                                                <option value="ReverseChrono">(RC) Reverse Chrono</option>
+                                                <option value="ReverseChronoPopularity">(RC) Popularity</option>
+                                                <option value="ReverseChronoFollowers">(RC) Followers</option>
+                                                <option value="ReverseChronoFollowersPopularity">(RC)
+                                                    Followers-Popularity
+                                                </option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div class="box-line">
+                                        <span class="left">Friendship RecSys</span>
+                                        <div class="select">
+                                            <select name="frecsys_type">
+                                                <option value="FollowRecSys">Random</option>
+                                                <option value="CommonNeighbors">Common Neighbors</option>
+                                                <option value="Jaccard">Jaccard</option>
+                                                <option value="AdamicAdar">Adamic Adar</option>
+                                                <option value="PreferentialAttachment">Preferential Attachment</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div class="box-line">
                                         <span class="left">Age Range</span>
                                         <div class="slider-timeline">
                                         <input name="age_min" type="range" value="18" min="1" max="100" oninput="this.nextElementSibling.value = this.value">
@@ -202,6 +233,10 @@
                                     <div class="box-line">
                                         <span class="left">Nationalities</span>
                                         <span class="right" style="width: 70%;"><input type="text" name="nationalities" class="input" value="American, Italian"></span>
+                                    </div>
+                                     <div class="box-line">
+                                        <span class="left">Languages</span>
+                                        <span class="right" style="width: 70%;"><input type="text" name="languages" class="input" value="English, Italian"></span>
                                     </div>
                                     <div class="box-line">
                                         <span class="left">Interests</span>

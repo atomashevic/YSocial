@@ -3,7 +3,8 @@ from flask_login import login_required, current_user
 from .data_access import *
 from .models import Admin_users
 
-main = Blueprint('main', __name__)
+main = Blueprint("main", __name__)
+
 
 def is_admin(username):
 
@@ -12,29 +13,33 @@ def is_admin(username):
         return False
     return True
 
-@main.route('/')
+
+@main.route("/")
 def index():
     if current_user.is_authenticated:
         return redirect(f"/feed/{current_user.id}/feed/rf/1")
-    return render_template('login.html')
+    return render_template("login.html")
 
 
-@main.get('/profile')
+@main.get("/profile")
 @login_required
 def profile():
     user_id = current_user.id
     return redirect(f"/profile/{user_id}/rf/1")
 
 
-@main.get('/profile/<int:user_id>/<string:mode>/<int:page>')
+@main.get("/profile/<int:user_id>/<string:mode>/<int:page>")
 @login_required
 def profile_logged(user_id, page=1, mode="recent"):
     user_id = int(user_id)
     user = User_mgmt.query.filter_by(id=user_id).first()
 
     # check if the logged user is following the user
-    is_following = (Follow.query.filter_by(follower_id=user_id, user_id=current_user.id).
-                    group_by(Follow.follower_id).having(func.count(Follow.user_id) % 2 == 1)).all()
+    is_following = (
+        Follow.query.filter_by(follower_id=user_id, user_id=current_user.id)
+        .group_by(Follow.follower_id)
+        .having(func.count(Follow.user_id) % 2 == 1)
+    ).all()
 
     if len(is_following) == 0:
         is_following = False
@@ -103,12 +108,22 @@ def profile_logged(user_id, page=1, mode="recent"):
     most_used_emotions = [(h[0].emotion_id, h[1], h[2]) for h in emotions]
 
     # get user total number of followers
-    total_followee = len(list(Follow.query.filter_by(user_id=user_id).group_by(Follow.follower_id)
-             .having(func.count(Follow.follower_id) % 2 == 1)))
+    total_followee = len(
+        list(
+            Follow.query.filter_by(user_id=user_id)
+            .group_by(Follow.follower_id)
+            .having(func.count(Follow.follower_id) % 2 == 1)
+        )
+    )
 
     # get user total followee
-    total_followers = len(list(Follow.query.filter_by(follower_id=user_id).group_by(Follow.user_id)
-        .having(func.count(Follow.user_id) % 2 == 1)))
+    total_followers = len(
+        list(
+            Follow.query.filter_by(follower_id=user_id)
+            .group_by(Follow.user_id)
+            .having(func.count(Follow.user_id) % 2 == 1)
+        )
+    )
 
     res = {
         "user_data": user,
@@ -130,13 +145,30 @@ def profile_logged(user_id, page=1, mode="recent"):
 
     mentions = get_unanswered_mentions(current_user.id)
 
-    return render_template("profile.html", user=res, enumerate=enumerate, username=user.username,
-                           items=rp, len=len, mutual=mutual_friends, page=page, mode=mode, user_id=int(user_id),
-                           logged_username=current_user.username, hashtags=hashtags, str=str, logged_id=current_user.id,
-                           is_following=is_following, interests=interests, bool=bool, mentions=mentions, is_admin=is_admin(current_user.username))
+    return render_template(
+        "profile.html",
+        user=res,
+        enumerate=enumerate,
+        username=user.username,
+        items=rp,
+        len=len,
+        mutual=mutual_friends,
+        page=page,
+        mode=mode,
+        user_id=int(user_id),
+        logged_username=current_user.username,
+        hashtags=hashtags,
+        str=str,
+        logged_id=current_user.id,
+        is_following=is_following,
+        interests=interests,
+        bool=bool,
+        mentions=mentions,
+        is_admin=is_admin(current_user.username),
+    )
 
 
-@main.get('/feed')
+@main.get("/feed")
 @login_required
 def feeed_logged():
     user_id = current_user.id
@@ -190,7 +222,11 @@ def feed(user_id="all", timeline="timeline", mode="rf", page=1):
             username = User_mgmt.query.filter_by(id=int(user_id)).first().username
 
             # only get the posts of the followees that were not unfollowed
-            followers = list(Follow.query.filter_by(user_id=int(user_id)).group_by(Follow.follower_id).having(func.count(Follow.follower_id) % 2 == 1))
+            followers = list(
+                Follow.query.filter_by(user_id=int(user_id))
+                .group_by(Follow.follower_id)
+                .having(func.count(Follow.follower_id) % 2 == 1)
+            )
             users = [f.follower_id for f in followers]
             users.append(user_id)
 
@@ -257,14 +293,20 @@ def feed(user_id="all", timeline="timeline", mode="rf", page=1):
                     "round": c.round,
                     "day": Rounds.query.filter_by(id=c.round).first().day,
                     "hour": Rounds.query.filter_by(id=c.round).first().hour,
-                    "likes": len(list(Reactions.query.filter_by(post_id=c.id, type="like"))),
+                    "likes": len(
+                        list(Reactions.query.filter_by(post_id=c.id, type="like"))
+                    ),
                     "dislikes": len(
                         list(Reactions.query.filter_by(post_id=c.id, type="dislike"))
                     ),
-                    "is_liked": Reactions.query.filter_by(post_id=c.id, user_id=current_user.id,
-                                                          type="like").first() is None,
-                    "is_disliked": Reactions.query.filter_by(post_id=c.id, user_id=current_user.id,
-                                                             type="dislike").first() is None,
+                    "is_liked": Reactions.query.filter_by(
+                        post_id=c.id, user_id=current_user.id, type="like"
+                    ).first()
+                    is None,
+                    "is_disliked": Reactions.query.filter_by(
+                        post_id=c.id, user_id=current_user.id, type="dislike"
+                    ).first()
+                    is None,
                     "emotions": emotions,
                 }
             )
@@ -302,13 +344,20 @@ def feed(user_id="all", timeline="timeline", mode="rf", page=1):
                 "round": post.round,
                 "day": day,
                 "hour": hour,
-                "likes": len(list(Reactions.query.filter_by(post_id=post.id, type="like"))),
+                "likes": len(
+                    list(Reactions.query.filter_by(post_id=post.id, type="like"))
+                ),
                 "dislikes": len(
                     list(Reactions.query.filter_by(post_id=post.id, type="dislike"))
                 ),
-                "is_liked": Reactions.query.filter_by(post_id=post.id, user_id=current_user.id, type="like").first() is None,
-                "is_disliked": Reactions.query.filter_by(post_id=post.id, user_id=current_user.id,
-                                                         type="dislike").first() is None,
+                "is_liked": Reactions.query.filter_by(
+                    post_id=post.id, user_id=current_user.id, type="like"
+                ).first()
+                is None,
+                "is_disliked": Reactions.query.filter_by(
+                    post_id=post.id, user_id=current_user.id, type="dislike"
+                ).first()
+                is None,
                 "comments": cms,
                 "t_comments": len(cms),
                 "emotions": emotions,
@@ -333,14 +382,17 @@ def feed(user_id="all", timeline="timeline", mode="rf", page=1):
         trending_ht=trending_ht,
         str=str,
         bool=bool,
-        mentions=mentions, is_admin=is_admin(current_user.username)
+        mentions=mentions,
+        is_admin=is_admin(current_user.username),
     )
 
 
 @main.get("/hashtag_posts/<int:hashtag_id>/<int:page>")
 @login_required
 def get_post_hashtags(hashtag_id, page=1):
-    res = get_posts_associated_to_hashtags(hashtag_id, page, per_page=10, current_user=current_user.id)
+    res = get_posts_associated_to_hashtags(
+        hashtag_id, page, per_page=10, current_user=current_user.id
+    )
 
     # get hashtag name
     hashtag = Hashtags.query.filter_by(id=hashtag_id).first().hashtag
@@ -361,14 +413,17 @@ def get_post_hashtags(hashtag_id, page=1):
         hashtag_id=hashtag_id,
         current_hashtag=hashtag,
         str=str,
-        bool=bool, is_admin=is_admin(current_user.username)
+        bool=bool,
+        is_admin=is_admin(current_user.username),
     )
 
 
 @main.get("/interest/<int:interest_id>/<int:page>")
 @login_required
 def get_post_interest(interest_id, page=1):
-    res = get_posts_associated_to_interest(interest_id, page, per_page=10, current_user=current_user.id)
+    res = get_posts_associated_to_interest(
+        interest_id, page, per_page=10, current_user=current_user.id
+    )
 
     # get topic name
     interest = Interests.query.filter_by(iid=interest_id).first().interest
@@ -389,14 +444,17 @@ def get_post_interest(interest_id, page=1):
         hashtag_id=interest_id,
         current_interest=interest,
         str=str,
-        bool=bool, is_admin=is_admin(current_user.username)
+        bool=bool,
+        is_admin=is_admin(current_user.username),
     )
 
 
 @main.get("/emotion/<int:emotion_id>/<int:page>")
 @login_required
 def get_post_emotion(emotion_id, page=1):
-    res = get_posts_associated_to_emotion(emotion_id, page, per_page=10, current_user=current_user.id)
+    res = get_posts_associated_to_emotion(
+        emotion_id, page, per_page=10, current_user=current_user.id
+    )
 
     # get emotion name
     emotion = Emotions.query.filter_by(id=emotion_id).first()
@@ -418,14 +476,17 @@ def get_post_emotion(emotion_id, page=1):
         hashtag_id=emotion_id,
         current_emotion=emotion,
         str=str,
-        bool=bool, is_admin=is_admin(current_user.username)
+        bool=bool,
+        is_admin=is_admin(current_user.username),
     )
 
 
 @main.get("/friends/<int:user_id>/<int:page>")
 @login_required
 def get_friends(user_id, page=1):
-    followers, followees, number_followers, number_followees = get_user_friends(user_id, limit=12, page=page)
+    followers, followees, number_followers, number_followees = get_user_friends(
+        user_id, limit=12, page=page
+    )
     mentions = get_unanswered_mentions(current_user.id)
 
     return render_template(
@@ -443,7 +504,8 @@ def get_friends(user_id, page=1):
         number_followees=number_followees,
         str=str,
         bool=bool,
-        mentions=mentions, is_admin=is_admin(current_user.username)
+        mentions=mentions,
+        is_admin=is_admin(current_user.username),
     )
 
 
@@ -476,15 +538,21 @@ def get_thread(post_id):
         "hour": hour,
         posts[0].id: None,
         "children": [],
-        "likes": len(list(Reactions.query.filter_by(post_id=posts[0].id, type="like").all())),
+        "likes": len(
+            list(Reactions.query.filter_by(post_id=posts[0].id, type="like").all())
+        ),
         "dislikes": len(
             list(Reactions.query.filter_by(post_id=posts[0].id, type="dislike").all())
         ),
-        "is_liked": Reactions.query.filter_by(post_id=posts[0].id, user_id=current_user.id,
-                                              type="like").first() is None,
-        "is_disliked": Reactions.query.filter_by(post_id=posts[0].id, user_id=current_user.id,
-                                                 type="dislike").first() is None,
-        "emotions": get_elicited_emotions(posts[0].id)
+        "is_liked": Reactions.query.filter_by(
+            post_id=posts[0].id, user_id=current_user.id, type="like"
+        ).first()
+        is None,
+        "is_disliked": Reactions.query.filter_by(
+            post_id=posts[0].id, user_id=current_user.id, type="dislike"
+        ).first()
+        is None,
+        "emotions": get_elicited_emotions(posts[0].id),
     }
 
     reverse_map = {posts[0].id: None}
@@ -510,15 +578,21 @@ def get_thread(post_id):
             "day": day,
             "hour": hour,
             "children": [],
-            "likes": len(list(Reactions.query.filter_by(post_id=post.id, type="like").all())),
+            "likes": len(
+                list(Reactions.query.filter_by(post_id=post.id, type="like").all())
+            ),
             "dislikes": len(
                 list(Reactions.query.filter_by(post_id=post.id, type="dislike").all())
             ),
-            "is_liked": Reactions.query.filter_by(post_id=post.id, user_id=current_user.id,
-                                                  type="like").first() is None,
-            "is_disliked": Reactions.query.filter_by(post_id=post.id, user_id=current_user.id,
-                                                     type="dislike").first() is None,
-            "emotions": get_elicited_emotions(post.id)
+            "is_liked": Reactions.query.filter_by(
+                post_id=post.id, user_id=current_user.id, type="like"
+            ).first()
+            is None,
+            "is_disliked": Reactions.query.filter_by(
+                post_id=post.id, user_id=current_user.id, type="dislike"
+            ).first()
+            is None,
+            "emotions": get_elicited_emotions(post.id),
         }
 
         parent = post.comment_to
@@ -544,21 +618,22 @@ def get_thread(post_id):
         enumerate=enumerate,
         trending_ht=trending_ht,
         len=len,
-        mentions=mentions, is_admin=is_admin(current_user.username)
+        mentions=mentions,
+        is_admin=is_admin(current_user.username),
     )
 
 
 def __expand_tree(post_to_child, post_to_data):
     for pid, clds in post_to_child.items():
         for cl in clds:
-            post_to_data[pid]['children'].append(post_to_data[cl])
+            post_to_data[pid]["children"].append(post_to_data[cl])
 
     return post_to_data
 
 
 def recursive_visit(data):
-    if len(data['children']) == 0:
-        return data['post']
+    if len(data["children"]) == 0:
+        return data["post"]
     else:
-        for c in data['children']:
+        for c in data["children"]:
             return recursive_visit(c)

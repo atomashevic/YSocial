@@ -1,5 +1,6 @@
 from y_web import app
 
+
 def start_app(debug=True, port=8080, host="localhost"):
     """
     Start the app
@@ -13,4 +14,3 @@ def start_app(debug=True, port=8080, host="localhost"):
 
 if __name__ == "__main__":
     start_app()
-

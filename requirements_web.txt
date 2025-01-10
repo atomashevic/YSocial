@@ -1,3 +1,4 @@
+faker
 pyautogen
 numpy
 SQLAlchemy==1.4.37

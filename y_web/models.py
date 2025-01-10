@@ -186,6 +186,7 @@ class Article_topics(db.Model):
 
 ############################################################################################################
 
+
 class Admin_users(UserMixin, db.Model):
     __bind_key__ = "db_admin"
     __tablename__ = "admin_users"
@@ -219,3 +220,76 @@ class Exp_stats(db.Model):
     reactions = db.Column(db.Integer, nullable=False)
     mentions = db.Column(db.Integer, nullable=False)
 
+
+class Population(db.Model):
+    __bind_key__ = "db_admin"
+    __tablename__ = "population"
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(50), nullable=False)
+    descr = db.Column(db.String(200), nullable=False)
+    size = db.Column(db.Integer)
+    llm = db.Column(db.String(50))
+    age_min = db.Column(db.Integer)
+    age_max = db.Column(db.Integer)
+    education = db.Column(db.String(100))
+    leanings = db.Column(db.String(200))
+    nationalities = db.Column(db.String(200))
+    interests = db.Column(db.String(300))
+    toxicity = db.Column(db.String(50))
+    languages = db.Column(db.String(100))
+    crecsys = db.Column(db.String(50))
+    frecsys = db.Column(db.String(50))
+
+
+class Agent(db.Model):
+    __bind_key__ = "db_admin"
+    __tablename__ = "agents"
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(50), nullable=False)
+    ag_type = db.Column(db.String(50), nullable=False)
+    gender = db.Column(db.String(10))
+    leaning = db.Column(db.String(50))
+    age = db.Column(db.Integer)
+    education_level = db.Column(db.String(50))
+    interests = db.Column(db.String(200))
+    oe = db.Column(db.String(50))
+    co = db.Column(db.String(50))
+    ex = db.Column(db.String(50))
+    ag = db.Column(db.String(50))
+    ne = db.Column(db.String(50))
+    language = db.Column(db.String(10))
+    toxicity = db.Column(db.String(50))
+    round_actions = db.Column(db.String(50))
+    nationality = db.Column(db.String(50))
+    crecsys = db.Column(db.String(50))
+    frecsys = db.Column(db.String(50))
+
+
+class Agent_Population(db.Model):
+    __bind_key__ = "db_admin"
+    __tablename__ = "agent_population"
+    id = db.Column(db.Integer, primary_key=True)
+    agent_id = db.Column(db.Integer, db.ForeignKey("agents.id"), nullable=False)
+    population_id = db.Column(
+        db.Integer, db.ForeignKey("population.id"), nullable=False
+    )
+
+
+class Agent_Profile(db.Model):
+    __bind_key__ = "db_admin"
+    __tablename__ = "agent_profile"
+    id = db.Column(db.Integer, primary_key=True)
+    agent_id = db.Column(db.Integer, db.ForeignKey("agents.id"), nullable=False)
+    profile = db.Column(db.String(300))
+
+
+class Page(db.Model):
+    __bind_key__ = "db_admin"
+    __tablename__ = "pages"
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(50), nullable=False)
+    descr = db.Column(db.String(200))
+    page_type = db.Column(db.String(50), nullable=False)
+    feed = db.Column(db.String(200))
+    keywords = db.Column(db.String(200))
+    logo = db.Column(db.String(300))

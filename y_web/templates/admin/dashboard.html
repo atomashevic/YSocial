@@ -1,172 +1,175 @@
 {% include "admin/head.html" %}
 
- <div class="view-wrapper is-dashboard">
-        <!--Dashboard container-->
-        <div id="creator-dashboard" class="dashboard-container">
-            <!--Toolbar-->
+<div class="view-wrapper is-dashboard">
+    <!--Dashboard container-->
+    <div id="creator-dashboard" class="dashboard-container">
+        <!--Toolbar-->
 
-            {% include "admin/dash_head.html" %}
+        {% include "admin/dash_head.html" %}
 
-            <div class="dashboard-body">
-                <div class="columns">
-                    <!--Dashboard column-->
-                    <div class="column is-4">
-                        <!--Dashboard box-->
-                        <div class="dashboard-box">
-                            <h3 class="title is-5 is-thin">Latest simulations</h3>
-                            <div class="box-media">
-                                <img src="https://via.placeholder.com/1600x900" data-demo-src="assets/img/demo/unsplash/4.jpg" alt="" />
-                            </div>
-                            <div class="box-content">
-                                <div class="box-lines">
-                                    <div class="box-line">
-                                        <span class="left">Name</span>
-                                        <span class="right">3 of 6</span>
-                                    </div>
-                                    <div class="box-line">
-                                        <span class="left">Agents</span>
-                                        <span class="right">3 of 6</span>
-                                    </div>
-                                    <div class="box-line">
-                                        <span class="left">Rounds</span>
-                                        <span class="right">2.8k</span>
-                                    </div>
-                                    <div class="box-line">
-                                        <span class="left">Posts/Comments</span>
-                                        <span class="right"><span class="positive">2.3%</span>
-                                        </span>
-                                    </div>
-                                    <div class="box-line">
-                                        <span class="left">Reactions</span>
-                                        <span class="right">2:19</span>
-                                    </div>
-                                     <div class="box-line">
-                                        <span class="left">Mentions</span>
-                                        <span class="right">2:19</span>
-                                    </div>
-                                </div>
-                                <div class="button-wrap">
-                                    <button class="button is-solid primary-button is-fullwidth">
-                                        View Details
-                                    </button>
-                                </div>
-                            </div>
+        <div class="dashboard-body">
+            <div class="columns">
+                <!--Dashboard column-->
+                <div class="column is-4">
+                    <!--Dashboard box-->
+                    <div class="dashboard-box">
+                        <h3 class="title is-5 is-thin">Latest simulations</h3>
+                        <div class="box-media">
+                            <img src="https://via.placeholder.com/1600x900"
+                                 data-demo-src="assets/img/demo/unsplash/4.jpg" alt=""/>
                         </div>
-
-                        <!--Dashboard box-->
-                        <div class="dashboard-box">
-                            <h3 class="title is-5 is-thin">Admin Users</h3>
-
-                            <div class="box-content">
-                                <div class="box-subscribers">
-                                    <!--Subscriber-->
-                                    <div class="box-subscriber">
-                                        <img class="subscriber-avatar" src="https://via.placeholder.com/300x300" data-demo-src="assets/img/avatars/lana.jpeg" data-user-popover="10" alt="" />
-                                        <div class="subscriber-meta">
-                                            <span class="meta-title">Lana Henrikssen</span>
-                                            <span class="meta-content">223 followers</span>
-                                        </div>
-                                    </div>
-
+                        <div class="box-content">
+                            <div class="box-lines">
+                                <div class="box-line">
+                                    <span class="left">Name</span>
+                                    <span class="right">3 of 6</span>
                                 </div>
-
-                                <div class="link-wrap">
-                                    <a class="link">
-                                        <span>View All</span>
-                                        <i data-feather="arrow-right"></i>
-                                    </a>
+                                <div class="box-line">
+                                    <span class="left">Agents</span>
+                                    <span class="right">3 of 6</span>
                                 </div>
+                                <div class="box-line">
+                                    <span class="left">Rounds</span>
+                                    <span class="right">2.8k</span>
+                                </div>
+                                <div class="box-line">
+                                    <span class="left">Posts/Comments</span>
+                                    <span class="right"><span class="positive">2.3%</span>
+                                        </span>
+                                </div>
+                                <div class="box-line">
+                                    <span class="left">Reactions</span>
+                                    <span class="right">2:19</span>
+                                </div>
+                                <div class="box-line">
+                                    <span class="left">Mentions</span>
+                                    <span class="right">2:19</span>
+                                </div>
+                            </div>
+                            <div class="button-wrap">
+                                <button class="button is-solid primary-button is-fullwidth">
+                                    View Details
+                                </button>
                             </div>
                         </div>
                     </div>
 
-                    <!--Dashboard column-->
-                    <div class="column is-4">
-                        <!--Dashboard box-->
-                        <div class="dashboard-box">
-                            <h3 class="title is-5 is-thin">Analytics</h3>
-                            <div class="stat-block">
-                                <span class="stat-title">Available Simulations</span>
-                                <span class="stat-value">839</span>
+                    <!--Dashboard box-->
+                    <div class="dashboard-box">
+                        <h3 class="title is-5 is-thin">Admin Users</h3>
+
+                        <div class="box-content">
+                            <div class="box-subscribers">
+                                <!--Subscriber-->
+                                <div class="box-subscriber">
+                                    <img class="subscriber-avatar" src="https://via.placeholder.com/300x300"
+                                         data-demo-src="assets/img/avatars/lana.jpeg" data-user-popover="10" alt=""/>
+                                    <div class="subscriber-meta">
+                                        <span class="meta-title">Lana Henrikssen</span>
+                                        <span class="meta-content">223 followers</span>
+                                    </div>
+                                </div>
+
                             </div>
 
-                            <div class="box-content">
-                                <div class="box-lines">
-                                    <h4 class="topheading">Longest Simulation</h4>
-                                    <div class="box-line">
-                                        <span class="left">Name</span>
-                                        <span class="right">3 of 6</span>
-                                    </div>
-                                    <div class="box-line">
-                                        <span class="left">Rounds</span>
-                                        <span class="right">2.5k</span>
-                                    </div>
-                                </div>
-                                <div class="box-lines">
-                                    <h4 class="topheading">Most Crowded Simulation</h4>
-                                    <div class="box-line">
-                                        <span class="left">Name</span>
-                                        <span class="right">3 of 6</span>
-                                    </div>
-                                    <div class="box-line">
-                                        <span class="left">Rounds</span>
-                                        <span class="right"><span class="positive">+7.8%</span>
-                                        </span>
-                                    </div>
-                                    <div class="box-line">
-                                        <span class="left">Agents</span>
-                                        <span class="right"><span class="negative">-2.3%</span>
-                                        </span>
-                                    </div>
-                                    <div class="box-line">
-                                        <span class="left">Posts/Comments</span>
-                                        <span class="right"><span>+1.4%</span>
-                                        </span>
-                                    </div>
-                                    <div class="box-line">
-                                        <span class="left">Reactions</span>
-                                        <span class="right"><span>+5.1%</span>
-                                        </span>
-                                    </div>
-                                    <div class="box-line">
-                                        <span class="left">Mentions</span>
-                                        <span class="right"><span>+5.1%</span>
-                                        </span>
-                                    </div>
-                                </div>
-                                <div class="link-wrap">
-                                    <a class="link">
-                                        <span>View More</span>
-                                        <i data-feather="arrow-right"></i>
-                                    </a>
-                                </div>
+                            <div class="link-wrap">
+                                <a class="link">
+                                    <span>View All</span>
+                                    <i data-feather="arrow-right"></i>
+                                </a>
                             </div>
                         </div>
-
                     </div>
+                </div>
 
-                    <!--Dashboard column-->
-                    <div class="column is-4">
-                        <!--Box-->
-                        <div class="dashboard-box is-compact">
-                            <h3 class="title is-5 is-thin">Help</h3>
-                            <div class="help-block">
-                                <img class="light-image" src="assets/img/icons/questions/help.svg" alt="" />
-                                <img class="dark-image" src="assets/img/icons/questions/help-dark.svg" alt="" />
-                                <h4>Discussion Board</h4>
-                                <p>
-                                    Having trouble? Please search Y Social's
-                                    <a class="standard-link" href="https://github.com/orgs/YSocialTwin/discussions">discussion board</a> for a quick answer to
-                                    your problem.
-                                </p>
-                            </div>
+                <!--Dashboard column-->
+                <div class="column is-4">
+                    <!--Dashboard box-->
+                    <div class="dashboard-box">
+                        <h3 class="title is-5 is-thin">Analytics</h3>
+                        <div class="stat-block">
+                            <span class="stat-title">Available Simulations</span>
+                            <span class="stat-value">839</span>
                         </div>
 
+                        <div class="box-content">
+                            <div class="box-lines">
+                                <h4 class="topheading">Longest Simulation</h4>
+                                <div class="box-line">
+                                    <span class="left">Name</span>
+                                    <span class="right">3 of 6</span>
+                                </div>
+                                <div class="box-line">
+                                    <span class="left">Rounds</span>
+                                    <span class="right">2.5k</span>
+                                </div>
+                            </div>
+                            <div class="box-lines">
+                                <h4 class="topheading">Most Crowded Simulation</h4>
+                                <div class="box-line">
+                                    <span class="left">Name</span>
+                                    <span class="right">3 of 6</span>
+                                </div>
+                                <div class="box-line">
+                                    <span class="left">Rounds</span>
+                                    <span class="right"><span class="positive">+7.8%</span>
+                                        </span>
+                                </div>
+                                <div class="box-line">
+                                    <span class="left">Agents</span>
+                                    <span class="right"><span class="negative">-2.3%</span>
+                                        </span>
+                                </div>
+                                <div class="box-line">
+                                    <span class="left">Posts/Comments</span>
+                                    <span class="right"><span>+1.4%</span>
+                                        </span>
+                                </div>
+                                <div class="box-line">
+                                    <span class="left">Reactions</span>
+                                    <span class="right"><span>+5.1%</span>
+                                        </span>
+                                </div>
+                                <div class="box-line">
+                                    <span class="left">Mentions</span>
+                                    <span class="right"><span>+5.1%</span>
+                                        </span>
+                                </div>
+                            </div>
+                            <div class="link-wrap">
+                                <a class="link">
+                                    <span>View More</span>
+                                    <i data-feather="arrow-right"></i>
+                                </a>
+                            </div>
+                        </div>
                     </div>
+
+                </div>
+
+                <!--Dashboard column-->
+                <div class="column is-4">
+                    <!--Box-->
+                    <div class="dashboard-box is-compact">
+                        <h3 class="title is-5 is-thin">Help</h3>
+                        <div class="help-block">
+                            <img class="light-image" src="assets/img/icons/questions/help.svg" alt=""/>
+                            <img class="dark-image" src="assets/img/icons/questions/help-dark.svg" alt=""/>
+                            <h4>Discussion Board</h4>
+                            <p>
+                                Having trouble? Please search Y Social's
+                                <a class="standard-link" href="https://github.com/orgs/YSocialTwin/discussions">discussion
+                                    board</a> for a quick answer to
+                                your problem.
+                            </p>
+                        </div>
+                    </div>
+
                 </div>
             </div>
         </div>
-
     </div>
+
+</div>
 
 {% include "admin/footer.html" %}
