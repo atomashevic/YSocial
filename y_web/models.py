@@ -186,20 +186,36 @@ class Article_topics(db.Model):
 
 ############################################################################################################
 
-class Admin_mgmt(UserMixin, db.Model):
-    #__bind_key__ = "db_admin"
+class Admin_users(UserMixin, db.Model):
+    __bind_key__ = "db_admin"
+    __tablename__ = "admin_users"
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(15), nullable=False, unique=True)
     email = db.Column(db.String(50), nullable=False, unique=True)
     password = db.Column(db.String(80), nullable=False)
     last_seen = db.Column(db.String(30), nullable=False)
+    role = db.Column(db.String(10), nullable=False)
 
 
-class Experiments(db.Model):
-    #__bind_key__ = "db_admin"
+class Exps(db.Model):
+    __bind_key__ = "db_admin"
+    __tablename__ = "exps"
     idexp = db.Column(db.Integer, primary_key=True)
     exp_name = db.Column(db.String(50), nullable=False)
     db_name = db.Column(db.String(50), nullable=False)
     owner = db.Column(db.String(50), nullable=False)
-    exp_desc = db.Column(db.String(200), nullable=False)
+    exp_descr = db.Column(db.String(200), nullable=False)
     status = db.Column(db.Integer, nullable=False)
+
+
+class Exp_stats(db.Model):
+    __bind_key__ = "db_admin"
+    __tablename__ = "exp_stats"
+    id = db.Column(db.Integer, primary_key=True)
+    exp_id = db.Column(db.Integer, db.ForeignKey("exps.idexp"), nullable=False)
+    rounds = db.Column(db.Integer, nullable=False)
+    agents = db.Column(db.Integer, nullable=False)
+    posts = db.Column(db.Integer, nullable=False)
+    reactions = db.Column(db.Integer, nullable=False)
+    mentions = db.Column(db.Integer, nullable=False)
+

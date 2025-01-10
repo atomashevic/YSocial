@@ -1,0 +1,164 @@
+{% include "admin/head.html" %}
+
+ <div class="view-wrapper is-dashboard">
+        <!--Dashboard container-->
+        <div id="creator-dashboard" class="dashboard-container">
+            <!--Toolbar-->
+            {% include "admin/dash_head.html" %}
+
+            <div class="dashboard-body">
+                <div class="columns">
+                    <!--Dashboard column-->
+                    <div class="column is-8">
+                        <!--Dashboard box-->
+
+                        <div class="dashboard-box">
+                            <h3 class="title is-5 is-thin">Upload Experiment</h3>
+                            <div class="box-media">
+                                <img src="https://via.placeholder.com/1600x900" data-demo-src="assets/img/demo/unsplash/4.jpg" alt="" />
+                            </div>
+                            <div class="box-content">
+                                <form action="/admin/upload_database" enctype="multipart/form-data" method="POST">
+                                <div class="box-lines">
+
+                                    <div class="box-line">
+                                        <span class="left">SQlite file path</span>
+                                        <span class="right"><input type="file" id="sqlite" name="sqlite_filename"  class="input_file"></span>
+                                    </div>
+                                    <div class="box-line">
+                                        <span class="left">YServer configuration file</span>
+                                        <span class="right"><input type="file" id="yserver_conf" name="yserver_filename" class="input_file"></span>
+                                    </div>
+                                </div>
+                                <div class="button-wrap">
+                                    <button class="button is-solid primary-button is-fullwidth">
+                                        Load Experiment
+                                    </button>
+                                </div>
+                                </form>
+                            </div>
+                        </div>
+
+                            <div class="dashboard-box">
+                            <h3 class="title is-5 is-thin">New Experiment</h3>
+                            <div class="box-media">
+                                <img src="https://via.placeholder.com/1600x900" data-demo-src="assets/img/demo/unsplash/4.jpg" alt="" />
+                            </div>
+                            <div class="box-content">
+                                <form action="/admin/create_experiment" enctype="multipart/form-data" method="POST">
+                                <div class="box-lines">
+
+                                    <div class="box-line">
+                                        <span class="left">Name</span>
+                                        <span class="right" style="width: 70%;"><input type="text" name="exp_name"  class="input"></span>
+                                    </div>
+                                    <div class="box-line">
+                                        <span class="left">Description</span>
+                                        <span class="right" style="width: 70%;"><input type="textarea" name="exp_descr" class="input"></span>
+                                    </div>
+                                    <div class="box-line">
+                                        <span class="left">Owner</span>
+                                        <span class="right" style="width: 70%;">
+                                            <div class="select">
+                                                <select name="owner">
+                                                    {% for user in users %}
+                                                    <option value="{{ user.id }}">{{ user.username }}</option>
+                                                    {% endfor %}
+                                                </select>
+                                            </div>
+                                        </span>
+                                    </div>
+                                    <div class="box-line">
+                                        <span class="left">Host</span>
+                                        <span class="right" style="width: 70%;"><input type="text" name="host" class="input" value="0.0.0.0"></span>
+                                    </div>
+                                    <div class="box-line">
+                                        <span class="left">Port</span>
+                                        <span class="right" style="width: 70%;"><input type="text" name="port"  class="input" value="5000"></span>
+                                    </div>
+                                </div>
+                                <div class="button-wrap">
+                                    <button class="button is-solid primary-button is-fullwidth">
+                                        Create
+                                    </button>
+                                </div>
+                                </form>
+                            </div>
+                        </div>
+                        <!--Dashboard box-->
+                        <div class="dashboard-box">
+                            <h3 class="title is-5 is-thin">Available Experiments</h3>
+
+                            <div class="box-content">
+
+                                {% for exp in experiments %}
+                                <div class="box-subscribers">
+                                    <!--Subscriber-->
+                                    <div class="box-subscriber">
+                                        <img class="subscriber-avatar" src="https://via.placeholder.com/300x300" data-demo-src="{{ url_for('static', filename='assets/img/icons/emoji/robot.svg') }}" data-user-popover="10" alt="" />
+                                        <div class="subscriber-meta" style="width: 80%;">
+                                            <span class="meta-title">{{ exp.exp_name }}</span>
+                                            <span class="meta-content">Description: {{ exp.exp_descr }}</span>
+                                            <span class="meta-content">Owner: {{ exp.owner }} </span>
+
+                                        </div>
+
+                                        {% if exp.status==0 %}
+                                            <a class="button is-solid primary-button_small green-button" href='/admin/select_experiment/{{ exp.idexp }}'><div class="mdi mdi-play"></div> </a>
+                                           {% endif %}
+                                        {% if exp.status==1 %}
+                                         <a class="button is-solid primary-button_small" href="/admin/join_simulation"><div class="mdi mdi-plus"></div></a>
+                                        {% endif %}
+                                        <a class="button is-solid primary-button_small red-button" href="/admin/delete_simulation/{{ exp.idexp }}"><div class="mdi mdi-delete"></div></a>
+                                    </div>
+                                    <!--Subscriber-->
+                                </div>
+                                {% endfor %}
+
+                                <div class="link-wrap">
+                                    <a class="link">
+                                        <span>View All</span>
+                                        <i data-feather="arrow-right"></i>
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+
+                    <!--Dashboard column-->
+                    <div class="column is-4">
+                        <!--Box-->
+                        <div class="dashboard-box is-compact">
+                            <h3 class="title is-5 is-thin">Guide</h3>
+                            <div class="help-block">
+                                <img class="light-image" src="assets/img/icons/questions/help.svg" alt="" />
+                                <img class="dark-image" src="assets/img/icons/questions/help-dark.svg" alt="" />
+                                <h4>What is an Experiment?</h4>
+                                <p>
+                                    An experiment is the (active or consolidated) instance of a simulation.
+                                    It composes of two elements: an SQlite database and the YServer configuration file.
+                                </p>
+                                <br>
+
+                                <h4>Adding an Experiment</h4>
+                                    <p>
+                                    You can either load an existing experiment or create a new one.
+                                    </p>
+                                <br>
+                                <h4>Joining an Experiment</h4>
+                                <p>
+                                    Only an active experiments can be joined. A single experiment can be active at a time.
+                                </p>
+                            </div>
+                        </div>
+
+
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+{% include "admin/footer.html" %}

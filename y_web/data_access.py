@@ -312,12 +312,17 @@ def get_trending_emotions(limit=10, window=24):
     """
 
     # get current round
-    round = Rounds.query.order_by(desc(Rounds.id)).first().id
+    last_round = Rounds.query.order_by(desc(Rounds.id)).first()
+
+    if last_round is not None:
+        last_round = last_round.id
+    else:
+        last_round = 0
 
     # get the trending emotions
     em = (
         Post.query.join(Post_emotions, Post.id == Post_emotions.post_id)
-        .filter(Post.round >= round - window)
+        .filter(Post.round >= last_round - window)
         .join(Emotions, Post_emotions.emotion_id == Emotions.id)
         .add_columns(Emotions.emotion)
         .group_by(Emotions.emotion)
@@ -340,11 +345,16 @@ def get_trending_hashtags(limit=10, window=24):
     """
 
     # get current round
-    round = Rounds.query.order_by(desc(Rounds.id)).first().id
+
+    last_round = Rounds.query.order_by(desc(Rounds.id)).first()
+    if last_round is not None:
+        last_round = last_round.id
+    else:
+        last_round = 0
 
     ht = (
         Post.query.join(Post_hashtags, Post.id == Post_hashtags.post_id)
-        .filter(Post.round >= round - window)
+        .filter(Post.round >= last_round - window)
         .join(Hashtags, Post_hashtags.hashtag_id == Hashtags.id)
         .add_columns(Hashtags.hashtag)
         .group_by(Hashtags.hashtag)
@@ -360,12 +370,16 @@ def get_trending_hashtags(limit=10, window=24):
 
 def get_trending_topics(limit=10, window=24):
     # get current round
-    round = Rounds.query.order_by(desc(Rounds.id)).first().id
+    last_round = Rounds.query.order_by(desc(Rounds.id)).first()
+    if last_round is not None:
+        last_round = last_round.id
+    else:
+        last_round = 0
 
     # get the trending topics
     tp = (
         Post.query.join(Post_topics, Post.id == Post_topics.post_id)
-        .filter(Post.round >= round - window)
+        .filter(Post.round >= last_round - window)
         .join(Interests, Post_topics.topic_id == Interests.iid)
         .add_columns(Interests.interest)
         .group_by(Interests.interest)
@@ -720,7 +734,11 @@ def get_user_recent_interests(user_id, limit=5):
     :return:
     """
 
-    last_round = Rounds.query.order_by(desc(Rounds.id)).first().id
+    last_round = Rounds.query.order_by(desc(Rounds.id)).first()
+    if last_round is not None:
+        last_round = last_round.id
+    else:
+        last_round = 0
     # get the most recent interests of the user by frequency
     interests = (
         User_interest.query.filter_by(user_id=user_id)

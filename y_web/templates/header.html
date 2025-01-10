@@ -181,18 +181,20 @@
             </div>
           </div>
         </a>
-        <!-- <hr class="account-divider" /> -->
-        <!-- <a href="/options-settings.html" class="account-item">
+        {% if is_admin==True %}
+        <hr class="account-divider" />
+         <a href="/admin/dashboard" class="account-item">
           <div class="media">
             <div class="icon-wrap">
               <i data-feather="settings"></i>
             </div>
             <div class="media-content">
-              <h3>Settings</h3>
-              <small>Access widget settings.</small>
+              <h3>Admin Dashboard</h3>
+              <small>You got the power!</small>
             </div>
           </div>
-        </a> -->
+        </a>
+        {% endif %}
         <!-- <a class="account-item">
           <div class="media">
             <div class="icon-wrap">
@@ -272,13 +274,14 @@
         >
           <span><i data-feather="activity"></i>Feed</span>
         </a>
-        <!--<a
-          href="/navbar-v1-profile-friends.html"
+        {% if is_admin == True %}
+        <a
+          href="/admin/dashboard"
           class="navbar-item is-flex is-mobile-icon"
         >
-          <span><i data-feather="heart"></i>Friend Requests</span>
-          <span class="menu-badge">3</span>
-        </a>-->
+          <span><i data-feather="settings"></i>Admin Dashboard</span>
+        </a>
+        {% endif %}
         <a
           href="{{ url_for('main.profile') }}"
           class="navbar-item is-flex is-mobile-icon"

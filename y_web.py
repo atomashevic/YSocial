@@ -1,6 +1,16 @@
 from y_web import app
 
-if __name__ == "__main__":
+def start_app(debug=True, port=8080, host="localhost"):
+    """
+    Start the app
 
-    app.run(debug=True, port=8080, host="localhost")
+    :param debug: turn on debug mode
+    :param port: the port to run the app on
+    :param host: the host to run the app on
+    """
+    app.run(debug=debug, port=port, host=host)
+
+
+if __name__ == "__main__":
+    start_app()
 

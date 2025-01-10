@@ -15932,7 +15932,14 @@ button.button {
 .button.is-solid.primary-button {
     background: #3d70b2;
     border-color: #3d70b2;
-    color: #fff
+    color: #fff;
+}
+
+.button.is-solid.primary-button_small {
+    background: #3d70b2;
+    border-color: #3d70b2;
+    color: #fff;
+    margin-left: 2px;
 }
 
 .button.is-solid.primary-button.raised:hover {
@@ -41600,8 +41607,9 @@ body.is-dark .mapboxgl-ctrl-geocoder .mapboxgl-ctrl-geocoder--suggestion-address
 
 .settings-wrapper {
     padding: 30px;
-    width: calc(100% - 280px);
-    margin-left: 280px
+    margin-left: 80px;
+        width: calc(100% - 80px);
+        padding-top: 1.5rem;"
 }
 
 .settings-wrapper.is-full {
@@ -41844,8 +41852,12 @@ body.is-dark .mapboxgl-ctrl-geocoder .mapboxgl-ctrl-geocoder--suggestion-address
     }
 
     .settings-wrapper {
-        width: calc(100% - 250px);
-        margin-left: 250px
+        /*width: calc(100% - 250px);
+        margin-left: 250px*/
+        position: relative;
+        margin-left: 80px;
+        width: calc(100% - 80px);
+        padding-top: 1.5rem;"
     }
 }
 
@@ -41913,6 +41925,7 @@ body.is-dark .mapboxgl-ctrl-geocoder .mapboxgl-ctrl-geocoder--suggestion-address
     max-width: 1200px;
     margin: 0 auto;
     padding: 0 1rem
+
 }
 
 @media only screen and (max-width: 767px) {
@@ -47672,4 +47685,45 @@ body.is-dark .elements-wrap .element-block code {
   left: 1em;
   background: #888;
   border: 1px solid black;
+}
+
+.simulation_button {
+    margin: auto;
+}
+
+.input_file[type=file] {
+    background: #fff;
+    border: 0;
+    padding: 1em 2em;
+    cursor: pointer;
+    color: #393a4f;
+    border-radius: 6px;
+    border: 1px solid #e0e0e0;
+    box-shadow: -1px 3px 10px 0 rgba(0,0,0,.06);
+    outline: none !important;
+    margin-right: 12px;
+
+}
+
+.input_file[type=file]::file-selector-button {
+  border: 2px solid #fff;
+  padding: .2em .4em;
+  border-radius: .2em;
+  background-color: #FFFFFF;
+  transition: 1s;
+    visibility: hidden;
+}
+
+
+td.gridjs-td, th.gridjs-th{
+        font-family: "Roboto", sans-serif;
+    font-size: .9rem;
+    color: #393a4f
+}
+
+select {
+  width: 200px;
+  padding: 16px 30px;
+  border: none;
+  border-radius: 20px;
 }

@@ -1,9 +1,16 @@
 from flask import Blueprint, render_template, redirect
 from flask_login import login_required, current_user
 from .data_access import *
+from .models import Admin_users
 
 main = Blueprint('main', __name__)
 
+def is_admin(username):
+
+    user = Admin_users.query.filter_by(username=username).first()
+    if user.role != "admin":
+        return False
+    return True
 
 @main.route('/')
 def index():
@@ -126,7 +133,7 @@ def profile_logged(user_id, page=1, mode="recent"):
     return render_template("profile.html", user=res, enumerate=enumerate, username=user.username,
                            items=rp, len=len, mutual=mutual_friends, page=page, mode=mode, user_id=int(user_id),
                            logged_username=current_user.username, hashtags=hashtags, str=str, logged_id=current_user.id,
-                           is_following=is_following, interests=interests, bool=bool, mentions=mentions)
+                           is_following=is_following, interests=interests, bool=bool, mentions=mentions, is_admin=is_admin(current_user.username))
 
 
 @main.get('/feed')
@@ -326,7 +333,7 @@ def feed(user_id="all", timeline="timeline", mode="rf", page=1):
         trending_ht=trending_ht,
         str=str,
         bool=bool,
-        mentions=mentions
+        mentions=mentions, is_admin=is_admin(current_user.username)
     )
 
 
@@ -354,7 +361,7 @@ def get_post_hashtags(hashtag_id, page=1):
         hashtag_id=hashtag_id,
         current_hashtag=hashtag,
         str=str,
-        bool=bool
+        bool=bool, is_admin=is_admin(current_user.username)
     )
 
 
@@ -382,7 +389,7 @@ def get_post_interest(interest_id, page=1):
         hashtag_id=interest_id,
         current_interest=interest,
         str=str,
-        bool=bool
+        bool=bool, is_admin=is_admin(current_user.username)
     )
 
 
@@ -411,7 +418,7 @@ def get_post_emotion(emotion_id, page=1):
         hashtag_id=emotion_id,
         current_emotion=emotion,
         str=str,
-        bool=bool
+        bool=bool, is_admin=is_admin(current_user.username)
     )
 
 
@@ -436,7 +443,7 @@ def get_friends(user_id, page=1):
         number_followees=number_followees,
         str=str,
         bool=bool,
-        mentions=mentions
+        mentions=mentions, is_admin=is_admin(current_user.username)
     )
 
 
@@ -483,8 +490,6 @@ def get_thread(post_id):
     reverse_map = {posts[0].id: None}
     post_to_child = {posts[0].id: []}
     post_to_data = {posts[0].id: discussion_tree}
-
-    print(posts)
 
     for post in posts[1:]:
 
@@ -539,7 +544,7 @@ def get_thread(post_id):
         enumerate=enumerate,
         trending_ht=trending_ht,
         len=len,
-        mentions=mentions
+        mentions=mentions, is_admin=is_admin(current_user.username)
     )
 
 

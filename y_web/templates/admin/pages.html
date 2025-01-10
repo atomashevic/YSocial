@@ -1,0 +1,207 @@
+{% include "admin/head.html" %}
+
+ <div class="view-wrapper is-dashboard">
+        <!--Dashboard container-->
+        <div id="creator-dashboard" class="dashboard-container">
+            <!--Toolbar-->
+            {% include "admin/dash_head.html" %}
+
+            <div class="dashboard-body">
+                <div class="columns">
+                    <!--Dashboard column-->
+                    <div class="column is-8">
+                        <!--Dashboard box-->
+                        <div class="dashboard-box">
+                            <h3 class="title is-5 is-thin">Available Pages</h3>
+
+                            <div class="box-content">
+
+
+                                <div id="table"></div>
+
+                                <script src="https://unpkg.com/gridjs/dist/gridjs.umd.js"></script>
+                                <script>
+                                      const tableDiv = document.getElementById('table');
+
+                                      const updateUrl = (prev, query) => {
+                                        return prev + (prev.indexOf('?') >= 0 ? '&' : '?') + new URLSearchParams(query).toString();
+                                      };
+
+                                      const editableCellAttributes = (data, row, col) => {
+                                          if (row) {
+                                            return {contentEditable: 'true', 'data-element-id': row.cells[0].data};
+                                          }
+                                          else {
+                                            return {};
+                                          }
+                                      };
+
+                                      new gridjs.Grid({
+                                        columns: [
+                                          { id: 'id', 'hidden': true },
+                                          { id: 'name', name: 'Name', 'attributes': editableCellAttributes },
+                                          { id: 'description', name: 'Description' },
+                                            { id: 'type', name: 'Type' },
+                                            {id: 'details', name: 'Details', formatter: (cell) => {
+                                                return gridjs.html(`<a href="/admin/agent_details/${cell}">Details</a>`);
+                                            }},
+                                        ],
+                                        server: {
+                                          url: '/admin/pages_data',
+                                          then: results => results.data,
+                                          total: results => results.total,
+                                        },
+                                        search: {
+                                          enabled: true,
+                                          server: {
+                                            url: (prev, search) => {
+                                              return updateUrl(prev, {search});
+                                            },
+                                          },
+                                        },
+                                        sort: {
+                                          enabled: true,
+                                          multiColumn: true,
+                                          server: {
+                                            url: (prev, columns) => {
+                                              const columnIds = ['id', 'name', 'type', 'description'];
+                                              const sort = columns.map(col => (col.direction === 1 ? '+' : '-') + columnIds[col.index]);
+                                              return updateUrl(prev, {sort});
+                                            },
+                                          },
+                                        },
+                                        pagination: {
+                                          enabled: true,
+                                          server: {
+                                            url: (prev, page, limit) => {
+                                              return updateUrl(prev, {start: page * limit, length: limit});
+                                            },
+                                          },
+                                        },
+                                      }).render(tableDiv);
+
+                                      let savedValue;
+
+                                      tableDiv.addEventListener('focusin', ev => {
+                                        if (ev.target.tagName === 'TD') {
+                                          savedValue = ev.target.textContent;
+                                        }
+                                      });
+
+                                      tableDiv.addEventListener('focusout', ev => {
+                                        if (ev.target.tagName === 'TD') {
+                                          if (savedValue !== ev.target.textContent) {
+                                            fetch('/admin/pages_data', {
+                                              method: 'POST',
+                                              headers: {'Content-Type': 'application/json'},
+                                              body: JSON.stringify({
+                                                id: ev.target.dataset.elementId,
+                                                [ev.target.dataset.columnId]: ev.target.textContent
+                                              }),
+                                            });
+                                          }
+                                          savedValue = undefined;
+                                        }
+                                      });
+
+                                      tableDiv.addEventListener('keydown', ev => {
+                                        if (ev.target.tagName === 'TD') {
+                                          if (ev.key === 'Escape') {
+                                            ev.target.textContent = savedValue;
+                                            ev.target.blur();
+                                          }
+                                          else if (ev.key === 'Enter') {
+                                            ev.preventDefault();
+                                            ev.target.blur();
+                                          }
+                                        }
+                                      });
+                                </script>
+
+                            </div>
+                        </div>
+
+                        <div class="dashboard-box">
+                            <h3 class="title is-5 is-thin">Create Page</h3>
+                            <div class="box-media">
+                                <img src="https://via.placeholder.com/1600x900" data-demo-src="assets/img/demo/unsplash/4.jpg" alt="" />
+                            </div>
+                            <div class="box-content">
+                                <form action="/admin/add_page" enctype="multipart/form-data" method="POST">
+                                <div class="box-lines">
+
+                                    <div class="box-line">
+                                        <span class="left">Page Name</span>
+                                        <span class="right" style="width: 70%;"><input type="text" name="name" class="input"></span>
+                                    </div>
+                                     <div class="box-line">
+                                        <span class="left">Description</span>
+                                        <span class="right" style="width: 70%;"><input type="text" name="descr" class="input"></span>
+                                    </div>
+                                    <div class="box-line">
+                                        <span class="left">Type</span>
+                                        <div class="select">
+                                                <select name="user_type">
+                                                    <option value="media">Media Page</option>
+                                                    <option value="other">Other</option>
+                                                </select>
+                                            </div>
+                                    </div>
+                                    <div class="box-line">
+                                        <span class="left">RSS Feed</span>
+                                        <span class="right" style="width: 70%;"><input type="text" name="feed" class="input"></span>
+                                    </div>
+                                    <div class="box-line">
+                                        <span class="left">Keywords <small>(comma separated)</small></span>
+                                        <span class="right" style="width: 70%;"><input type="text" name="keywords" class="input"></span>
+                                    </div>
+
+                                </div>
+                                <div class="button-wrap">
+                                    <button class="button is-solid primary-button is-fullwidth">
+                                        Create
+                                    </button>
+                                </div>
+                                </form>
+                            </div>
+                        </div>
+                        <!--Dashboard box-->
+
+                    </div>
+
+
+                    <!--Dashboard column-->
+                    <div class="column is-4">
+                        <!--Box-->
+                        <div class="dashboard-box is-compact">
+                            <h3 class="title is-5 is-thin">Guide</h3>
+                            <div class="help-block">
+                                <img class="light-image" src="assets/img/icons/questions/help.svg" alt="" />
+                                <img class="dark-image" src="assets/img/icons/questions/help-dark.svg" alt="" />
+                                <h4>Which Simulations?</h4>
+                                <p>
+                                    Here you can view all available simulations.
+                                    Remember that you can only join one simulation at a time.
+                                </p>
+                                <br>
+
+                                <h4>Static vs. Dynamic</h4>
+                                    <p>
+                                    Simulations can be either static or dynamic.
+
+                                    <br><br>
+                                     Static simulations are not currently running<br>
+                                     Dynamic simulations are currently running
+                                </p>
+                            </div>
+                        </div>
+
+
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+{% include "admin/footer.html" %}
