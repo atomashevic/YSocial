@@ -17,7 +17,7 @@ if not os.path.exists(f"{BASE_DIR}/db/dashboard.db"):
 
 
 app.config['SECRET_KEY'] = '4323432nldsf'
-app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{BASE_DIR}/db/dashboard.db'#  f'sqlite:///{BASE_DIR}/v1.db'
+app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{BASE_DIR}/db/dashboard.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 app.config['SQLALCHEMY_BINDS'] = {
