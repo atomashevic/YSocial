@@ -152,7 +152,7 @@ def page_data():
 
 @admin.route("/admin/user_data")
 @login_required
-def data():
+def users_data():
     query = Admin_users.query
 
     # search filter
@@ -674,3 +674,46 @@ def pages_data():
         ],
         "total": total,
     }
+
+
+@admin.route("/admin/agent_details/<int:uid>")
+@login_required
+def agent_details(uid):
+    check_privileges(current_user.username)
+    # get agent details
+    agent = Agent.query.filter_by(id=uid).first()
+
+    # get agent populations along with population names and ids
+    agent_populations = (
+        db.session.query(Agent_Population, Population)
+        .join(Population)
+        .filter(Agent_Population.agent_id == uid)
+        .all()
+    )
+
+    # get agent profiles
+    agent_profiles = Agent_Profile.query.filter_by(agent_id=uid).first()
+
+    pops = [(p[1].name, p[1].id) for p in agent_populations]
+
+    # get all populations
+    populations = Population.query.all()
+
+    return render_template("admin/agent_details.html", agent=agent, agent_populations=pops,
+                           profile=agent_profiles, populations=populations)
+
+
+@admin.route("/admin/add_to_population", methods=["POST"])
+@login_required
+def add_to_population():
+    check_privileges(current_user.username)
+
+    agent_id = request.form.get("agent_id")
+    population_id = request.form.get("population_id")
+
+    ap = Agent_Population(agent_id=agent_id, population_id=population_id)
+
+    db.session.add(ap)
+    db.session.commit()
+
+    return agent_details(agent_id)

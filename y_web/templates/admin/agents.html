@@ -42,8 +42,8 @@
                                         {id: 'gender', name: 'Gender', sort: false},
                                         {id: 'nationality', name: 'Nationality', sort: false},
                                         {
-                                            id: 'details', name: 'Details', sort: false, formatter: (cell) => {
-                                                return gridjs.html(`<a href="/admin/agent_details/${cell}">Details</a>`);
+                                            id: 'details', name: 'Details', sort: false, formatter: (cell, row) => {
+                                                return gridjs.html(`<a href="/admin/agent_details/${row.cells[0].data}">Details</a>`);
                                             }
                                         },
                                     ],
@@ -131,10 +131,6 @@
                     <!--Dashboard box-->
                     <div class="dashboard-box">
                         <h3 class="title is-5 is-thin">Create Agent</h3>
-                        <div class="box-media">
-                            <img src="https://via.placeholder.com/1600x900"
-                                 data-demo-src="assets/img/demo/unsplash/4.jpg" alt=""/>
-                        </div>
                         <div class="box-content">
                             <form action="/admin/create_agent" enctype="multipart/form-data" method="POST">
                                 <div class="box-lines">
@@ -387,7 +383,7 @@
                                     <p>Specifying the agent pre-prompt overrides the other configuration variables.</p>
                                     <div class="box-line">
                                         <span class="left">Alternative profile</span>
-                                        <span class="right" style="width: 70%;"><input type="text" id="alt_profile"
+                                        <span class="right" style="width: 70%;"><input type="text" name="alt_profile"
                                                                                        class="input" value=""></span>
                                     </div>
 
@@ -408,8 +404,6 @@
                     <div class="dashboard-box is-compact">
                         <h3 class="title is-5 is-thin">Guide</h3>
                         <div class="help-block">
-                            <img class="light-image" src="assets/img/icons/questions/help.svg" alt=""/>
-                            <img class="dark-image" src="assets/img/icons/questions/help-dark.svg" alt=""/>
                             <h4>Which Simulations?</h4>
                             <p>
                                 Here you can view all available simulations.

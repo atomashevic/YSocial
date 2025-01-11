@@ -1,0 +1,173 @@
+{% include "admin/head.html" %}
+
+<div class="view-wrapper is-dashboard">
+    <!--Dashboard container-->
+    <div id="creator-dashboard" class="dashboard-container">
+        <!--Toolbar-->
+        {% include "admin/dash_head.html" %}
+
+        <div class="dashboard-body">
+
+            <div class="columns">
+                <!--Dashboard column-->
+                <div class="column is-6">
+                    <!--Dashboard box-->
+                    <div class="dashboard-box">
+                        <h3 class="title is-5 is-thin">Agent</h3>
+                        <div class="box-media">
+                            <img src="https://via.placeholder.com/1600x900"
+                                 data-demo-src="assets/img/demo/unsplash/4.jpg" alt=""/>
+                        </div>
+                        <div class="box-content">
+                            <div class="box-lines">
+                                <h4><b>Simulation Models</b></h4>
+                                <div class="box-line">
+                                    <span class="left">LLM</span>
+                                    <span class="right">{{ agent.ag_type }}</span>
+                                </div>
+                                <div class="box-line">
+                                    <span class="left">Content RecSys</span>
+                                    <span class="right">{{ agent.crecsys }}</span>
+                                </div>
+                                <div class="box-line">
+                                    <span class="left">Friendship RecSys</span>
+                                    <span class="right">{{ agent.frecsys }}</span>
+                                </div>
+                                <hr>
+                                <h4><b>Demographic Information</b></h4>
+                                <div class="box-line">
+                                    <span class="left">Agent Name</span>
+                                    <span class="right">{{ agent.name }}</span>
+                                </div>
+                                <div class="box-line">
+                                    <span class="left">Age</span>
+                                    <span class="right">{{ agent.age }}</span>
+                                </div>
+                                <div class="box-line">
+                                    <span class="left">Gender</span>
+                                    <span class="right">{{ agent.gender }}</span>
+                                </div>
+                                <div class="box-line">
+                                    <span class="left">Language Spoken</span>
+                                    <span class="right">{{ agent.language }}</span>
+                                </div>
+                                <div class="box-line">
+                                    <span class="left">Nationality</span>
+                                    <span class="right">{{ agent.nationality }}</span>
+                                </div>
+                                <div class="box-line">
+                                    <span class="left">Education Level</span>
+                                    <span class="right">{{ agent.education_level }}</span>
+                                </div>
+                                <hr>
+                                <h4><b>Thematic Characterization</b></h4>
+                                <div class="box-line">
+                                    <span class="left">Political Leaning</span>
+                                    <span class="right">{{ agent.political_leaning }}</span>
+                                </div>
+                                <div class="box-line">
+                                    <span class="left">Interests</span>
+                                    <span class="right">{{ agent.interests }}</span>
+                                </div>
+
+                                <hr>
+
+                                <h4><b>Big Five Personality profile</b></h4>
+                                <div class="box-line">
+                                    <span class="left">Openness to Experience</span>
+                                    <span class="right">{{ agent.oe }}</span>
+                                </div>
+                                <div class="box-line">
+                                    <span class="left">Conscientiousness</span>
+                                    <span class="right">{{ agent.co }}</span>
+                                </div>
+                                <div class="box-line">
+                                    <span class="left">Extraversion</span>
+                                    <span class="right">{{ agent.ex }}</span>
+                                </div>
+                                <div class="box-line">
+                                    <span class="left">Agreeableness</span>
+                                    <span class="right">{{ agent.ag }}</span>
+                                </div>
+                                <div class="box-line">
+                                    <span class="left">Neuroticism</span>
+                                    <span class="right">{{ agent.ne }}</span>
+                                </div>
+
+                                <hr>
+                                <h4><b>Expected Social Behavior</b></h4>
+                                <div class="box-line">
+                                    <span class="left">Toxicity Level</span>
+                                    <span class="right">{{ agent.toxicity }}</span>
+
+                                </div>
+
+                                {% if profile is not none %}
+                                <hr>
+                                <h4><b>Advanced Role-Playing</b></h4>
+                                <span class="right">{{ profile.profile }}</span>
+                                {% endif %}
+
+                            </div>
+
+                        </div>
+                    </div>
+                </div>
+
+                <!--Dashboard box-->
+
+                <!--Dashboard column-->
+                <div class="column is-6">
+                    <!--Box-->
+                    <div class="dashboard-box">
+                        <h3 class="title is-5 is-thin">Populations</h3>
+                        <div class="box-content">
+                            <div class="box-lines">
+                                <div class="box-line">
+                                    <span class="left">Deployed on</span>
+                                    <span class="right">
+                                        <ul>
+                                        {% for population in agent_populations %}
+                                            <li><a href="/admin/population_detail/{{ population[1] }}">{{ population[0] }}</a></li>
+                                        {% endfor %}
+                                        </ul>
+                                    </span>
+                                </div>
+                            </div>
+
+                        </div>
+                    </div>
+
+                    <div class="dashboard-box">
+                        <h3 class="title is-5 is-thin">Add to Population</h3>
+                        <div class="box-content">
+                            <form action="/admin/add_to_population" enctype="multipart/form-data" method="POST">
+                                <div class="box-lines">
+                                    <div class="box-line">
+                                        <input type="hidden" name="agent_id" value="{{ agent.id }}">
+                                        <span class="left">Population</span>
+                                        <div class="select">
+                                            <select name="population_id">
+                                                {% for population in populations %}
+                                                <option value="{{ population.id }}">{{ population.name }}</option>
+                                                {% endfor %}
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="button-wrap">
+                                    <button class="button is-solid primary-button is-fullwidth">
+                                        Update
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+{% include "admin/footer.html" %}
