@@ -40,7 +40,7 @@
                                           { id: 'name', name: 'Name', 'attributes': editableCellAttributes },
                                           { id: 'descr', name: 'Description' },
                                             {id: 'details', name: 'Details', formatter: (cell, row) => {
-                                                return gridjs.html(`<a href="/admin/population/${row.cells[0].data}">Details</a>`);
+                                                return gridjs.html(`<a href="/admin/population_details/${row.cells[0].data}">Details</a>`);
                                             }},
                                         ],
                                         server: {

@@ -14,9 +14,10 @@
                     <!--Dashboard box-->
                     <div class="dashboard-box">
                         <h3 class="title is-5 is-thin">Agent</h3>
-                        <div class="box-media">
-                            <img src="https://via.placeholder.com/1600x900"
-                                 data-demo-src="assets/img/demo/unsplash/4.jpg" alt=""/>
+                        <div class="buttons" style="display: flex; justify-content: flex-end">
+                        <a class="button is-solid live-button has-icon" href="/admin/delete_agent/{{ agent.id }}">
+                            <span>Delete</span>
+                        </a>
                         </div>
                         <div class="box-content">
                             <div class="box-lines">
@@ -63,7 +64,7 @@
                                 <h4><b>Thematic Characterization</b></h4>
                                 <div class="box-line">
                                     <span class="left">Political Leaning</span>
-                                    <span class="right">{{ agent.political_leaning }}</span>
+                                    <span class="right">{{ agent.leaning }}</span>
                                 </div>
                                 <div class="box-line">
                                     <span class="left">Interests</span>
@@ -128,7 +129,7 @@
                                     <span class="right">
                                         <ul>
                                         {% for population in agent_populations %}
-                                            <li><a href="/admin/population_detail/{{ population[1] }}">{{ population[0] }}</a></li>
+                                            <li><a href="/admin/population_details/{{ population[1] }}">{{ population[0] }}</a></li>
                                         {% endfor %}
                                         </ul>
                                     </span>

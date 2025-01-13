@@ -1,0 +1,342 @@
+{% include "admin/head.html" %}
+
+<div class="view-wrapper is-dashboard">
+    <!--Dashboard container-->
+    <div id="creator-dashboard" class="dashboard-container">
+        <!--Toolbar-->
+        {% include "admin/dash_head.html" %}
+
+        <div class="dashboard-body">
+
+            <div class="columns">
+                <!--Dashboard column-->
+                <div class="column is-6">
+                    <!--Dashboard box-->
+                    <div class="dashboard-box">
+                        <h3 class="title is-5 is-thin">Population</h3>
+                        <div class="buttons" style="display: flex; justify-content: flex-end">
+                        <a class="button is-solid live-button has-icon" href="/admin/delete_population/{{ population.id }}">
+                            <span>Delete</span>
+                        </a>
+                        </div>
+                        <div class="box-content">
+                            <div class="box-lines">
+                                <h4><b>General Information</b></h4>
+                                <div class="box-line">
+                                    <span class="left">Name</span>
+                                    <span class="right">{{ population.name }}</span>
+                                </div>
+                                <div class="box-line">
+                                    <span class="left">Description</span>
+                                    <span class="right">{{ population.descr }}</span>
+                                </div>
+                                <div class="box-line">
+                                    <span class="left">Prevalent LLM</span>
+                                    <span class="right">{{ population.llm }}</span>
+                                </div>
+                                <div class="box-line">
+                                    <span class="left">Prevalent Content Recsys</span>
+                                    <span class="right">{{ population.crecsys }}</span>
+                                </div>
+                                <div class="box-line">
+                                    <span class="left">Prevalent Friendship Recsys</span>
+                                    <span class="right">{{ population.frecsys }}</span>
+                                </div>
+                                <div class="box-line">
+                                    <span class="left">Initial Size<small>(initial agents)</small></span>
+                                    <span class="right">{{ population.size }}</span>
+                                </div>
+                                <div class="box-line">
+                                    <span class="left">Topics of Interest<small>(initial agents)</small></span>
+                                    <span class="right">{{ population.interests }}</span>
+                                </div>
+                                <hr>
+                                <h4><b>Agents Data</b></h4>
+                                <div class="box-line">
+                                    <span class="left">Age Range</span>
+                                    <span class="right">{{ population.age_min }} - {{ population.age_max }}</span>
+                                </div>
+                                <div class="box-line">
+                                    <span class="left">Education</span>
+                                    <span class="right">{{ population.education }}</span>
+                                </div>
+                                <div class="box-line">
+                                    <span class="left">Political Leaning</span>
+                                    <span class="right">{{ population.leanings }}</span>
+                                </div>
+                                <div class="box-line">
+                                    <span class="left">Nationalities</span>
+                                    <span class="right">{{ population.nationalities }}</span>
+                                </div>
+                                <div class="box-line">
+                                    <span class="left">Toxicity Level</span>
+                                    <span class="right">{{ population.toxicity }}</span>
+                                </div>
+                                <div class="box-line">
+                                    <span class="left">Spoken Languages</span>
+                                    <span class="right">{{ population.languages }}</span>
+                                </div>
+
+                            </div>
+
+                        </div>
+                    </div>
+                </div>
+
+                <div class="column is-6">
+
+                    <div class="dashboard-box">
+                        <h3 class="title is-5 is-thin">Experiments</h3>
+                        <div class="box-content">
+                            <div class="box-lines">
+                                <div class="box-line">
+                                    <span class="left">Deployed on</span>
+                                    <span class="right">
+                                        <ul>
+                                        {% for exp in population_experiments %}
+                                            <li><a href="/admin/experiment_details/{{ exp[1] }}">{{ exp[0] }}</a></li>
+                                        {% endfor %}
+                                        </ul>
+                                    </span>
+                                </div>
+                            </div>
+
+                        </div>
+                    </div>
+
+                    <div class="dashboard-box">
+                        <h3 class="title is-5 is-thin">Add to Experiment</h3>
+                        <div class="box-content">
+                            <form action="/admin/add_to_experiment" enctype="multipart/form-data" method="POST">
+                                <div class="box-lines">
+                                    <div class="box-line">
+                                        <input type="hidden" name="population_id" value="{{ population.id }}">
+                                        <span class="left">Experiment</span>
+                                        <div class="select">
+                                            <select name="experiment_id">
+                                                {% for experiment in experiments %}
+                                                <option value="{{ experiment.idexp }}">{{ experiment.exp_name }}
+                                                </option>
+                                                {% endfor %}
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="button-wrap">
+                                    <button class="button is-solid primary-button is-fullwidth">
+                                        Update
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+
+
+
+                </div>
+
+                <!--Dashboard box-->
+
+                <!--Dashboard column-->
+
+            </div>
+
+            <div class="columns">
+                <!-- left column -->
+                <div class="column is-4">
+                     <div class="dashboard-box">
+                        <div class="box-content">
+
+                            <canvas id="leanings" style="width:100%;max-width:700px"></canvas>
+                            <script>
+                                new Chart("leanings", {
+                                    type: 'bar',
+                                    data: {
+                                        datasets: [{
+                                            label: 'Political Leanings',
+                                          data:  {{ data["leaning"]["total"] }},
+                                        }],
+                                        labels: {{ data["leaning"]["leanings"]|tojson  }}
+                                      },
+                                    options: {
+                                        scales: {
+                                            y: {
+                                                beginAtZero: true
+                                            }
+                                        }
+                                    }
+
+                                });
+                            </script>
+                        </div>
+
+                    </div>
+
+                    <div class="dashboard-box">
+                        <div class="box-content">
+
+                            <canvas id="nationalities" style="width:100%;max-width:700px"></canvas>
+                            <script>
+                                new Chart("nationalities", {
+                                    type: 'bar',
+                                    data: {
+                                        datasets: [{
+                                            label: 'Nationalities',
+                                          data:  {{ data["nationalities"]["total"] }},
+                                        }],
+                                        labels: {{ data["nationalities"]["nationalities"]|tojson  }}
+                                      },
+                                    options: {
+                                        scales: {
+                                            y: {
+                                                beginAtZero: true
+                                            }
+                                        }
+                                    }
+
+                                });
+                            </script>
+                        </div>
+
+                    </div>
+
+                </div>
+                <!-- center column -->
+                <div class="column is-4">
+                    <div class="dashboard-box">
+                        <div class="box-content">
+
+                            <canvas id="ages" style="width:100%;max-width:700px"></canvas>
+                            <script>
+                                new Chart("ages", {
+                                    type: 'bar',
+                                    data: {
+                                        datasets: [{
+                                            label: 'Age',
+                                          data:  {{ data["age"]["total"] }},
+                                        }],
+                                        labels: {{ data["age"]["age"]|tojson  }}
+                                      },
+                                    options: {
+                                        scales: {
+                                            y: {
+                                                beginAtZero: true
+                                            },
+                                            x: {
+                                                min: 0,
+                                                max: 100,
+                                              }
+                                        }
+                                    }
+
+                                });
+                            </script>
+                        </div>
+
+                    </div>
+
+                    <div class="dashboard-box">
+                        <div class="box-content">
+
+                            <canvas id="languages" style="width:100%;max-width:700px"></canvas>
+                            <script>
+                                new Chart("languages", {
+                                    type: 'bar',
+                                    data: {
+                                        datasets: [{
+                                            label: 'Spoken Languages',
+                                          data:  {{ data["languages"]["total"] }},
+                                        }],
+                                        labels: {{ data["languages"]["languages"]|tojson  }}
+                                      },
+                                    options: {
+                                        scales: {
+                                            y: {
+                                                beginAtZero: true
+                                            },
+                                            x: {
+                                                min: 0,
+                                                max: 100,
+                                              }
+                                        }
+                                    }
+
+                                });
+                            </script>
+                        </div>
+
+                    </div>
+                <div>
+            </div>
+        </div>
+                <!-- right column -->
+                <div class="column is-4">
+                    <div class="dashboard-box">
+                        <div class="box-content">
+
+                            <canvas id="edu" style="width:100%;max-width:700px"></canvas>
+                            <script>
+                                new Chart("edu", {
+                                    type: 'bar',
+                                    data: {
+                                        datasets: [{
+                                            label: 'Education',
+                                          data:  {{ data["education"]["total"] }},
+                                        }],
+                                        labels: {{ data["education"]["education"]|tojson  }}
+                                      },
+                                    options: {
+                                        scales: {
+                                            y: {
+                                                beginAtZero: true
+                                            },
+                                            x: {
+                                                min: 0,
+                                                max: 100,
+                                              }
+                                        }
+                                    }
+
+                                });
+                            </script>
+                        </div>
+                    </div>
+
+                    <div class="dashboard-box">
+                        <div class="box-content">
+
+                            <canvas id="tox" style="width:100%;max-width:700px"></canvas>
+                            <script>
+                                new Chart("tox", {
+                                    type: 'bar',
+                                    data: {
+                                        datasets: [{
+                                            label: 'Toxicity Levels',
+                                          data:  {{ data["toxicity"]["total"] }},
+                                        }],
+                                        labels: {{ data["toxicity"]["toxicity"]|tojson  }}
+                                      },
+                                    options: {
+                                        scales: {
+                                            y: {
+                                                beginAtZero: true
+                                            },
+                                            x: {
+                                                min: 0,
+                                                max: 100,
+                                              }
+                                        }
+                                    }
+
+                                });
+                            </script>
+                        </div>
+                    </div>
+                <div>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+{% include "admin/footer.html" %}

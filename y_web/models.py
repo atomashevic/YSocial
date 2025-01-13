@@ -293,3 +293,11 @@ class Page(db.Model):
     feed = db.Column(db.String(200))
     keywords = db.Column(db.String(200))
     logo = db.Column(db.String(300))
+
+
+class Population_Experiment(db.Model):
+    __bind_key__ = "db_admin"
+    __tablename__ = "population_experiment"
+    id = db.Column(db.Integer, primary_key=True)
+    id_population = db.Column(db.Integer, db.ForeignKey("population.id"), nullable=False)
+    id_exp = db.Column(db.Integer, db.ForeignKey("exps.idexp"), nullable=False)
