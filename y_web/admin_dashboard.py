@@ -2,6 +2,8 @@ import random
 
 from flask import Blueprint, render_template, redirect, url_for, request, flash, abort
 from flask_login import login_user, login_required, current_user
+from numpy.lib.index_tricks import index_exp
+
 from .models import (
     Exps,
     Admin_users,
@@ -13,14 +15,17 @@ from .models import (
     Agent_Population,
     Agent_Profile,
     Page, Population_Experiment,
+    Page_Population,
+    User_Experiment
 )
-from y_web.data_generation import generate_population
+from y_web.data_generation import generate_population, get_feed
 import json
 import os
 import pathlib, shutil
 import uuid
 from . import db, app
 import re
+import ollama
 
 admin = Blueprint("admin", __name__)
 
@@ -107,17 +112,20 @@ def change_active_experiment(exp_id):
         db.session.add(new_user)
         db.session.commit()
 
+        # ad to experiment if not present
+        user_exp = db.session.query(User_Experiment).filter_by(user_id=current_user.id, exp_id=exp_id).first()
+        if user_exp is None:
+            user_exp = User_Experiment(user_id=current_user.id, exp_id=exp_id)
+            db.session.add(user_exp)
+            db.session.commit()
+
     db.session.query(Exps).filter_by(status=1).update({Exps.status: 0})
     db.session.query(Exps).filter_by(db_name=exp.db_name).update({Exps.status: 1})
     db.session.commit()
 
     reload_current_user(uname)
 
-    # load all experiments
-    experiments = Exps.query.limit(5).all()
-    users = Admin_users.query.all()
-
-    return render_template("admin/settings.html", experiments=experiments, users=users)
+    return experiment_details(exp_id)
 
 
 @admin.route("/admin/users")
@@ -131,7 +139,11 @@ def user_data():
 @login_required
 def populations():
     check_privileges(current_user.username)
-    return render_template("admin/populations.html")
+
+    models = ollama.list()
+    models = [m['name'] for m in models['models']]
+
+    return render_template("admin/populations.html", models=models)
 
 
 @admin.route("/admin/agents")
@@ -139,15 +151,22 @@ def populations():
 def agent_data():
     check_privileges(current_user.username)
 
+    models = ollama.list()
+    models = [m['name'] for m in models['models']]
+
     populations = Population.query.all()
-    return render_template("admin/agents.html", populations=populations)
+    return render_template("admin/agents.html", populations=populations, models=models)
 
 
 @admin.route("/admin/pages")
 @login_required
 def page_data():
     check_privileges(current_user.username)
-    return render_template("admin/pages.html")
+
+    models = ollama.list()
+    models = [m['name'] for m in models['models']]
+
+    return render_template("admin/pages.html", models=models)
 
 
 @admin.route("/admin/user_data")
@@ -367,6 +386,14 @@ def delete_simulation(exp_id):
             f"y_web{os.sep}experiments{os.sep}{exp.db_name.split(os.sep)[0]}{os.sep}{exp.db_name.split(os.sep)[1]}",
             ignore_errors=True,
         )
+
+        # remove populaiton_experiment
+        db.session.query(Population_Experiment).filter_by(id_exp=exp_id).delete()
+        db.session.commit()
+
+        # delete user experiment
+        db.session.query(User_Experiment).filter_by(exp_id=exp_id).delete()
+        db.session.commit()
 
     return settings()
 
@@ -603,6 +630,7 @@ def create_page():
     feed = request.form.get("feed")
     keywords = request.form.get("keywords")
     logo = request.form.get("logo")
+    pg_type = request.form.get("pg_type")
 
     page = Page(
         name=name,
@@ -611,6 +639,7 @@ def create_page():
         feed=feed,
         keywords=keywords,
         logo=logo,
+        pg_type=pg_type
     )
 
     db.session.add(page)
@@ -914,6 +943,24 @@ def delete_population(uid):
     return populations()
 
 
+@admin.route("/admin/delete_page/<int:uid>")
+@login_required
+def delete_page(uid):
+    check_privileges(current_user.username)
+
+    page = Page.query.filter_by(id=uid).first()
+    db.session.delete(page)
+    db.session.commit()
+
+    # delete page_population entries
+    page_population = Page_Population.query.filter_by(page_id=uid).all()
+    for pp in page_population:
+        db.session.delete(pp)
+        db.session.commit()
+
+    return page_data()
+
+
 @admin.route("/admin/delete_agent/<int:uid>")
 @login_required
 def delete_agent(uid):
@@ -936,3 +983,324 @@ def delete_agent(uid):
         db.session.commit()
 
     return agent_data()
+
+
+@admin.route("/admin/page_details/<int:uid>")
+@login_required
+def page_details(uid):
+    check_privileges(current_user.username)
+
+    # get page details
+    page = Page.query.filter_by(id=uid).first()
+
+    # get agent populations along with population names and ids
+    page_populations = (
+        db.session.query(Page_Population, Population)
+        .join(Population)
+        .filter(Page_Population.page_id == uid)
+        .all()
+    )
+
+    pops = [(p[1].name, p[1].id) for p in page_populations]
+
+    # get all populations
+    populations = Population.query.all()
+
+    feed = get_feed(page.feed)
+
+    return render_template("admin/page_details.html", page=page, page_populations=pops,
+                            populations=populations, feeds=feed[:3])
+
+
+@admin.route("/admin/add_page_to_population", methods=["POST"])
+@login_required
+def add_page_to_population():
+    check_privileges(current_user.username)
+
+    page_id = request.form.get("page_id")
+    population_id = request.form.get("population_id")
+
+    # check if the page is already in the population
+    ap = Page_Population.query.filter_by(page_id=page_id, population_id=population_id).first()
+    if ap:
+        return page_details(page_id)
+
+    ap = Page_Population(page_id=page_id, population_id=population_id)
+
+    db.session.add(ap)
+    db.session.commit()
+
+    return page_details(page_id)
+
+
+@admin.route("/admin/user_details/<int:uid>")
+@login_required
+def user_details(uid):
+    check_privileges(current_user.username)
+
+    # get user details
+    user = Admin_users.query.filter_by(id=uid).first()
+
+    # get experiments for the user
+    experiments = Exps.query.filter_by(owner=user.username).all()
+
+    # get all experiments
+    all_experiments = Exps.query.all()
+
+    # get user experiments
+    joined_exp = User_Experiment.query.filter_by(user_id=uid).all()
+
+    # get user experiments details for the ones joined
+    joined_exp = [(j.exp_id, Exps.query.filter_by(idexp=j.exp_id).first().exp_name) for j in joined_exp]
+    print(joined_exp)
+
+    return render_template("admin/user_details.html", user=user,
+                           user_experiments=experiments, all_experiments=all_experiments,
+                           user_experiments_joined=joined_exp)
+
+
+@admin.route("/admin/add_user", methods=["POST"])
+@login_required
+def add_user():
+    check_privileges(current_user.username)
+
+    username = request.form.get("username")
+    email = request.form.get("email")
+    password = request.form.get("password")
+    role = request.form.get("role")
+
+    user = Admin_users(username=username, email=email, password=password, role=role)
+
+    db.session.add(user)
+    db.session.commit()
+
+    return user_data()
+
+
+@admin.route("/admin/delete_user/<int:uid>")
+@login_required
+def delete_user(uid):
+    check_privileges(current_user.username)
+
+    user = Admin_users.query.filter_by(id=uid).first()
+    db.session.delete(user)
+    db.session.commit()
+
+    return user_data()
+
+
+@admin.route("/admin/add_user_to_experiment", methods=["POST"])
+@login_required
+def add_user_to_experiment():
+    check_privileges(current_user.username)
+
+    user_id = request.form.get("user_id")
+    experiment_id = request.form.get("experiment_id")
+
+    # get username
+    user = Admin_users.query.filter_by(id=user_id).first()
+    # get experiment
+    exp = Exps.query.filter_by(idexp=experiment_id).first()
+
+    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+    app.config["SQLALCHEMY_BINDS"]["db_exp"] = f"sqlite:///{BASE_DIR}/{exp.db_name}"
+
+    # check if the user is present in the User_mgmt table
+    user_exp = db.session.query(User_mgmt).filter_by(username=user.username).first()
+
+    if user_exp is None:
+        new_user = User_mgmt(
+            email=user.email,
+            username=user.username,
+            password=user.password,
+            user_type="user",
+            leaning="neutral",
+            age=0,
+            recsys_type="default",
+            language="en",
+            frecsys_type="default",
+            round_actions=1,
+            toxicity="no",
+        )
+        db.session.add(new_user)
+        db.session.commit()
+
+        # ad to experiment if not present
+        user_exp = db.session.query(User_Experiment).filter_by(user_id=user_id, exp_id=experiment_id).first()
+
+        if user_exp is None:
+            user_exp = User_Experiment(user_id=user_id, exp_id=experiment_id)
+            db.session.add(user_exp)
+            db.session.commit()
+
+    db.session.query(Exps).filter_by(status=1).update({Exps.status: 0})
+    db.session.query(Exps).filter_by(db_name=exp.db_name).update({Exps.status: 1})
+    db.session.commit()
+
+    return user_details(user_id)
+
+
+@admin.route("/admin/experiments_data")
+@login_required
+def experiments_data():
+
+    print("here")
+    query = Exps.query
+
+    # search filter
+    search = request.args.get("search")
+    if search:
+        query = query.filter(db.or_(Exps.exp_name.like(f"%{search}%")))
+    total = query.count()
+
+    # sorting
+    sort = request.args.get("sort")
+    if sort:
+        order = []
+        for s in sort.split(","):
+            direction = s[0]
+            name = s[1:]
+            if name not in ["exp_name", "exp_descr", "owner"]:
+                name = "name"
+            col = getattr(Exps, name)
+            if direction == "-":
+                col = col.desc()
+            order.append(col)
+        if order:
+            query = query.order_by(*order)
+
+    # pagination
+    start = request.args.get("start", type=int, default=-1)
+    length = request.args.get("length", type=int, default=-1)
+    if start != -1 and length != -1:
+        query = query.offset(start).limit(length)
+
+    # response
+    res = query.all()
+
+    return {
+        "data": [
+            {
+                "idexp": exp.idexp,
+                "exp_name": exp.exp_name,
+                "exp_descr": exp.exp_descr,
+                "owner": exp.owner,
+                "status": "Loaded" if exp.status==1 else "Stopped",
+            }
+            for exp in res
+        ],
+        "total": total,
+    }
+
+
+@admin.route("/admin/experiment_details/<int:uid>")
+@login_required
+def experiment_details(uid):
+    check_privileges(current_user.username)
+
+    # get experiment details
+    experiment = Exps.query.filter_by(idexp=uid).first()
+
+    # get experiment populations along with population names and ids
+    experiment_populations = (
+        db.session.query(Population_Experiment, Population)
+        .join(Population)
+        .filter(Population_Experiment.id_exp == uid)
+        .all()
+    )
+
+    pops = [(p[1].name, p[1].id, p[0].client_running) for p in experiment_populations]
+
+    users = (
+        db.session.query(Admin_users, User_Experiment)
+        .join(User_Experiment)
+        .filter(User_Experiment.exp_id == uid)
+        .all()
+    )
+
+    return render_template("admin/experiment_details.html",
+                           experiment=experiment, experiment_populations=pops, users=users)
+
+
+@admin.route("/admin/start_experiment/<int:uid>")
+@login_required
+def start_experiment(uid):
+    check_privileges(current_user.username)
+
+    # get experiment
+    exp = Exps.query.filter_by(idexp=uid).first()
+
+    # check if the experiment is already running
+    if exp.running == 1:
+        return experiment_details(uid)
+
+    # update the experiment status
+    db.session.query(Exps).filter_by(idexp=uid).update({Exps.running: 1})
+    db.session.commit()
+
+    #@todo: configure and start the yserver
+
+    return experiment_details(uid)
+
+
+@admin.route("/admin/stop_experiment/<int:uid>")
+@login_required
+def stop_experiment(uid):
+    check_privileges(current_user.username)
+
+    # get experiment
+    exp = Exps.query.filter_by(idexp=uid).first()
+
+    # check if the experiment is already running
+    if exp.running == 0:
+        return experiment_details(uid)
+
+    # update the experiment status
+    db.session.query(Exps).filter_by(idexp=uid).update({Exps.running: 0})
+    db.session.commit()
+
+    # @todo: stop the yserver
+
+    # the clients are killed as soon as the server stops
+    # update client statuses
+
+    # get all populations for the experiment and update the client_running status
+    populations = Population_Experiment.query.filter_by(id_exp=uid).all()
+    for pop in populations:
+        db.session.query(Population_Experiment).filter_by(id=pop.id_population).update({Population_Experiment.client_running: 0})
+        db.session.commit()
+
+    return experiment_details(uid)
+
+
+@admin.route("/admin/run_client/<int:uid>/<int:idexp>")
+@login_required
+def run_client(uid, idexp):
+    check_privileges(current_user.username)
+
+    # get experiment
+    exp = Exps.query.filter_by(idexp=idexp).first()
+
+    # check if the experiment is already running
+    if exp.running == 0:
+        return experiment_details(idexp)
+
+    # @todo: configure and start the yclient
+
+    # set the population_experiment running_status
+    db.session.query(Population_Experiment).filter_by(id_population=uid, id_exp=idexp).update({Population_Experiment.client_running: 1})
+    db.session.commit()
+
+    return experiment_details(idexp)
+
+
+@admin.route("/admin/stop_client/<int:uid>/<int:idexp>")
+@login_required
+def stop_client(uid, idexp):
+    check_privileges(current_user.username)
+
+    # get population_experiment and update the client_running status
+    db.session.query(Population_Experiment).filter_by(id_population=uid, id_exp=idexp).update({Population_Experiment.client_running: 0})
+    db.session.commit()
+
+    return experiment_details(idexp)

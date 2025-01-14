@@ -1,0 +1,118 @@
+{% include "admin/head.html" %}
+
+<div class="view-wrapper is-dashboard">
+    <!--Dashboard container-->
+    <div id="creator-dashboard" class="dashboard-container">
+        <!--Toolbar-->
+        {% include "admin/dash_head.html" %}
+
+        <div class="dashboard-body">
+
+            <div class="columns">
+                <!--Dashboard column-->
+                <div class="column is-6">
+                    <!--Dashboard box-->
+                    <div class="dashboard-box">
+                        <h3 class="title is-5 is-thin">User</h3>
+
+                        <div class="box-content">
+                            <div class="box-lines">
+                                <div class="box-line">
+                                    <span class="left">Username</span>
+                                    <span class="right">{{ user.username }}</span>
+                                </div>
+                                <div class="box-line">
+                                    <span class="left">Email</span>
+                                    <span class="right">{{ user.email }}</span>
+                                </div>
+                                <div class="box-line">
+                                    <span class="left">Role</span>
+                                    <span class="right">{{ user.role }}</span>
+                                </div>
+
+                            </div>
+
+                            <div class="buttons" style="display: flex; justify-content: center">
+                                <a class="button is-solid live-button has-icon" href="/admin/delete_user/{{ user.id }}">
+                                    <span>Delete</span>
+                                </a>
+                            </div>
+
+                        </div>
+                    </div>
+
+
+
+
+                </div>
+
+                <!--Dashboard box-->
+
+                <!--Dashboard column-->
+                <div class="column is-6">
+                    <!--Box-->
+                     <div class="dashboard-box">
+                        <h3 class="title is-5 is-thin">Experiments</h3>
+                        <div class="box-content">
+                            <div class="box-lines">
+                                <div class="box-line">
+                                    <span class="left">Owner of</span>
+                                    <span class="right">
+                                        <ul>
+                                        {% for exp in user_experiments %}
+                                            <li><a href="/admin/experiment_details/{{ exp.idexp }}">{{ exp.exp_name }}</a></li>
+                                        {% endfor %}
+                                        </ul>
+                                    </span>
+                                </div>
+                                <hr>
+                                 <div class="box-line">
+                                    <span class="left">Joined</span>
+                                    <span class="right">
+                                        <ul>
+                                        {% for exp in user_experiments_joined %}
+                                            <li><a href="/admin/experiment_details/{{ exp[0] }}">{{ exp[1] }}</a></li>
+                                        {% endfor %}
+                                        </ul>
+                                    </span>
+                                </div>
+                            </div>
+
+                        </div>
+                    </div>
+
+                    <div class="dashboard-box">
+                        <h3 class="title is-5 is-thin">Add to Experiment</h3>
+                        <div class="box-content">
+                            <form action="/admin/add_user_to_experiment" enctype="multipart/form-data" method="POST">
+                                <div class="box-lines">
+                                    <div class="box-line">
+                                        <input type="hidden" name="user_id" value="{{ user.id }}">
+                                        <span class="left">Experiment</span>
+                                        <div class="select">
+                                            <select name="experiment_id">
+                                                {% for exp in all_experiments %}
+                                                <option value="{{ exp.idexp }}">{{ exp.exp_name }}</option>
+                                                {% endfor %}
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="button-wrap">
+                                    <button class="button is-solid primary-button is-fullwidth">
+                                        Update
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+
+
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+{% include "admin/footer.html" %}

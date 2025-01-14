@@ -1,0 +1,158 @@
+{% include "admin/head.html" %}
+
+<div class="view-wrapper is-dashboard">
+    <!--Dashboard container-->
+    <div id="creator-dashboard" class="dashboard-container">
+        <!--Toolbar-->
+        {% include "admin/dash_head.html" %}
+
+        <div class="dashboard-body">
+
+            <div class="columns">
+                <!--Dashboard column-->
+                <div class="column is-6">
+                    <!--Dashboard box-->
+                    <div class="dashboard-box">
+                        <h3 class="title is-5 is-thin">Experiment</h3>
+
+                        <div class="box-content">
+                            <div class="box-lines">
+                                <div class="box-line">
+                                    <span class="left">Name</span>
+                                    <span class="right">{{ experiment.exp_name }}</span>
+                                </div>
+                                <div class="box-line">
+                                    <span class="left">Description</span>
+                                    <span class="right">{{ experiment.exp_descr }}</span>
+                                </div>
+                                <div class="box-line">
+                                    <span class="left">Owner</span>
+                                    <span class="right">{{ experiment.owner }}</span>
+                                </div>
+                                <hr>
+                                <div class="box-line">
+                                    <span class="left">Populations joined</span>
+                                    <span class="right">
+                                        <ul>
+                                        {% for population in experiment_populations %}
+                                            <li><a href="/admin/population_details/{{ population[1] }}">{{ population[0] }}</a></li>
+                                        {% endfor %}
+                                        </ul>
+                                    </span>
+                                </div>
+                                <hr>
+                                <div class="box-line">
+                                    <span class="left">Registered users</span>
+                                    <span class="right">
+                                        <ul>
+                                        {% for user, user_exp in users %}
+                                            <li><a href="/admin/user_details/{{ user.id }}">{{ user.username }}</a></li>
+                                        {% endfor %}
+                                        </ul>
+                                    </span>
+                                </div>
+                                <hr>
+
+
+                            </div>
+
+                            <div class="buttons" style="display: flex; justify-content: center">
+                                <a class="button is-solid live-button has-icon"
+                                   href="/admin/delete_simulation/{{ experiment.idexp }}">
+                                    <span>Delete</span>
+                                </a>
+                            </div>
+
+                        </div>
+                    </div>
+
+
+                </div>
+
+                <!--Dashboard box-->
+
+                <!--Dashboard column-->
+                <div class="column is-6">
+                    <!--Box-->
+                    <div class="dashboard-box">
+
+                        <div class="box-content">
+                            <h3 class="title is-5 is-thin">Experiment Activity Status</h3>
+                            <div class="buttons" style="display: flex; justify-content: flex-end">
+                                {% if experiment.status == 0 %}
+                                <a class="button is-solid live-button has-icon"
+                                   href="/admin/select_experiment/{{ experiment.idexp }}">
+                                    <span>Load Experiment</span>
+                                </a>
+
+                                {% endif %}
+                                {% if experiment.status == 1 %}
+                                <a class="button is-solid live-button has-icon" href="/admin/join_simulation">
+                                    <span>Join Experiment</span>
+                                </a>
+
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="dashboard-box">
+
+                        <div class="box-content">
+                            <h3 class="title is-5 is-thin">YServer Administration panel</h3>
+
+                            <div class="buttons" style="display: flex; justify-content: flex-end">
+                                {% if experiment.running == 0 %}
+                                <a class="button is-solid live-button has-icon"
+                                   href="/admin/start_experiment/{{ experiment.idexp }}">
+                                    <span>Start Experiment</span>
+                                </a>
+                                {% endif %}
+                                {% if experiment.running == 1 %}
+                                <a class="button is-solid live-button has-icon"
+                                   href="/admin/stop_experiment/{{ experiment.idexp }}">
+                                    <span>Stop Experiment</span>
+                                </a>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+
+                    {% if experiment.running == 1 %}
+                    <div class="dashboard-box">
+                        <div class="box-content">
+                            <h3 class="title is-5 is-thin">YClient Administration panel</h3>
+
+                            {% for pops in experiment_populations %}
+                                <div class="box-line">
+                                    <span class="left"><b>Population:</b> {{ pops[0]}}</span>
+                                    <span class="right">
+                                        {% if pops[2] == 0 %}
+                                        <a class="button is-solid live-button has-icon"
+                                             href="/admin/run_client/{{ pops[1] }}/{{ experiment.idexp }}">
+                                            <span>Run Client</span>
+                                         </a>
+                                            {% else %}
+                                            <a class="button is-solid live-button has-icon"
+                                             href="/admin/stop_client/{{ pops[1] }}/{{ experiment.idexp }}">
+                                                  <span>Stop Client</span>
+                                         </a>
+                                            {% endif %}
+
+                                    </span>
+                                </div>
+                            {% endfor %}
+
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+{% include "admin/footer.html" %}

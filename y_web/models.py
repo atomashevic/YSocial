@@ -1,4 +1,6 @@
 from flask_login import UserMixin
+from pygments.lexer import default
+
 from . import db
 
 
@@ -207,6 +209,7 @@ class Exps(db.Model):
     owner = db.Column(db.String(50), nullable=False)
     exp_descr = db.Column(db.String(200), nullable=False)
     status = db.Column(db.Integer, nullable=False)
+    running = db.Column(db.Integer, nullable=False, default=0)
 
 
 class Exp_stats(db.Model):
@@ -293,6 +296,7 @@ class Page(db.Model):
     feed = db.Column(db.String(200))
     keywords = db.Column(db.String(200))
     logo = db.Column(db.String(300))
+    pg_type = db.Column(db.String(100))
 
 
 class Population_Experiment(db.Model):
@@ -301,3 +305,24 @@ class Population_Experiment(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     id_population = db.Column(db.Integer, db.ForeignKey("population.id"), nullable=False)
     id_exp = db.Column(db.Integer, db.ForeignKey("exps.idexp"), nullable=False)
+    client_running = db.Column(db.Integer, nullable=False, default=0)
+
+
+class Page_Population(db.Model):
+    __bind_key__ = "db_admin"
+    __tablename__ = "page_population"
+    id = db.Column(db.Integer, primary_key=True)
+    page_id = db.Column(db.Integer, db.ForeignKey("pages.id"), nullable=False)
+    population_id = db.Column(
+        db.Integer, db.ForeignKey("population.id"), nullable=False
+    )
+
+
+class User_Experiment(db.Model):
+    __bind_key__ = "db_admin"
+    __tablename__ = "user_experiment"
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("admin_users.id"), nullable=False)
+    exp_id = db.Column(
+        db.Integer, db.ForeignKey("exps.idexp"), nullable=False
+    )

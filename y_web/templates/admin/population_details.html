@@ -14,11 +14,7 @@
                     <!--Dashboard box-->
                     <div class="dashboard-box">
                         <h3 class="title is-5 is-thin">Population</h3>
-                        <div class="buttons" style="display: flex; justify-content: flex-end">
-                        <a class="button is-solid live-button has-icon" href="/admin/delete_population/{{ population.id }}">
-                            <span>Delete</span>
-                        </a>
-                        </div>
+
                         <div class="box-content">
                             <div class="box-lines">
                                 <h4><b>General Information</b></h4>
@@ -78,7 +74,11 @@
                                 </div>
 
                             </div>
-
+                            <div class="buttons" style="display: flex; justify-content: center">
+                        <a class="button is-solid live-button has-icon" href="/admin/delete_population/{{ population.id }}">
+                            <span>Delete</span>
+                        </a>
+                        </div>
                         </div>
                     </div>
                 </div>

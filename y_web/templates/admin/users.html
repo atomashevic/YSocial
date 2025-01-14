@@ -51,7 +51,7 @@
                                         {id: 'role', name: 'Role', sort: true, 'attributes': editableCellAttributes},
                                         {
                                             id: 'details', name: 'Details', formatter: (cell, row) => {
-                                                return gridjs.html(`<a href="/admin/user/${row.cells[0].data}">Details</a>`);
+                                                return gridjs.html(`<a href="/admin/user_details/${row.cells[0].data}">Details</a>`);
                                             }
                                         },
                                     ],
@@ -137,23 +137,23 @@
 
                                     <div class="box-line">
                                         <span class="left">Username</span>
-                                        <span class="right" style="width: 70%;"><input type="text" id="username"
+                                        <span class="right" style="width: 70%;"><input type="text" name="username"
                                                                                        class="input"></span>
                                     </div>
                                     <div class="box-line">
                                         <span class="left">Password</span>
-                                        <span class="right" style="width: 70%;"><input type="password" id="password"
+                                        <span class="right" style="width: 70%;"><input type="password" name="password"
                                                                                        class="input"></span>
                                     </div>
                                     <div class="box-line">
                                         <span class="left">Email</span>
-                                        <span class="right" style="width: 70%;"><input type="text" id="host"
+                                        <span class="right" style="width: 70%;"><input type="text" name="email"
                                                                                        class="input" value=""></span>
                                     </div>
                                     <div class="box-line">
                                         <span class="left">Role</span>
                                         <div class="select">
-                                            <select id="role">
+                                            <select name="role">
                                                 <option value="Admin">admin</option>
                                                 <option value="Admin">user</option>
                                             </select>

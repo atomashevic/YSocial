@@ -41,8 +41,8 @@
                                         {id: 'page_type', name: 'Type'},
                                         {id: 'keywords', name: 'Keywords'},
                                         {
-                                            id: 'details', name: 'Details', formatter: (cell) => {
-                                                return gridjs.html(`<a href="/admin/agent_details/${cell}">Details</a>`);
+                                            id: 'details', name: 'Details', formatter: (cell, row) => {
+                                                return gridjs.html(`<a href="/admin/page_details/${row.cells[0].data}">Details</a>`);
                                             }
                                         },
                                     ],
@@ -150,6 +150,17 @@
                                             <select name="page_type">
                                                 <option value="media">Media Page</option>
                                                 <option value="other">Other</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div class="box-line">
+                                        <span class="left">LLM</span>
+                                        <div class="select">
+                                            <select name="pg_type">
+                                                <option value=""></option>
+                                                    {% for model in models %}
+                                                    <option value="{{ model }}">{{ model }}</option>
+                                                    {% endfor %}
                                             </select>
                                         </div>
                                     </div>
