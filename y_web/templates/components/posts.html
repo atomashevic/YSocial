@@ -164,22 +164,17 @@
             <div class="social-count">
                 <div class="likes-count" id="likes-count-{{ item['post_id'] }}">
                     <div class="like-wrapper" id="like-{{ item['post_id'] }}">
-                        <a class="like-button" id="l{{ item['post_id'] }}" {% if not bool(item["is_liked"])
-                        %}style="background: #6aa3e7;"{% endif %} >
-                        <i data-feather="thumbs-up" {% if not bool(item["is_liked"]) %}style="stroke: #ffffff;"{% endif
-                        %}></i>
-                        <span id="span-{{ item['post_id'] }}" {% if not bool(item["is_liked"]) %}style="color:
-                        #ffffff;"{% endif %}>{{ item["likes"] }}</span> </a>
+                        <a class="like-button" id="l{{ item['post_id']}}" {% if not bool(item["is_liked"]) %} style="background: #6aa3e7;"{% endif %} >
+                        <i data-feather="thumbs-up" {% if not bool(item['is_liked']) %}style="stroke: #ffffff;"{% endif %}></i>
+                        <span id="span-{{item['post_id']}}" {% if not bool(item['is_liked']) %}style="color: #ffffff;"{% endif %}>{{ item['likes'] }}</span> </a>
                     </div>
                 </div>
+
                 <div class="likes-count" id="dislikes-count-{{ item['post_id'] }}">
                     <div class="dislike-wrapper" id="dislike-{{ item['post_id'] }}">
-                        <a class="dislike-button" id="d{{ item['post_id'] }}" {% if not bool(item["is_disliked"])
-                        %}style="background: #6aa3e7;"{% endif %}>
-                        <i data-feather="thumbs-down" {% if not bool(item["is_disliked"]) %}style="stroke: #ffffff;"{%
-                        endif %}></i>
-                        <span id="span-{{ item['post_id'] }}" {% if not bool(item["is_disliked"]) %}style="color:
-                        #ffffff;"{% endif %}>{{ item["dislikes"] }}</span>
+                        <a class="dislike-button" id="d{{ item['post_id'] }}" {% if not bool(item["is_disliked"]) %} style="background: #6aa3e7;"{% endif %} >
+                        <i data-feather="thumbs-down" {% if not bool(item["is_disliked"]) %} style="stroke: #ffffff;" {% endif %}></i>
+                        <span id="span-{{ item['post_id'] }}" {% if not bool(item["is_disliked"]) %}style="color: #ffffff;" {% endif %}>{{ item["dislikes"] }}</span>
                         </a>
                     </div>
                 </div>
@@ -235,17 +230,14 @@
                     <div class="reply" style="text-align: right">
                         <a id='{{ item["post_id"] }}' onClick="editLink(this.id)">Reply</a>
                     </div>
-                    <p id="message-{{ item[" post_id"] }}"></p>
-                    <form class="comment_form" id="comment_form-{{ item[" post_id
-                    "] }}">
-                    <textarea rows="3" class="reply_comment" id="comment-{{ item[" post_id"] }}">@{{ item["author"]
-                    }} </textarea>
+                    <p id="message-{{ item['post_id']}}"></p>
+                    <form class="comment_form" id="comment_form-{{item['post_id']}}">
+                    <textarea rows="3" class="reply_comment" id="comment-{{ item['post_id'] }}">@{{ item["author"]}} </textarea>
                     <button
                             id="add_comment"
                             type="button"
                             class="button is-solid accent-button is-fullwidth"
-                            val="{{ item[" post_id
-                    "] }}"
+                            val="{{ item['post_id'] }}"
                     >
                     Comment
                     </button>
@@ -287,19 +279,15 @@
                     </div>
                     <div class="controls">
 
-                        <div class="like-count" id="like-count-{{ cm[" post_id
-                        "] }}">
+                        <div class="like-count" id="like-count-{{cm['post_id']}}">
                         <i data-feather="thumbs-up" {% if not bool(cm["is_liked"]) %}style="stroke: #69a2e6;"{% endif
                         %}></i>
                         <span {% if not bool(cm["is_liked"]) %}style="color: #69a2e6;"{% endif %}>{{ cm["likes"]
                         }}</span>
                     </div>
-                    <div class="dislike-count" id="dislike-count-{{ cm[" post_id
-                    "] }}">
-                    <i data-feather="thumbs-down" {% if not bool(cm["is_disliked"]) %}style="stroke: #69a2e6;"{% endif
-                    %} ></i>
-                    <span {% if not bool(cm["is_disliked"]) %}style="color: #69a2e6;"{% endif %}>{{ cm["dislikes"]
-                    }}</span>
+                    <div class="dislike-count" id="dislike-count-{{ cm['post_id'] }}">
+                    <i data-feather="thumbs-down" {% if not bool(cm["is_disliked"]) %}style="stroke: #69a2e6;"{% endif %} ></i>
+                    <span {% if not bool(cm["is_disliked"]) %} style="color: #69a2e6;"{% endif %}>{{ cm["dislikes"] }}</span>
                 </div>
                 <!-- <div class="reply" style="text-align: right">
                    <a href="#">Reply</a>
@@ -311,16 +299,14 @@
             <div class="reply" style="text-align: right">
                 <a id='{{ cm["post_id"] }}' onClick="editLink(this.id)">Reply</a>
             </div>
-            <p id="message-{{ cm[" post_id"] }}"></p>
-            <form class="comment_form" id="comment_form-{{ cm[" post_id
-            "] }}">
-            <textarea rows="3" class="reply_comment" id="comment-{{ cm[" post_id"] }}">@{{ cm["author"] }} </textarea>
+            <p id="message-{{ cm['post_id'] }}"></p>
+            <form class="comment_form" id="comment_form-{{cm['post_id']}}">
+            <textarea rows="3" class="reply_comment" id="comment-{{ cm['post_id'] }}">@{{ cm["author"] }} </textarea>
             <button
                     id="add_comment"
                     type="button"
                     class="button is-solid accent-button is-fullwidth"
-                    val="{{ cm[" post_id
-            "] }}"
+                    val="{{cm['post_id']}}"
             >
             Comment
             </button>

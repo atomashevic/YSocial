@@ -1,8 +1,6 @@
 from .models import (
-    User_mgmt,
     Post,
     Post_hashtags,
-    Hashtags,
     Mentions,
     Emotions,
     Post_emotions,
@@ -17,7 +15,7 @@ from .models import (
 )
 from sqlalchemy.sql.expression import func
 from sqlalchemy import desc
-from .utils import *
+from .text_utils import *
 
 
 def get_user_recent_posts(user_id, page, per_page=10, mode="rf", current_user=None):

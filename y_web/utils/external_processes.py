@@ -1,6 +1,9 @@
 import subprocess
 import os
 import sys
+from requests import post
+import json
+import time
 
 
 def terminate_process_on_port(port):
@@ -41,3 +44,12 @@ def start_server(exp):
     print(f"Starting server for experiment {exp_uid}...")
     subprocess.run(screen_command, shell=True, check=True)
 
+    # Wait for the server to start
+    time.sleep(5)
+    print("Setup the database")
+    data = {"path": f"{BASE_DIR[1:]}{exp.db_name}"}
+    headers = {"Content-Type": "application/json"}
+    ns = f"http://{exp.server}:{exp.port}/change_db"
+    print(ns)
+    print(data)
+    post(f"{ns}", headers=headers, data=json.dumps(data))

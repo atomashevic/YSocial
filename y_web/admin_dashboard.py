@@ -1,5 +1,4 @@
 import random
-import sys
 import os
 
 from flask import Blueprint, render_template, redirect, url_for, request, flash, abort
@@ -92,6 +91,8 @@ def change_active_experiment(exp_id):
 
     BASE_DIR = os.path.dirname(os.path.abspath(__file__))
     app.config["SQLALCHEMY_BINDS"]["db_exp"] = f"sqlite:///{BASE_DIR}/{exp.db_name}"
+
+    print(app.config["SQLALCHEMY_BINDS"]["db_exp"])
 
     # check if the user is present in the User_mgmt table
     user = db.session.query(User_mgmt).filter_by(username=current_user.username).first()

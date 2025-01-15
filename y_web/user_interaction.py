@@ -127,6 +127,8 @@ def publish_post():
     mentions = annotator.extract_components(text, c_type="mentions")
     topics = annotator.annotate_topics(text)
 
+    print(emotions, hashtags, mentions, topics)
+
     for topic in topics:
         res = Interests.query.filter_by(interest=topic).first()
         if res is None:
