@@ -39,7 +39,8 @@
                                         {id: 'exp_name', name: 'Name', 'attributes': editableCellAttributes},
                                         {id: 'exp_descr', name: 'Age', sort: false},
                                         {id: 'owner', name: 'Gender', sort: false},
-                                        {id: 'status', name: 'Status', sort: true},
+                                        {id: 'web', name: 'Web Interface', sort: true},
+                                        {id: 'running', name: 'YServer Status', sort: true},
                                         {
                                             id: 'details', name: 'Details', sort: false, formatter: (cell, row) => {
                                                 return gridjs.html(`<a href="/admin/experiment_details/${row.cells[0].data}">Details</a>`);
@@ -64,7 +65,7 @@
                                         multiColumn: true,
                                         server: {
                                             url: (prev, columns) => {
-                                                const columnIds = ['idexp', 'exp_name', 'exp_descr', 'owner', 'status'];
+                                                const columnIds = ['idexp', 'exp_name', 'exp_descr', 'owner', 'web', 'running'];
                                                 const sort = columns.map(col => (col.direction === 1 ? '+' : '-') + columnIds[col.index]);
                                                 return updateUrl(prev, {sort});
                                             },

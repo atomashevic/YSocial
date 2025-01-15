@@ -1148,7 +1148,6 @@ def add_user_to_experiment():
 @login_required
 def experiments_data():
 
-    print("here")
     query = Exps.query
 
     # search filter
@@ -1189,7 +1188,8 @@ def experiments_data():
                 "exp_name": exp.exp_name,
                 "exp_descr": exp.exp_descr,
                 "owner": exp.owner,
-                "status": "Loaded" if exp.status==1 else "Stopped",
+                "web": "Loaded" if exp.status == 1 else "Not loaded",
+                "running": "Running" if exp.running == 1 else "Stopped",
             }
             for exp in res
         ],
@@ -1223,7 +1223,8 @@ def experiment_details(uid):
     )
 
     return render_template("admin/experiment_details.html",
-                           experiment=experiment, experiment_populations=pops, users=users)
+                           experiment=experiment, experiment_populations=pops,
+                           users=users, len=len)
 
 
 @admin.route("/admin/start_experiment/<int:uid>")
