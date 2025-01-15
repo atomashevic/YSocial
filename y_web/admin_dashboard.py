@@ -920,6 +920,51 @@ def add_to_experiment():
     db.session.add(ap)
     db.session.commit()
 
+    # get the agents in the population
+    agents = Agent_Population.query.filter_by(population_id=population_id).all()
+    # get the agent details
+    agents = [Agent.query.filter_by(id=a.agent_id).first() for a in agents]
+    # get the population name
+    population_name = Population.query.filter_by(id=population_id).first().name
+
+    res = {"agents": []}
+    for a in agents:
+        res["agents"].append(
+            {
+                "name": a.name,
+                "email": f"{a.name}@ysocial.it",
+                "password": f"{a.name}",
+                "age": a.age,
+                "type": a.ag_type,
+                "leaning": a.leaning,
+                "interests": [
+                    [x.strip() for x in a.interests.split(",")],
+                    [len([x for x in a.interests.split(",")])]
+                ],
+                "oe": a.oe,
+                "co": a.co,
+                "ex": a.ex,
+                "ag": a.ag,
+                "ne": a.ne,
+                "rec_sys": a.crecsys,
+                "frec_sys": a.frecsys,
+                "language": a.language,
+                "owner": current_user.username,
+                "education_level": a.education_level,
+                "round_actions": 3,
+                "gender": a.gender,
+                "nationality": a.nationality,
+                "toxicity": a.toxicity,
+                "is_page": 0
+            }
+        )
+
+    # get the experiment name
+    exp_name = Exps.query.filter_by(idexp=experiment_id).first().db_name
+    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+    filename = f"{BASE_DIR}{os.sep}{exp_name.split('database_server.db')[0]}{os.sep}{population_name.replace(' ', '')}.json"
+    json.dump(res, open(filename, "w"))
+
     return population_details(population_id)
 
 
