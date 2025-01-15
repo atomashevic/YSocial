@@ -1,5 +1,4 @@
 import random
-import json
 import faker
 from y_web import db
 from y_web.models import Population, Agent, Agent_Population

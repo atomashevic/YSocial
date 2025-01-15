@@ -1,8 +1,9 @@
 import random
+import sys
+import os
 
 from flask import Blueprint, render_template, redirect, url_for, request, flash, abort
 from flask_login import login_user, login_required, current_user
-from numpy.lib.index_tricks import index_exp
 
 from .models import (
     Exps,
@@ -18,9 +19,9 @@ from .models import (
     Page_Population,
     User_Experiment
 )
-from y_web.data_generation import generate_population, get_feed
+from y_web.utils import (generate_population, get_feed,
+                         terminate_process_on_port, start_server)
 import json
-import os
 import pathlib, shutil
 import uuid
 from . import db, app
@@ -252,12 +253,12 @@ def upload_database():
         parents=True, exist_ok=True
     )
 
-    database.save(f"y_web{os.sep}experiments{os.sep}{uid}{os.sep}{database.filename}")
-    config.save(f"y_web{os.sep}experiments{os.sep}{uid}{os.sep}{config.filename}")
+    database.save(f"y_web{os.sep}experiments{os.sep}{uid}{os.sep}database_server.db")
+    config.save(f"y_web{os.sep}experiments{os.sep}{uid}{os.sep}config_server.json")
 
     try:
         experiment = json.load(
-            open(f"y_web{os.sep}experiments{os.sep}{uid}{os.sep}{config.filename}")
+            open(f"y_web{os.sep}experiments{os.sep}{uid}{os.sep}config_server.json")
         )
         experiment = experiment["name"]
 
@@ -343,6 +344,8 @@ def create_experiment():
         owner=db.session.query(Admin_users).filter_by(id=owner).first().username,
         exp_descr=exp_descr,
         status=0,
+        port=int(port),
+        server=host
     )
 
     db.session.add(exp)
@@ -1238,7 +1241,8 @@ def start_experiment(uid):
     db.session.query(Exps).filter_by(idexp=uid).update({Exps.running: 1})
     db.session.commit()
 
-    #@todo: configure and start the yserver
+    # start the yserver
+    start_server(exp)
 
     return experiment_details(uid)
 
@@ -1255,20 +1259,20 @@ def stop_experiment(uid):
     if exp.running == 0:
         return experiment_details(uid)
 
-    # update the experiment status
-    db.session.query(Exps).filter_by(idexp=uid).update({Exps.running: 0})
-    db.session.commit()
-
-    # @todo: stop the yserver
+    # stop the yserver
+    terminate_process_on_port(exp.port)
 
     # the clients are killed as soon as the server stops
     # update client statuses
-
     # get all populations for the experiment and update the client_running status
     populations = Population_Experiment.query.filter_by(id_exp=uid).all()
     for pop in populations:
         db.session.query(Population_Experiment).filter_by(id=pop.id_population).update({Population_Experiment.client_running: 0})
         db.session.commit()
+
+    # update the experiment status
+    db.session.query(Exps).filter_by(idexp=uid).update({Exps.running: 0})
+    db.session.commit()
 
     return experiment_details(uid)
 
