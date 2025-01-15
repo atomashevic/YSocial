@@ -1,0 +1,3 @@
+[submodule "external/YServer"]
+	path = external/YServer
+	url = https://github.com/YSocialTwin/YServer.git
