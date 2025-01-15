@@ -1,6 +1,6 @@
 import re
 from html.parser import HTMLParser
-from .models import User_mgmt, Hashtags
+from y_web.models import User_mgmt, Hashtags
 from io import StringIO
 
 
