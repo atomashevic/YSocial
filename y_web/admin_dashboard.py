@@ -143,7 +143,7 @@ def populations():
     check_privileges(current_user.username)
 
     models = ollama.list()
-    models = [m['name'] for m in models['models']]
+    models = [str(m[1]).split("'")[1] for m in models] # %todo check this breaking change
 
     return render_template("admin/populations.html", models=models)
 
@@ -154,7 +154,7 @@ def agent_data():
     check_privileges(current_user.username)
 
     models = ollama.list()
-    models = [m['name'] for m in models['models']]
+    models = [str(m[1]).split("'")[1] for m in models] # %todo check this breaking change
 
     populations = Population.query.all()
     return render_template("admin/agents.html", populations=populations, models=models)
@@ -166,7 +166,7 @@ def page_data():
     check_privileges(current_user.username)
 
     models = ollama.list()
-    models = [m['name'] for m in models['models']]
+    models = [str(m[1]).split("'")[1] for m in models] # %todo check this breaking change
 
     return render_template("admin/pages.html", models=models)
 
