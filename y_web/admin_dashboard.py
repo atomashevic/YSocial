@@ -1327,7 +1327,7 @@ def stop_experiment(uid):
     # get all populations for the experiment and update the client_running status
     populations = Client.query.filter_by(id_exp=uid).all()
     for pop in populations:
-        db.session.query(Client).filter_by(id=pop.id_population).update({Client.status: 0})
+        db.session.query(Client).filter_by(id=pop.population_id).update({Client.status: 0})
         db.session.commit()
 
     # update the experiment status
@@ -1352,7 +1352,7 @@ def run_client(uid, idexp):
     # @todo: configure and start the yclient
 
     # set the population_experiment running_status
-    db.session.query(Client).filter_by(id_population=uid, id_exp=idexp).update({Client.status: 1})
+    db.session.query(Client).filter_by(population_id=uid, id_exp=idexp).update({Client.status: 1})
     db.session.commit()
 
     return experiment_details(idexp)
@@ -1364,7 +1364,7 @@ def stop_client(uid, idexp):
     check_privileges(current_user.username)
 
     # get population_experiment and update the client_running status
-    db.session.query(Client).filter_by(id_population=uid, id_exp=idexp).update({Client.status: 0})
+    db.session.query(Client).filter_by(population_id=uid, id_exp=idexp).update({Client.status: 0})
     db.session.commit()
 
     return experiment_details(idexp)
