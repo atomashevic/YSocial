@@ -1,0 +1,284 @@
+{% include "admin/head.html" %}
+
+<div class="view-wrapper is-dashboard">
+    <!--Dashboard container-->
+    <div id="creator-dashboard" class="dashboard-container">
+        <!--Toolbar-->
+        {% include "admin/dash_head.html" %}
+
+        <div class="dashboard-body">
+
+            <div class="columns">
+                <div class="column is-12">
+                    <div class="dashboard-box">
+                        <a href="/admin/experiments">Experiments</a> > Simulation: <a href="/admin/experiment_details/{{ experiment.idexp }}">{{ experiment.exp_name }} </a> > Create New Client
+                    </div>
+                </div>
+            </div>
+
+            <div class="columns">
+                <!--Dashboard column-->
+                <div class="column is-8">
+                    <!--Dashboard box-->
+
+                    <div class="dashboard-box">
+                        <h3 class="title is-5 is-thin">New Client</h3>
+                        <div class="box-content">
+                            <form action="/admin/create_client" enctype="multipart/form-data"
+                                  method="POST">
+                                <div class="box-lines">
+                                    <input type="hidden" name="id_exp" value="{{ experiment.idexp }}">
+
+                                    <div class="box-line">
+                                        <span class="left">Name</span>
+                                        <span class="right" style="width: 70%;"><input type="text"
+                                                                                       name="name"
+                                                                                       class="input"></span>
+                                    </div>
+                                    <div class="box-line">
+                                        <span class="left">Description</span>
+                                        <span class="right" style="width: 70%;"><input type="textarea"
+                                                                                       name="descr"
+                                                                                       class="input"></span>
+                                    </div>
+                                    <div class="box-line">
+                                        <span class="left">Population</span>
+                                        <div class="select">
+                                            <select name="population_id">
+                                                <option value=""></option>
+                                                    {% for pop in populations %}
+                                                    <option value="{{ pop.id }}">{{ pop.name }}</option>
+                                                    {% endfor %}
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <hr>
+                                    <h4><b>Simulation Parameters</b></h4>
+                                    <div class="box-line">
+                                        <span class="left">Simulation Length (days)</span>
+                                        <span class="right" style="width: 70%;"><input type="text"
+                                                                                       name="days"
+                                                                                       class="input"
+                                                                                       value="30"></span>
+                                    </div>
+                                    <div class="box-line">
+                                        <span class="left">% New Agents (daily)</span>
+                                        <span class="right" style="width: 70%;"><input type="text"
+                                                                                       name="percentage_new_agents_iteration"
+                                                                                       class="input"
+                                                                                       value="0"></span>
+                                    </div>
+                                    <div class="box-line">
+                                        <span class="left">% Daily Churn</span>
+                                        <span class="right" style="width: 70%;"><input type="text"
+                                                                                       name="percentage_removed_agents_iteration"
+                                                                                       class="input"
+                                                                                       value="0"></span>
+                                    </div>
+                                    <div class="box-line">
+                                        <span class="left">Thread Context Length</span>
+                                        <span class="right" style="width: 70%;"><input type="text"
+                                                                                       name="max_length_thread_reading"
+                                                                                       class="input"
+                                                                                       value="5"></span>
+                                    </div>
+                                    <div class="box-line">
+                                        <span class="left">Timeline Follower Ratio</span>
+                                        <span class="right" style="width: 70%;"><input type="text"
+                                                                                       name="reading_from_follower_ratio"
+                                                                                       class="input"
+                                                                                       value="0.6"></span>
+                                    </div>
+                                    <div class="box-line">
+                                        <span class="left">Probability Daily Follow</span>
+                                        <span class="right" style="width: 70%;"><input type="text"
+                                                                                       name="probability_of_daily_follow"
+                                                                                       class="input"
+                                                                                       value="0.1"></span>
+                                    </div>
+                                    <div class="box-line">
+                                        <span class="left">Agents' Memory (hours)</span>
+                                        <span class="right" style="width: 70%;"><input type="text"
+                                                                                       name="attention_window"
+                                                                                       class="input"
+                                                                                       value="336"></span>
+                                    </div>
+                                    <div class="box-line">
+                                        <span class="left">Content Visibility (hours)</span>
+                                        <span class="right" style="width: 70%;"><input type="text"
+                                                                                       name="visibility_rounds"
+                                                                                       class="input"
+                                                                                       value="36"></span>
+                                    </div>
+                                    <hr>
+                                    <h4><b>Agents' Actions Candidate Selection Likelihood</b></h4>
+                                    <div class="box-line">
+                                        <span class="left">Post new content</span>
+                                        <span class="right" style="width: 70%;"><input type="text"
+                                                                                       name="post"
+                                                                                       class="input"
+                                                                                       value="0.2"></span>
+                                    </div>
+                                    <div class="box-line">
+                                        <span class="left">Share and comment an Image</span>
+                                        <span class="right" style="width: 70%;"><input type="text"
+                                                                                       name="image"
+                                                                                       class="input"
+                                                                                       value="0.15"></span>
+                                    </div>
+                                    <div class="box-line">
+                                        <span class="left">Comment on a News</span>
+                                        <span class="right" style="width: 70%;"><input type="text"
+                                                                                       name="news"
+                                                                                       class="input"
+                                                                                       value="0.15"></span>
+                                    </div>
+                                    <div class="box-line">
+                                        <span class="left">Comment a Post</span>
+                                        <span class="right" style="width: 70%;"><input type="text"
+                                                                                       name="comment"
+                                                                                       class="input"
+                                                                                       value="0.5"></span>
+                                    </div>
+                                    <div class="box-line">
+                                        <span class="left">Read a content</span>
+                                        <span class="right" style="width: 70%;"><input type="text"
+                                                                                       name="read"
+                                                                                       class="input"
+                                                                                       value="0.2"></span>
+                                    </div>
+                                    <div class="box-line">
+                                        <span class="left">Share News from a Page</span>
+                                        <span class="right" style="width: 70%;"><input type="text"
+                                                                                       name="share"
+                                                                                       class="input"
+                                                                                       value="0.2"></span>
+                                    </div>
+                                    <div class="box-line">
+                                        <span class="left">Search a Hashtag</span>
+                                        <span class="right" style="width: 70%;"><input type="text"
+                                                                                       name="search"
+                                                                                       class="input"
+                                                                                       value="0.1"></span>
+                                    </div>
+                                    <div class="box-line">
+                                        <span class="left">Cast Vote</span>
+                                        <span class="right" style="width: 70%;"><input type="text"
+                                                                                       name="vote"
+                                                                                       class="input"
+                                                                                       value="0"></span>
+                                    </div>
+                                    <hr>
+                                    <h4><b>Large Language Models</b></h4>
+                                    <div class="box-line">
+                                        <span class="left">LLM Server</span>
+                                        <span class="right" style="width: 70%;"><input type="text"
+                                                                                       name="llm"
+                                                                                       class="input"
+                                                                                       value="http://127.0.0.1:11434/v1"></span>
+                                    </div>
+                                    <div class="box-line">
+                                        <span class="left">API Key</span>
+                                        <span class="right" style="width: 70%;"><input type="text"
+                                                                                       name="llm_api_key"
+                                                                                       class="input"
+                                                                                       value="NULL"></span>
+                                    </div>
+                                    <div class="box-line">
+                                        <span class="left">Max tokens</span>
+                                        <span class="right" style="width: 70%;"><input type="text"
+                                                                                       name="llm_max_tokens"
+                                                                                       class="input"
+                                                                                       value="-1"></span>
+                                    </div>
+                                    <div class="box-line">
+                                        <span class="left">Temperature</span>
+                                        <span class="right" style="width: 70%;"><input type="text"
+                                                                                       name="llm_temperature"
+                                                                                       class="input"
+                                                                                       value="300"></span>
+                                    </div>
+                                    <hr>
+                                    <h4><b>Large Language Models (Image Transcription)</b></h4>
+                                    <div class="box-line">
+                                        <span class="left">LLM Model</span>
+                                        <span class="right" style="width: 70%;">minicpm-v<input  type="hidden"
+                                                                                       name="llm_v_agent"
+                                                                                       class="input"
+                                                                                       value="minicpm-v"></span>
+                                    </div>
+                                    <div class="box-line">
+                                        <span class="left">LLM Server</span>
+                                        <span class="right" style="width: 70%;"><input type="text"
+                                                                                       name="llm_v"
+                                                                                       class="input"
+                                                                                       value="http://127.0.0.1:11434/v1"></span>
+                                    </div>
+                                    <div class="box-line">
+                                        <span class="left">API Key</span>
+                                        <span class="right" style="width: 70%;"><input type="text"
+                                                                                       name="llm_v_api_key"
+                                                                                       class="input"
+                                                                                       value="NULL"></span>
+                                    </div>
+                                    <div class="box-line">
+                                        <span class="left">Max tokens</span>
+                                        <span class="right" style="width: 70%;"><input type="text"
+                                                                                       name="llm_v_max_tokens"
+                                                                                       class="input"
+                                                                                       value="300"></span>
+                                    </div>
+                                    <div class="box-line">
+                                        <span class="left">Temperature</span>
+                                        <span class="right" style="width: 70%;"><input type="text"
+                                                                                       name="llm_v_temperature"
+                                                                                       class="input"
+                                                                                       value="0.5"></span>
+                                    </div>
+
+                                </div>
+                                <div class="button-wrap">
+                                    <button class="button is-solid primary-button is-fullwidth">
+                                        Create
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+
+                <!--Dashboard column-->
+                <div class="column is-4">
+                    <!--Box-->
+                    <div class="dashboard-box is-compact">
+                        <h3 class="title is-5 is-thin">Guide</h3>
+                        <div class="help-block">
+                            <h4>What is an Experiment?</h4>
+                            <p>
+                                An experiment is the (active or consolidated) instance of a simulation.
+                                It composes of two elements: an SQlite database and the YServer
+                                configuration file.
+                            </p>
+                            <br>
+
+                            <h4>Adding an Experiment</h4>
+                            <p>
+                                You can either load an existing experiment or create a new one.
+                            </p>
+                            <br>
+                            <h4>Joining an Experiment</h4>
+                            <p>
+                                Only an active experiments can be joined. A single experiment can be
+                                active at a time.
+                            </p>
+                        </div>
+                    </div>
+
+
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% include "admin/footer.html" %}

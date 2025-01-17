@@ -1,0 +1,180 @@
+{% include "admin/head.html" %}
+
+<div class="view-wrapper is-dashboard">
+    <!--Dashboard container-->
+    <div id="creator-dashboard" class="dashboard-container">
+        <!--Toolbar-->
+        {% include "admin/dash_head.html" %}
+
+        <div class="dashboard-body">
+
+            <div class="columns">
+                <div class="column is-12">
+                    <div class="dashboard-box">
+                        <a href="/admin/experiments">Experiments</a> > Simulation: <a href="/admin/experiment_details/{{ experiment.idexp }}">{{ experiment.exp_name }} </a>  > Client: {{ client.name }}
+                    </div>
+                </div>
+            </div>
+
+            <div class="columns">
+                <!--Dashboard column-->
+                <div class="column is-6">
+                    <!--Dashboard box-->
+                    <div class="dashboard-box">
+                        <h3 class="title is-5 is-thin">Client</h3>
+
+                        <div class="box-content">
+                            <div class="box-lines">
+                                <div class="box-line">
+                                    <span class="left">Name</span>
+                                    <span class="right">{{ client.name }}</span>
+                                </div>
+                                <div class="box-line">
+                                    <span class="left">Description</span>
+                                    <span class="right">{{ client.descr }}</span>
+                                </div>
+                                <div class="box-line">
+                                    <span class="left">Population</span>
+                                    <span class="right">{{ client.population_id }}</span>
+                                </div>
+                                <hr>
+                                <h4><b>Simulation Parameters</b></h4>
+                                <div class="box-line">
+                                    <span class="left">Simulation Length (days)</span>
+                                    <span class="right">{{ client.days }}</span>
+                                </div>
+                                <div class="box-line">
+                                    <span class="left">% New Agents (daily)</span>
+                                    <span class="right">{{ client.percentage_new_agents_iteration }}</span>
+                                </div>
+                                <div class="box-line">
+                                    <span class="left">% Daily Churn</span>
+                                    <span class="right">{{ client.percentage_removed_agents_iteration }}</span>
+                                </div>
+                                <div class="box-line">
+                                    <span class="left">Thread Context Length</span>
+                                    <span class="right">{{ client.max_length_thread_reading }}</span>
+                                </div>
+                                <div class="box-line">
+                                    <span class="left">Timeline Follower Ratio</span>
+                                    <span class="right">{{ client.reading_from_follower_ratio }}</span>
+                                </div>
+                                <div class="box-line">
+                                    <span class="left">Probability Daily Follow</span>
+                                    <span class="right">{{ client.probability_of_daily_follow }}</span>
+                                </div>
+                                <div class="box-line">
+                                    <span class="left">Agents' Memory (hours)</span>
+                                    <span class="right">{{ client.attention_window }}</span>
+                                </div>
+                                <div class="box-line">
+                                    <span class="left">Content Visibility (hours)</span>
+                                    <span class="right">{{ client.visibility_rounds }}</span>
+                                </div>
+                                <hr>
+                                <h4><b>Agents' Actions Candidate Selection Likelihood</b></h4>
+                                <div class="box-line">
+                                    <span class="left">Post new content</span>
+                                    <span class="right">{{ client.post }}</span>
+                                </div>
+                                <div class="box-line">
+                                    <span class="left">Share and comment an Image</span>
+                                    <span class="right">{{ client.image }}</span>
+                                </div>
+                                <div class="box-line">
+                                    <span class="left">Comment on a News</span>
+                                    <span class="right">{{ client.news }}</span>
+                                </div>
+                                <div class="box-line">
+                                    <span class="left">Comment a Post</span>
+                                    <span class="right">{{ client.comment }}</span>
+                                </div>
+                                <div class="box-line">
+                                    <span class="left">Read a content</span>
+                                    <span class="right">{{ client.read }}</span>
+                                </div>
+                                <div class="box-line">
+                                    <span class="left">Share News from a Page</span>
+                                    <span class="right">{{ client.share }}</span>
+                                </div>
+                                <div class="box-line">
+                                    <span class="left">Search a Hashtag</span>
+                                    <span class="right">{{ client.search }}</span>
+                                </div>
+                                <div class="box-line">
+                                    <span class="left">Cast Vote</span>
+                                    <span class="right">{{ client.vote }}</span>
+                                </div>
+                            </div>
+                            <div class="buttons" style="display: flex; justify-content: center">
+                                <a class="button is-solid live-button has-icon" href="/admin/delete_client/{{ client.id }}">
+                            <span>Delete</span>
+                        </a>
+                        </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!--Dashboard box-->
+
+                <!--Dashboard column-->
+                <div class="column is-6">
+                    <!--Box-->
+                    <div class="dashboard-box">
+                        <div class="box-content">
+                            <div class="box-lines">
+                                <h4><b>Large Language Models</b></h4>
+                                <div class="box-line">
+                                    <span class="left">LLM Server</span>
+                                    <span class="right">{{ client.llm }}</span>
+                                </div>
+                                <div class="box-line">
+                                    <span class="left">API Key</span>
+                                    <span class="right">{{ client.llm_api_key }}</span>
+                                </div>
+
+                                <div class="box-line">
+                                    <span class="left">Max tokens</span>
+                                    <span class="right">{{ client.llm_max_tokens }}</span>
+                                </div>
+                                <div class="box-line">
+                                    <span class="left">Temperature</span>
+                                    <span class="right">{{ client.llm_temperature }}</span>
+                                </div>
+                                <hr>
+                                <h4><b>Large Language Models (Image Transcription)</b></h4>
+                                <div class="box-line">
+                                    <span class="left">LLM Model</span>
+                                    <span class="right">{{ client.llm_v_agent }}</span>
+                                </div>
+                                 <div class="box-line">
+                                    <span class="left">LLM Server</span>
+                                    <span class="right">{{ client.llm_v }}</span>
+                                </div>
+                                <div class="box-line">
+                                    <span class="left">API Key</span>
+                                    <span class="right">{{ client.llm_v_api_key }}</span>
+                                </div>
+
+                                <div class="box-line">
+                                    <span class="left">Max tokens</span>
+                                    <span class="right">{{ client.llm_v_max_tokens }}</span>
+                                </div>
+                                <div class="box-line">
+                                    <span class="left">Temperature</span>
+                                    <span class="right">{{ client.llm_v_temperature }}</span>
+                                </div>
+                            </div>
+
+                        </div>
+                    </div>
+
+
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+{% include "admin/footer.html" %}

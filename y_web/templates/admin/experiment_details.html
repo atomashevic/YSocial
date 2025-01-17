@@ -6,182 +6,210 @@
         <!--Toolbar-->
         {% include "admin/dash_head.html" %}
 
-        <div class="dashboard-body">
+        <div class="dashboard-body" >
 
             <div class="columns">
-                <!--Dashboard column-->
-                <div class="column is-4">
-                    <!--Dashboard box-->
+                <div class="column is-12">
                     <div class="dashboard-box">
-                        <h3 class="title is-5 is-thin">Experiment Summary</h3>
-
-                        <div class="box-content">
-                            <div class="box-lines">
-                                <div class="box-line">
-                                    <span class="left">Name</span>
-                                    <span class="right">{{ experiment.exp_name }}</span>
-                                </div>
-                                <div class="box-line">
-                                    <span class="left">Description</span>
-                                    <span class="right">{{ experiment.exp_descr }}</span>
-                                </div>
-                                <div class="box-line">
-                                    <span class="left">Owner</span>
-                                    <span class="right">{{ experiment.owner }}</span>
-                                </div>
-                                {% if experiment.running == 1 %}
-                                <div class="box-line">
-                                    <span class="left">Connection Endpoint</span>
-                                    <span class="right">http://{{ experiment.server }}:{{ experiment.port }}</span>
-                                </div>
-                                {% endif %}
-                            </div>
-
-                            <div class="buttons" style="display: flex; justify-content: center">
-                                <a class="button is-solid live-button has-icon"
-                                   href="/admin/delete_simulation/{{ experiment.idexp }}">
-                                    <span>Delete</span>
-                                </a>
-                            </div>
-
-                        </div>
+                        <a href="/admin/experiments">Experiments</a> > Simulation: {{ experiment.exp_name }}
                     </div>
+                </div>
+            </div>
 
-                    <div class="dashboard-box">
-                        <h3 class="title is-5 is-thin">Registered Users</h3>
+            <div class="columns">
+                            <!--Dashboard column-->
+                            <div class="column is-4">
+                                <!--Dashboard box-->
+                                <div class="dashboard-box">
+                                    <h3 class="title is-5 is-thin">Experiment Summary</h3>
 
-                        <div class="box-content">
-                            <div class="box-lines">
-                                <div class="box-line">
+                                    <div class="box-content">
+                                        <div class="box-lines">
+                                            <div class="box-line">
+                                                <span class="left">Name</span>
+                                                <span class="right">{{ experiment.exp_name }}</span>
+                                            </div>
+                                            <div class="box-line">
+                                                <span class="left">Description</span>
+                                                <span class="right">{{ experiment.exp_descr }}</span>
+                                            </div>
+                                            <div class="box-line">
+                                                <span class="left">Owner</span>
+                                                <span class="right">{{ experiment.owner }}</span>
+                                            </div>
+                                            {% if experiment.running == 1 %}
+                                            <div class="box-line">
+                                                <span class="left">Connection Endpoint</span>
+                                                <span class="right">http://{{ experiment.server }}:{{ experiment.port }}</span>
+                                            </div>
+                                            {% endif %}
+                                        </div>
+
+                                        <div class="buttons" style="display: flex; justify-content: center">
+                                            <a class="button is-solid live-button has-icon"
+                                               href="/admin/delete_simulation/{{ experiment.idexp }}">
+                                                <span>Delete</span>
+                                            </a>
+                                        </div>
+
+                                    </div>
+                                </div>
+
+                                <div class="dashboard-box">
+                                    <h3 class="title is-5 is-thin">Registered Users</h3>
+
+                                    <div class="box-content">
+                                        <div class="box-lines">
+                                            <div class="box-line">
 
                                     <span class="left">
                                         {% for user, user_exp in users %}
-                                            <a href="/admin/user_details/{{ user.id }}"  style="border: #0d95e8 1px solid; padding: 2px; margin: 2px;">{{ user.username }}</a>
+                                            <a href="/admin/user_details/{{ user.id }}"
+                                               style="border: #0d95e8 1px solid; padding: 2px; margin: 2px;">{{ user.username }}</a>
                                         {% endfor %}
                                     </span>
 
+                                            </div>
+                                        </div>
+
+                                    </div>
                                 </div>
                             </div>
 
-                        </div>
-                    </div>
-                </div>
+                            <!--Dashboard box-->
 
-                <!--Dashboard box-->
+                            <!--Dashboard column-->
+                            <div class="column is-4">
+                                <!--Box-->
+                                <div class="dashboard-box">
 
-                <!--Dashboard column-->
-                <div class="column is-4">
-                    <!--Box-->
-                    <div class="dashboard-box">
+                                    <div class="box-content">
+                                        <h3 class="title is-5 is-thin">Web Interface</h3>
+                                        <div class="buttons" style="display: flex; justify-content: flex-end">
+                                            {% if experiment.status == 0 %}
+                                            <a class="button is-solid live-button has-icon"
+                                               href="/admin/select_experiment/{{ experiment.idexp }}">
+                                                <span>Load Experiment</span>
+                                            </a>
 
-                        <div class="box-content">
-                            <h3 class="title is-5 is-thin">Web Interface</h3>
-                            <div class="buttons" style="display: flex; justify-content: flex-end">
-                                {% if experiment.status == 0 %}
-                                <a class="button is-solid live-button has-icon"
-                                   href="/admin/select_experiment/{{ experiment.idexp }}">
-                                    <span>Load Experiment</span>
-                                </a>
+                                            {% endif %}
+                                            {% if experiment.status == 1 %}
+                                            <a class="button is-solid live-button has-icon"
+                                               href="/admin/join_simulation">
+                                                <span>Join Experiment</span>
+                                            </a>
 
-                                {% endif %}
-                                {% if experiment.status == 1 %}
-                                <a class="button is-solid live-button has-icon" href="/admin/join_simulation">
-                                    <span>Join Experiment</span>
-                                </a>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                </div>
 
-                                {% endif %}
-                            </div>
-                        </div>
-                    </div>
+                                <div class="dashboard-box">
 
-                    <div class="dashboard-box">
+                                    <div class="box-content">
+                                        <h3 class="title is-5 is-thin">YServer Administration</h3>
 
-                        <div class="box-content">
-                            <h3 class="title is-5 is-thin">YServer Administration</h3>
+                                        <div class="buttons" style="display: flex; justify-content: flex-end">
+                                            {% if experiment.running == 0 %}
+                                            <a class="button is-solid live-button has-icon"
+                                               href="/admin/start_experiment/{{ experiment.idexp }}">
+                                                <span>Start Experiment</span>
+                                            </a>
+                                            {% endif %}
+                                            {% if experiment.running == 1 %}
+                                            <a class="button is-solid live-button has-icon"
+                                               href="/admin/stop_experiment/{{ experiment.idexp }}">
+                                                <span>Stop Experiment</span>
+                                            </a>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                </div>
 
-                            <div class="buttons" style="display: flex; justify-content: flex-end">
-                                {% if experiment.running == 0 %}
-                                <a class="button is-solid live-button has-icon"
-                                   href="/admin/start_experiment/{{ experiment.idexp }}">
-                                    <span>Start Experiment</span>
-                                </a>
-                                {% endif %}
-                                {% if experiment.running == 1 %}
-                                <a class="button is-solid live-button has-icon"
-                                   href="/admin/stop_experiment/{{ experiment.idexp }}">
-                                    <span>Stop Experiment</span>
-                                </a>
-                                {% endif %}
-                            </div>
-                        </div>
-                    </div>
 
-                    {% if experiment.running == 1 and len(experiment_populations)>0 %}
-                    <div class="dashboard-box">
-                        <div class="box-content">
-                            <h3 class="title is-5 is-thin">YClient Administration</h3>
-
-                            {% for pops in experiment_populations %}
-                                <div class="box-line">
-                                    <span class="left"><b>Population:</b> {{ pops[0]}}</span>
-                                    <span class="right">
-                                        {% if pops[2] == 0 %}
+                                <div class="dashboard-box">
+                                    <div class="box-content">
+                                        <h3 class="title is-5 is-thin">YClient Administration</h3>
+                                        {% if len(clients) == 0 %}
+                                        <div class="box-line">
+                                            <span class="left">No clients registered</span>
+                                        </div>
+                                        {% endif %}
+                                        {% for client in clients %}
+                                        <div class="box-line">
+                                            <span class="left"><b><a href="/admin/client_details/{{client.id}}">{{ client.name }}</a></b></span>
+                                            <span class="right">
+                                        {% if client.status == 0 and experiment.running == 1%}
                                         <a class="button is-solid live-button has-icon"
-                                             href="/admin/run_client/{{ pops[1] }}/{{ experiment.idexp }}">
+                                           href="/admin/run_client/{{ client.id }}/{{ experiment.idexp }}">
                                             <span>Run Client</span>
                                          </a>
-                                            {% else %}
+                                            {% elif client.status == 1 and experiment.running == 1 %}
                                             <a class="button is-solid live-button has-icon"
-                                             href="/admin/stop_client/{{ pops[1] }}/{{ experiment.idexp }}">
+                                               href="/admin/stop_client/{{ client.id }}/{{ experiment.idexp }}">
                                                   <span>Stop Client</span>
                                          </a>
                                             {% endif %}
 
                                     </span>
+                                        </div>
+                                        {% endfor %}
+                                        <hr>
+                                        <div style="text-align: center">
+                                        <a class="button is-solid live-button has-icon"
+                                               href="/admin/clients/{{ experiment.idexp }}">
+                                                <span>Create New Client</span>
+                                            </a>
+                                        </div>
+
+                                    </div>
                                 </div>
-                            {% endfor %}
 
                             </div>
+
+                            <div class="column is-4">
+                                <!--Box-->
+                                <div class="dashboard-box is-compact">
+                                    <h3 class="title is-5 is-thin">Guide</h3>
+                                    <div class="help-block">
+                                        <h4>Web Interface</h4>
+                                        <p>
+                                            The web interface allows you to control the experiment and view the results.
+                                            It can be activated only for one experiment at a time.
+                                        </p>
+                                        <br>
+
+                                        <h4>YServer Execution</h4>
+                                        <p>
+                                            The YServer is the main component of the experiment. It is responsible for
+                                            the execution
+                                            of the experiment.
+                                            When the YServer is running, populations can connect to it and participate
+                                            in the
+                                            experiment.
+                                        </p>
+                                        <br>
+                                        {% if experiment.running == 1 and len(experiment_populations)>0 %}
+                                        <h4>YClient</h4>
+                                        <p>
+                                            The YClient is a component that can be used to simulate a population in the
+                                            experiment.
+                                            Each YClient simulates a population of agents.
+                                        </p>
+                                        {% endif %}
+                                    </div>
+                                </div>
+
+
+                            </div>
+
+
                         </div>
-                    {% endif %}
-                    </div>
-
-                <div class="column is-4">
-                    <!--Box-->
-                    <div class="dashboard-box is-compact">
-                        <h3 class="title is-5 is-thin">Guide</h3>
-                        <div class="help-block">
-                            <h4>Web Interface</h4>
-                            <p>
-                                The web interface allows you to control the experiment and view the results.
-                                It can be activated only for one experiment at a time.
-                            </p>
-                            <br>
-
-                            <h4>YServer Execution</h4>
-                            <p>
-                                The YServer is the main component of the experiment. It is responsible for the execution of the experiment.
-                                When the YServer is running, populations can connect to it and participate in the experiment.
-                            </p>
-                            <br>
-                            {% if experiment.running == 1 and len(experiment_populations)>0 %}
-                            <h4>YClient</h4>
-                            <p>
-                                The YClient is a component that can be used to simulate a population in the experiment.
-                                Each YClient simulates a population of agents.
-                            </p>
-                            {% endif %}
-                        </div>
-                    </div>
 
 
-                </div>
-
-
-                </div>
-            </div>
         </div>
     </div>
+</div>
 
 
 {% include "admin/footer.html" %}

@@ -12630,7 +12630,7 @@ body.is-white {
     transition: all .3s
 }
 
-.options-nav.no-shadow {
+.options-nav.no-shadow, .options-nav-dashboard.no-shadow {
     box-shadow: none
 }
 
@@ -42753,32 +42753,32 @@ body.is-dark .mobile-navbar .navbar-menu .navbar-item .navbar-dropdown .navbar-i
 }
 
 /*! _navbar-options-dark.scss | Friendkit | © Css Ninja. 2020-2021 */
-body.is-dark .options-nav {
+body.is-dark .options-nav, body.is-dark .options-nav-dashboard {
     background: #1c2330;
     border-color: #1c2330
 }
 
-body.is-dark .options-nav .nav-inner.is-friends .nav-item.is-icon svg {
+body.is-dark .options-nav .nav-inner.is-friends .nav-item.is-icon svg, body.is-dark .options-nav-dashboard .nav-inner.is-friends .nav-item.is-icon svg {
     stroke: #a2a5b9
 }
 
-body.is-dark .options-nav .nav-inner.is-friends .option-tabs.is-friends .option-tab:not(.is-active) span {
+body.is-dark .options-nav .nav-inner.is-friends .option-tabs.is-friends .option-tab:not(.is-active) span, body.is-dark .options-nav-dashboard .nav-inner.is-friends .option-tabs.is-friends .option-tab:not(.is-active) span {
     color: #4e6183
 }
 
-body.is-dark .options-nav .nav-inner.is-friends .option-tabs.is-friends .option-tab.is-active span {
+body.is-dark .options-nav .nav-inner.is-friends .option-tabs.is-friends .option-tab.is-active span, body.is-dark .options-nav-dashboard .nav-inner.is-friends .option-tabs.is-friends .option-tab.is-active span {
     color: #fafafa
 }
 
-body.is-dark .options-nav .nav-inner.is-friends .option-tabs.is-friends .option-naver {
+body.is-dark .options-nav .nav-inner.is-friends .option-tabs.is-friends .option-naver, body.is-dark .options-nav-dashboard .nav-inner.is-friends .option-tabs.is-friends .option-naver {
     background: #5596e6
 }
 
-body.is-dark .options-nav .nav-inner.is-friends .end-group .is-friend-count {
+body.is-dark .options-nav .nav-inner.is-friends .end-group .is-friend-count, body.is-dark .options-nav-dashboard .nav-inner.is-friends .end-group .is-friend-count {
     color: #a2a5b9
 }
 
-body.is-dark .options-nav .nav-inner.is-friends .end-group .is-icon,body.is-dark .options-nav .nav-inner.is-friends .end-group .is-search {
+body.is-dark .options-nav .nav-inner.is-friends .end-group .is-icon,body.is-dark .options-nav .nav-inner.is-friends .end-group .is-search, body.is-dark .options-nav-dashboard .nav-inner.is-friends .end-group .is-icon,body.is-dark .options-nav-dashboard .nav-inner.is-friends .end-group .is-search {
     border-color: #37445c
 }
 

@@ -16,7 +16,8 @@ from .models import (
     Agent_Profile,
     Page, Population_Experiment,
     Page_Population,
-    User_Experiment
+    User_Experiment,
+    Client
 )
 from y_web.utils import (generate_population, get_feed,
                          terminate_process_on_port, start_server)
@@ -1101,7 +1102,6 @@ def user_details(uid):
 
     # get user experiments details for the ones joined
     joined_exp = [(j.exp_id, Exps.query.filter_by(idexp=j.exp_id).first().exp_name) for j in joined_exp]
-    print(joined_exp)
 
     return render_template("admin/user_details.html", user=user,
                            user_experiments=experiments, all_experiments=all_experiments,
@@ -1258,8 +1258,6 @@ def experiment_details(uid):
         .all()
     )
 
-    pops = [(p[1].name, p[1].id, p[0].client_running) for p in experiment_populations]
-
     users = (
         db.session.query(Admin_users, User_Experiment)
         .join(User_Experiment)
@@ -1267,8 +1265,11 @@ def experiment_details(uid):
         .all()
     )
 
+    # get experiment clients
+    clients = Client.query.filter_by(id_exp=uid).all()
+
     return render_template("admin/experiment_details.html",
-                           experiment=experiment, experiment_populations=pops,
+                           experiment=experiment, clients=clients,
                            users=users, len=len)
 
 
@@ -1312,9 +1313,9 @@ def stop_experiment(uid):
     # the clients are killed as soon as the server stops
     # update client statuses
     # get all populations for the experiment and update the client_running status
-    populations = Population_Experiment.query.filter_by(id_exp=uid).all()
+    populations = Client.query.filter_by(id_exp=uid).all()
     for pop in populations:
-        db.session.query(Population_Experiment).filter_by(id=pop.id_population).update({Population_Experiment.client_running: 0})
+        db.session.query(Client).filter_by(id=pop.id_population).update({Client.status: 0})
         db.session.commit()
 
     # update the experiment status
@@ -1339,7 +1340,7 @@ def run_client(uid, idexp):
     # @todo: configure and start the yclient
 
     # set the population_experiment running_status
-    db.session.query(Population_Experiment).filter_by(id_population=uid, id_exp=idexp).update({Population_Experiment.client_running: 1})
+    db.session.query(Client).filter_by(id_population=uid, id_exp=idexp).update({Client.status: 1})
     db.session.commit()
 
     return experiment_details(idexp)
@@ -1351,7 +1352,121 @@ def stop_client(uid, idexp):
     check_privileges(current_user.username)
 
     # get population_experiment and update the client_running status
-    db.session.query(Population_Experiment).filter_by(id_population=uid, id_exp=idexp).update({Population_Experiment.client_running: 0})
+    db.session.query(Client).filter_by(id_population=uid, id_exp=idexp).update({Client.status: 0})
     db.session.commit()
 
     return experiment_details(idexp)
+
+
+@admin.route("/admin/clients/<idexp>")
+@login_required
+def clients(idexp):
+    check_privileges(current_user.username)
+
+    # get experiment
+    exp = Exps.query.filter_by(idexp=idexp).first()
+    # get population assigned to the experiment
+    populations = Population_Experiment.query.filter_by(id_exp=idexp).all()
+    # get the populations details
+    pops = [Population.query.filter_by(id=p.id_population).first() for p in populations]
+
+    return render_template("admin/clients.html", experiment=exp, populations=pops)
+
+
+@admin.route("/admin/create_client", methods=["POST"])
+@login_required
+def create_client():
+    check_privileges(current_user.username)
+
+    name = request.form.get("name")
+    descr = request.form.get("descr")
+    exp_id = request.form.get("id_exp")
+    population_id = request.form.get("population_id")
+    days = request.form.get("days")
+    percentage_new_agents_iteration = request.form.get("percentage_new_agents_iteration")
+    percentage_removed_agents_iteration = request.form.get("percentage_removed_agents_iteration")
+    max_length_thread_reading = request.form.get("max_length_thread_reading")
+    reading_from_follower_ratio = request.form.get("reading_from_follower_ratio")
+    probability_of_daily_follow = request.form.get("probability_of_daily_follow")
+    attention_window = request.form.get("attention_window")
+    visibility_rounds = request.form.get("visibility_rounds")
+    post = request.form.get("post")
+    share = request.form.get("share")
+    image = request.form.get("image")
+    comment = request.form.get("comment")
+    read = request.form.get("read")
+    news = request.form.get("news")
+    search = request.form.get("search")
+    vote = request.form.get("vote")
+    llm = request.form.get("llm")
+    llm_api_key = request.form.get("llm_api_key")
+    llm_max_tokens = request.form.get("llm_max_tokens")
+    llm_temperature = request.form.get("llm_temperature")
+    llm_v_agent = request.form.get("llm_v_agent")
+    llm_v = request.form.get("llm_v")
+    llm_v_api_key = request.form.get("llm_v_api_key")
+    llm_v_max_tokens = request.form.get("llm_v_max_tokens")
+    llm_v_temperature = request.form.get("llm_v_temperature")
+
+    # create the Client object
+    client = Client(
+        name=name,
+        descr=descr,
+        id_exp=exp_id,
+        population_id=population_id,
+        days=days,
+        percentage_new_agents_iteration=percentage_new_agents_iteration,
+        percentage_removed_agents_iteration=percentage_removed_agents_iteration,
+        max_length_thread_reading=max_length_thread_reading,
+        reading_from_follower_ratio=reading_from_follower_ratio,
+        probability_of_daily_follow=probability_of_daily_follow,
+        attention_window=attention_window,
+        visibility_rounds=visibility_rounds,
+        post=post,
+        share=share,
+        image=image,
+        comment=comment,
+        read=read,
+        news=news,
+        search=search,
+        vote=vote,
+        llm=llm,
+        llm_api_key=llm_api_key,
+        llm_max_tokens=llm_max_tokens,
+        llm_temperature=llm_temperature,
+        llm_v_agent=llm_v_agent,
+        llm_v=llm_v,
+        llm_v_api_key=llm_v_api_key,
+        llm_v_max_tokens=llm_v_max_tokens,
+        llm_v_temperature=llm_v_temperature,
+        status=0
+    )
+
+    db.session.add(client)
+    db.session.commit()
+
+    return experiment_details(exp_id)
+
+
+@admin.route("/admin/delete_client/<int:uid>")
+@login_required
+def delete_client(uid):
+    check_privileges(current_user.username)
+
+    client = Client.query.filter_by(id=uid).first()
+    db.session.delete(client)
+    db.session.commit()
+
+    return experiment_details(client.id_exp)
+
+
+@admin.route("/admin/client_details/<int:uid>")
+@login_required
+def client_details(uid):
+    check_privileges(current_user.username)
+
+    # get client details
+    client = Client.query.filter_by(id=uid).first()
+    experiment = Exps.query.filter_by(idexp=client.id_exp).first()
+
+    return render_template("admin/client_details.html", client=client, experiment=experiment)

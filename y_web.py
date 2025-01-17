@@ -1,7 +1,7 @@
 from y_web import app, db
 
 
-def start_app(debug=False, port=8080, host="localhost"):
+def start_app(debug=True, port=8080, host="localhost"):
     """
     Start the app
 
@@ -18,8 +18,6 @@ def start_app(debug=False, port=8080, host="localhost"):
     for exp in exps:
         exp.status = 0
     db.session.commit()
-
-
 
     app.run(debug=debug, port=port, host=host)
 

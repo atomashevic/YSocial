@@ -307,7 +307,6 @@ class Population_Experiment(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     id_population = db.Column(db.Integer, db.ForeignKey("population.id"), nullable=False)
     id_exp = db.Column(db.Integer, db.ForeignKey("exps.idexp"), nullable=False)
-    client_running = db.Column(db.Integer, nullable=False, default=0)
 
 
 class Page_Population(db.Model):
@@ -328,3 +327,39 @@ class User_Experiment(db.Model):
     exp_id = db.Column(
         db.Integer, db.ForeignKey("exps.idexp"), nullable=False
     )
+
+
+class Client(db.Model):
+    __bind_key__ = "db_admin"
+    __tablename__ = "client"
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(50), nullable=False)
+    descr = db.Column(db.String(200))
+    days = db.Column(db.Integer)
+    percentage_new_agents_iteration = db.Column(db.REAL)
+    percentage_removed_agents_iteration = db.Column(db.REAL)
+    max_length_thread_reading = db.Column(db.Integer)
+    reading_from_follower_ratio = db.Column(db.REAL)
+    probability_of_daily_follow = db.Column(db.REAL)
+    attention_window = db.Column(db.Integer)
+    visibility_rounds = db.Column(db.Integer)
+    post = db.Column(db.REAL)
+    share = db.Column(db.REAL)
+    image = db.Column(db.REAL)
+    comment = db.Column(db.REAL)
+    read = db.Column(db.REAL)
+    news = db.Column(db.REAL)
+    search = db.Column(db.REAL)
+    vote = db.Column(db.REAL)
+    llm = db.Column(db.String(100))
+    llm_api_key = db.Column(db.String(300))
+    llm_max_tokens = db.Column(db.Integer)
+    llm_temperature = db.Column(db.REAL)
+    llm_v_agent = db.Column(db.String(100))
+    llm_v = db.Column(db.String(100))
+    llm_v_api_key = db.Column(db.String(300))
+    llm_v_max_tokens = db.Column(db.Integer)
+    llm_v_temperature = db.Column(db.REAL)
+    status = db.Column(db.Integer, nullable=False, default=0)
+    id_exp = db.Column(db.Integer, db.ForeignKey("exps.idexp"), nullable=False)
+    population_id = db.Column(db.Integer, db.ForeignKey("population.id"), nullable=False)
