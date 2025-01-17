@@ -143,8 +143,14 @@ def user_data():
 def populations():
     check_privileges(current_user.username)
 
-    models = ollama.list()
-    models = [str(m[1]).split("'")[1] for m in models] # %todo check this breaking change
+    # Regular expression to match model values
+    pattern = r"model='(.*?)'"
+    models = []
+    # Extract all model values
+    for i in ollama.list():
+        models = re.findall(pattern, str(i))
+
+    models = [m for m in models if len(m) > 0]
 
     return render_template("admin/populations.html", models=models)
 
@@ -166,8 +172,14 @@ def agent_data():
 def page_data():
     check_privileges(current_user.username)
 
-    models = ollama.list()
-    models = [str(m[1]).split("'")[1] for m in models] # %todo check this breaking change
+    # Regular expression to match model values
+    pattern = r"model='(.*?)'"
+    models = []
+    # Extract all model values
+    for i in ollama.list():
+        models = re.findall(pattern, str(i))
+
+    models = [m for m in models if len(m) > 0]
 
     return render_template("admin/pages.html", models=models)
 
