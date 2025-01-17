@@ -14,13 +14,18 @@ from .models import (
     Agent,
     Agent_Population,
     Agent_Profile,
-    Page, Population_Experiment,
+    Page,
+    Population_Experiment,
     Page_Population,
     User_Experiment,
-    Client
+    Client,
 )
-from y_web.utils import (generate_population, get_feed,
-                         terminate_process_on_port, start_server)
+from y_web.utils import (
+    generate_population,
+    get_feed,
+    terminate_process_on_port,
+    start_server,
+)
 import json
 import pathlib, shutil
 import uuid
@@ -93,8 +98,6 @@ def change_active_experiment(exp_id):
     BASE_DIR = os.path.dirname(os.path.abspath(__file__))
     app.config["SQLALCHEMY_BINDS"]["db_exp"] = f"sqlite:///{BASE_DIR}/{exp.db_name}"
 
-    print(app.config["SQLALCHEMY_BINDS"]["db_exp"])
-
     # check if the user is present in the User_mgmt table
     user = db.session.query(User_mgmt).filter_by(username=current_user.username).first()
 
@@ -116,7 +119,11 @@ def change_active_experiment(exp_id):
         db.session.commit()
 
         # ad to experiment if not present
-        user_exp = db.session.query(User_Experiment).filter_by(user_id=current_user.id, exp_id=exp_id).first()
+        user_exp = (
+            db.session.query(User_Experiment)
+            .filter_by(user_id=current_user.id, exp_id=exp_id)
+            .first()
+        )
         if user_exp is None:
             user_exp = User_Experiment(user_id=current_user.id, exp_id=exp_id)
             db.session.add(user_exp)
@@ -161,7 +168,9 @@ def agent_data():
     check_privileges(current_user.username)
 
     models = ollama.list()
-    models = [str(m[1]).split("'")[1] for m in models] # %todo check this breaking change
+    models = [
+        str(m[1]).split("'")[1] for m in models
+    ]  # %todo check this breaking change
 
     populations = Population.query.all()
     return render_template("admin/agents.html", populations=populations, models=models)
@@ -359,7 +368,7 @@ def create_experiment():
         exp_descr=exp_descr,
         status=0,
         port=int(port),
-        server=host
+        server=host,
     )
 
     db.session.add(exp)
@@ -656,7 +665,7 @@ def create_page():
         feed=feed,
         keywords=keywords,
         logo=logo,
-        pg_type=pg_type
+        pg_type=pg_type,
     )
 
     db.session.add(page)
@@ -745,8 +754,13 @@ def agent_details(uid):
     # get all populations
     populations = Population.query.all()
 
-    return render_template("admin/agent_details.html", agent=agent, agent_populations=pops,
-                           profile=agent_profiles, populations=populations)
+    return render_template(
+        "admin/agent_details.html",
+        agent=agent,
+        agent_populations=pops,
+        profile=agent_profiles,
+        populations=populations,
+    )
 
 
 @admin.route("/admin/add_to_population", methods=["POST"])
@@ -758,7 +772,9 @@ def add_to_population():
     population_id = request.form.get("population_id")
 
     # check if the agent is already in the population
-    ap = Agent_Population.query.filter_by(agent_id=agent_id, population_id=population_id).first()
+    ap = Agent_Population.query.filter_by(
+        agent_id=agent_id, population_id=population_id
+    ).first()
     if ap:
         return agent_details(agent_id)
 
@@ -850,7 +866,14 @@ def population_details(uid):
                 tox["toxicity"].append(a[0].toxicity)
                 tox["total"].append(1)
 
-    dd = {"age": age, "leaning": ln, "education": edu, "nationalities": nat, "languages": lang, "toxicity": tox}
+    dd = {
+        "age": age,
+        "leaning": ln,
+        "education": edu,
+        "nationalities": nat,
+        "languages": lang,
+        "toxicity": tox,
+    }
 
     topics = {}
     for a in agents:
@@ -902,7 +925,7 @@ def population_details(uid):
             "leanings": ", ".join(dd["leaning"]["leanings"]),
             "nationalities": ", ".join(dd["nationalities"]["nationalities"]),
             "languages": ", ".join(dd["languages"]["languages"]),
-            "interests":", ".join([t for t in topics]),
+            "interests": ", ".join([t for t in topics]),
             "toxicity": ", ".join(dd["toxicity"]["toxicity"]),
             "frecsys": max(frecsys, key=frecsys.get),
             "crecsys": max(crecsys, key=crecsys.get),
@@ -911,8 +934,14 @@ def population_details(uid):
     except:
         pass
 
-    return render_template("admin/population_details.html", population=population,
-                           experiments=experiments, population_experiments=exps, agents=agents, data=dd)
+    return render_template(
+        "admin/population_details.html",
+        population=population,
+        experiments=experiments,
+        population_experiments=exps,
+        agents=agents,
+        data=dd,
+    )
 
 
 @admin.route("/admin/add_to_experiment", methods=["POST"])
@@ -924,7 +953,9 @@ def add_to_experiment():
     experiment_id = request.form.get("experiment_id")
 
     # check if the population is already in the experiment
-    ap = Population_Experiment.query.filter_by(id_population=population_id, id_exp=experiment_id).first()
+    ap = Population_Experiment.query.filter_by(
+        id_population=population_id, id_exp=experiment_id
+    ).first()
     if ap:
         return population_details(population_id)
 
@@ -952,7 +983,7 @@ def add_to_experiment():
                 "leaning": a.leaning,
                 "interests": [
                     [x.strip() for x in a.interests.split(",")],
-                    [len([x for x in a.interests.split(",")])]
+                    [len([x for x in a.interests.split(",")])],
                 ],
                 "oe": a.oe,
                 "co": a.co,
@@ -968,7 +999,7 @@ def add_to_experiment():
                 "gender": a.gender,
                 "nationality": a.nationality,
                 "toxicity": a.toxicity,
-                "is_page": 0
+                "is_page": 0,
             }
         )
 
@@ -997,7 +1028,9 @@ def delete_population(uid):
         db.session.commit()
 
     # delete population_experiment entries
-    population_experiment = Population_Experiment.query.filter_by(id_population=uid).all()
+    population_experiment = Population_Experiment.query.filter_by(
+        id_population=uid
+    ).all()
     for pe in population_experiment:
         db.session.delete(pe)
         db.session.commit()
@@ -1070,8 +1103,13 @@ def page_details(uid):
 
     feed = get_feed(page.feed)
 
-    return render_template("admin/page_details.html", page=page, page_populations=pops,
-                            populations=populations, feeds=feed[:3])
+    return render_template(
+        "admin/page_details.html",
+        page=page,
+        page_populations=pops,
+        populations=populations,
+        feeds=feed[:3],
+    )
 
 
 @admin.route("/admin/add_page_to_population", methods=["POST"])
@@ -1083,7 +1121,9 @@ def add_page_to_population():
     population_id = request.form.get("population_id")
 
     # check if the page is already in the population
-    ap = Page_Population.query.filter_by(page_id=page_id, population_id=population_id).first()
+    ap = Page_Population.query.filter_by(
+        page_id=page_id, population_id=population_id
+    ).first()
     if ap:
         return page_details(page_id)
 
@@ -1113,11 +1153,18 @@ def user_details(uid):
     joined_exp = User_Experiment.query.filter_by(user_id=uid).all()
 
     # get user experiments details for the ones joined
-    joined_exp = [(j.exp_id, Exps.query.filter_by(idexp=j.exp_id).first().exp_name) for j in joined_exp]
+    joined_exp = [
+        (j.exp_id, Exps.query.filter_by(idexp=j.exp_id).first().exp_name)
+        for j in joined_exp
+    ]
 
-    return render_template("admin/user_details.html", user=user,
-                           user_experiments=experiments, all_experiments=all_experiments,
-                           user_experiments_joined=joined_exp)
+    return render_template(
+        "admin/user_details.html",
+        user=user,
+        user_experiments=experiments,
+        all_experiments=all_experiments,
+        user_experiments_joined=joined_exp,
+    )
 
 
 @admin.route("/admin/add_user", methods=["POST"])
@@ -1187,7 +1234,11 @@ def add_user_to_experiment():
         db.session.commit()
 
         # ad to experiment if not present
-        user_exp = db.session.query(User_Experiment).filter_by(user_id=user_id, exp_id=experiment_id).first()
+        user_exp = (
+            db.session.query(User_Experiment)
+            .filter_by(user_id=user_id, exp_id=experiment_id)
+            .first()
+        )
 
         if user_exp is None:
             user_exp = User_Experiment(user_id=user_id, exp_id=experiment_id)
@@ -1280,9 +1331,13 @@ def experiment_details(uid):
     # get experiment clients
     clients = Client.query.filter_by(id_exp=uid).all()
 
-    return render_template("admin/experiment_details.html",
-                           experiment=experiment, clients=clients,
-                           users=users, len=len)
+    return render_template(
+        "admin/experiment_details.html",
+        experiment=experiment,
+        clients=clients,
+        users=users,
+        len=len,
+    )
 
 
 @admin.route("/admin/start_experiment/<int:uid>")
@@ -1327,7 +1382,9 @@ def stop_experiment(uid):
     # get all populations for the experiment and update the client_running status
     populations = Client.query.filter_by(id_exp=uid).all()
     for pop in populations:
-        db.session.query(Client).filter_by(id=pop.population_id).update({Client.status: 0})
+        db.session.query(Client).filter_by(id=pop.population_id).update(
+            {Client.status: 0}
+        )
         db.session.commit()
 
     # update the experiment status
@@ -1352,7 +1409,9 @@ def run_client(uid, idexp):
     # @todo: configure and start the yclient
 
     # set the population_experiment running_status
-    db.session.query(Client).filter_by(population_id=uid, id_exp=idexp).update({Client.status: 1})
+    db.session.query(Client).filter_by(population_id=uid, id_exp=idexp).update(
+        {Client.status: 1}
+    )
     db.session.commit()
 
     return experiment_details(idexp)
@@ -1364,7 +1423,9 @@ def stop_client(uid, idexp):
     check_privileges(current_user.username)
 
     # get population_experiment and update the client_running status
-    db.session.query(Client).filter_by(population_id=uid, id_exp=idexp).update({Client.status: 0})
+    db.session.query(Client).filter_by(population_id=uid, id_exp=idexp).update(
+        {Client.status: 0}
+    )
     db.session.commit()
 
     return experiment_details(idexp)
@@ -1395,8 +1456,12 @@ def create_client():
     exp_id = request.form.get("id_exp")
     population_id = request.form.get("population_id")
     days = request.form.get("days")
-    percentage_new_agents_iteration = request.form.get("percentage_new_agents_iteration")
-    percentage_removed_agents_iteration = request.form.get("percentage_removed_agents_iteration")
+    percentage_new_agents_iteration = request.form.get(
+        "percentage_new_agents_iteration"
+    )
+    percentage_removed_agents_iteration = request.form.get(
+        "percentage_removed_agents_iteration"
+    )
     max_length_thread_reading = request.form.get("max_length_thread_reading")
     reading_from_follower_ratio = request.form.get("reading_from_follower_ratio")
     probability_of_daily_follow = request.form.get("probability_of_daily_follow")
@@ -1451,7 +1516,7 @@ def create_client():
         llm_v_api_key=llm_v_api_key,
         llm_v_max_tokens=llm_v_max_tokens,
         llm_v_temperature=llm_v_temperature,
-        status=0
+        status=0,
     )
 
     db.session.add(client)
@@ -1481,4 +1546,6 @@ def client_details(uid):
     client = Client.query.filter_by(id=uid).first()
     experiment = Exps.query.filter_by(idexp=client.id_exp).first()
 
-    return render_template("admin/client_details.html", client=client, experiment=experiment)
+    return render_template(
+        "admin/client_details.html", client=client, experiment=experiment
+    )
