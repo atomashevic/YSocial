@@ -305,7 +305,9 @@ class Population_Experiment(db.Model):
     __bind_key__ = "db_admin"
     __tablename__ = "population_experiment"
     id = db.Column(db.Integer, primary_key=True)
-    id_population = db.Column(db.Integer, db.ForeignKey("population.id"), nullable=False)
+    id_population = db.Column(
+        db.Integer, db.ForeignKey("population.id"), nullable=False
+    )
     id_exp = db.Column(db.Integer, db.ForeignKey("exps.idexp"), nullable=False)
 
 
@@ -324,9 +326,7 @@ class User_Experiment(db.Model):
     __tablename__ = "user_experiment"
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey("admin_users.id"), nullable=False)
-    exp_id = db.Column(
-        db.Integer, db.ForeignKey("exps.idexp"), nullable=False
-    )
+    exp_id = db.Column(db.Integer, db.ForeignKey("exps.idexp"), nullable=False)
 
 
 class Client(db.Model):
@@ -362,4 +362,17 @@ class Client(db.Model):
     llm_v_temperature = db.Column(db.REAL)
     status = db.Column(db.Integer, nullable=False, default=0)
     id_exp = db.Column(db.Integer, db.ForeignKey("exps.idexp"), nullable=False)
-    population_id = db.Column(db.Integer, db.ForeignKey("population.id"), nullable=False)
+    population_id = db.Column(
+        db.Integer, db.ForeignKey("population.id"), nullable=False
+    )
+
+
+class Client_Execution(db.Model):
+    __bind_key__ = "db_admin"
+    __tablename__ = "client_execution"
+    id = db.Column(db.Integer, primary_key=True)
+    client_id = db.Column(db.Integer, db.ForeignKey("client.id"), nullable=False)
+    elapsed_time =db.Column(db.Integer, default=0)
+    expected_duration_rounds = db.Column(db.Integer, default=0)
+    last_active_hour = db.Column(db.Integer, default=-1)
+    last_active_day = db.Column(db.Integer, default=-1)

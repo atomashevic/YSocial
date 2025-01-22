@@ -4,12 +4,40 @@ from flask_login import LoginManager
 import shutil
 import os
 
+
+import signal
+import atexit
+
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 # init SQLAlchemy so we can use it later in our models
 
 
 app = Flask(__name__, static_url_path="/static")
+
+
+client_processes = {}
+def cleanup_subprocesses():
+    """Terminate all subprocesses."""
+    print("Cleaning up subprocesses...")
+    for _, proc in client_processes.items():
+        print(f"Terminating subprocess {proc.pid}...")
+        proc.terminate() # Wait for the process to terminate
+        proc.join()
+    print("All subprocesses terminated.")
+
+
+# Register cleanup for Ctrl+C (SIGINT)
+def signal_handler(sig, frame):
+    print("Ctrl+C detected, shutting down...")
+    cleanup_subprocesses()
+    exit(0)
+
+
+signal.signal(signal.SIGINT, signal_handler)
+
+# Register cleanup on normal program exit
+atexit.register(cleanup_subprocesses)
 
 # check if the database dashboard.db exists in the db directory, if not copy from data_schema
 if not os.path.exists(f"{BASE_DIR}/db/dashboard.db"):
@@ -63,3 +91,5 @@ app.register_blueprint(main_blueprint)
 from .user_interaction import user as user_blueprint
 
 app.register_blueprint(user_blueprint)
+
+

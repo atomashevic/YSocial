@@ -1,7 +1,17 @@
 import random
 import os
+from collections import defaultdict
 
-from flask import Blueprint, render_template, redirect, url_for, request, flash, abort
+from flask import (
+    Blueprint,
+    render_template,
+    redirect,
+    url_for,
+    request,
+    flash,
+    abort,
+    send_file,
+)
 from flask_login import login_user, login_required, current_user
 
 from .models import (
@@ -19,12 +29,15 @@ from .models import (
     Page_Population,
     User_Experiment,
     Client,
+    Client_Execution
 )
 from y_web.utils import (
     generate_population,
     get_feed,
     terminate_process_on_port,
     start_server,
+    start_client,
+    terminate_client
 )
 import json
 import pathlib, shutil
@@ -53,7 +66,28 @@ def reload_current_user(username):
 @login_required
 def dashboard():
     check_privileges(current_user.username)
-    return render_template("admin/dashboard.html")
+
+    # get all experiments
+    experiments = Exps.query.all()
+    # get all clients for each experiment
+    exps = {}
+    for e in experiments:
+        exps[e.idexp] = {
+            "experiment": e,
+            "clients": Client.query.filter_by(id_exp=e.idexp).all(),
+
+        }
+
+    res = {}
+    # get clients with client_execution information
+    for exp, data in exps.items():
+        res[exp] = {"experiment": data["experiment"], "clients": []}
+        for client in data["clients"]:
+            cl = Client_Execution.query.filter_by(client_id=client.id).first()
+            client_executions = cl if cl is not None else -1
+            res[exp]["clients"].append((client, client_executions))
+
+    return render_template("admin/dashboard.html", experiments=res)
 
 
 @admin.route("/admin/experiments")
@@ -167,10 +201,13 @@ def populations():
 def agent_data():
     check_privileges(current_user.username)
 
-    models = ollama.list()
-    models = [
-        str(m[1]).split("'")[1] for m in models
-    ]  # %todo check this breaking change
+    pattern = r"model='(.*?)'"
+    models = []
+    # Extract all model values
+    for i in ollama.list():
+        models = re.findall(pattern, str(i))
+
+    models = [m for m in models if len(m) > 0]
 
     populations = Population.query.all()
     return render_template("admin/agents.html", populations=populations, models=models)
@@ -393,7 +430,6 @@ def create_experiment():
 @admin.route("/admin/delete_simulation/<int:exp_id>")
 @login_required
 def delete_simulation(exp_id):
-
     # get the experiment
     exp = Exps.query.filter_by(idexp=exp_id).first()
     if exp:
@@ -964,51 +1000,6 @@ def add_to_experiment():
     db.session.add(ap)
     db.session.commit()
 
-    # get the agents in the population
-    agents = Agent_Population.query.filter_by(population_id=population_id).all()
-    # get the agent details
-    agents = [Agent.query.filter_by(id=a.agent_id).first() for a in agents]
-    # get the population name
-    population_name = Population.query.filter_by(id=population_id).first().name
-
-    res = {"agents": []}
-    for a in agents:
-        res["agents"].append(
-            {
-                "name": a.name,
-                "email": f"{a.name}@ysocial.it",
-                "password": f"{a.name}",
-                "age": a.age,
-                "type": a.ag_type,
-                "leaning": a.leaning,
-                "interests": [
-                    [x.strip() for x in a.interests.split(",")],
-                    [len([x for x in a.interests.split(",")])],
-                ],
-                "oe": a.oe,
-                "co": a.co,
-                "ex": a.ex,
-                "ag": a.ag,
-                "ne": a.ne,
-                "rec_sys": a.crecsys,
-                "frec_sys": a.frecsys,
-                "language": a.language,
-                "owner": current_user.username,
-                "education_level": a.education_level,
-                "round_actions": 3,
-                "gender": a.gender,
-                "nationality": a.nationality,
-                "toxicity": a.toxicity,
-                "is_page": 0,
-            }
-        )
-
-    # get the experiment name
-    exp_name = Exps.query.filter_by(idexp=experiment_id).first().db_name
-    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-    filename = f"{BASE_DIR}{os.sep}{exp_name.split('database_server.db')[0]}{os.sep}{population_name.replace(' ', '')}.json"
-    json.dump(res, open(filename, "w"))
-
     return population_details(population_id)
 
 
@@ -1255,7 +1246,6 @@ def add_user_to_experiment():
 @admin.route("/admin/experiments_data")
 @login_required
 def experiments_data():
-
     query = Exps.query
 
     # search filter
@@ -1359,7 +1349,7 @@ def start_experiment(uid):
     # start the yserver
     start_server(exp)
 
-    return experiment_details(uid)
+    return redirect(request.referrer) #experiment_details(uid)
 
 
 @admin.route("/admin/stop_experiment/<int:uid>")
@@ -1391,7 +1381,35 @@ def stop_experiment(uid):
     db.session.query(Exps).filter_by(idexp=uid).update({Exps.running: 0})
     db.session.commit()
 
-    return experiment_details(uid)
+    return redirect(request.referrer)  # experiment_details(uid)
+
+
+@admin.route("/admin/reset_client/<int:uid>")
+@login_required
+def reset_client(uid):
+    check_privileges(current_user.username)
+
+    # set elapsed time to 0
+    db.session.query(Client_Execution).filter_by(client_id=int(uid)).update(
+        {Client_Execution.elapsed_time: 0}
+    )
+    db.session.commit()
+
+    # delete experiment json files
+    client = Client.query.filter_by(id=uid).first()
+    exp = Exps.query.filter_by(idexp=client.id_exp).first()
+    population = Population.query.filter_by(id=client.population_id).first()
+    path = f"y_web{os.sep}experiments{os.sep}{exp.db_name.split(os.sep)[1]}{os.sep}{population.name}.json"
+    if os.path.exists(path):
+        os.remove(path)
+
+    path = f"y_web{os.sep}experiments{os.sep}{exp.db_name.split(os.sep)[1]}{os.sep}prompts.json"
+    if os.path.exists(path):
+        os.remove(path)
+
+    #todo finalize
+
+    return redirect(request.referrer)
 
 
 @admin.route("/admin/run_client/<int:uid>/<int:idexp>")
@@ -1401,20 +1419,63 @@ def run_client(uid, idexp):
 
     # get experiment
     exp = Exps.query.filter_by(idexp=idexp).first()
+    # get the client
+    client = Client.query.filter_by(id=uid).first()
+
+    # check if the experiment is already running
+    if exp.running == 0:
+        return redirect(request.referrer)
+
+    # get population of the experiment
+    population = Population.query.filter_by(id=client.population_id).first()
+    start_client(exp, client, population)
+
+    # set the population_experiment running_status
+    db.session.query(Client).filter_by(id=uid).update({Client.status: 1})
+    db.session.commit()
+
+    return redirect(request.referrer)
+
+
+@admin.route("/admin/resume_client/<int:uid>/<int:idexp>")
+@login_required
+def resume_client(uid, idexp):
+    check_privileges(current_user.username)
+
+    # get experiment
+    exp = Exps.query.filter_by(idexp=idexp).first()
+    # get the client
+    client = Client.query.filter_by(id=uid).first()
 
     # check if the experiment is already running
     if exp.running == 0:
         return experiment_details(idexp)
 
-    # @todo: configure and start the yclient
+    # get population of the experiment
+    population = Population.query.filter_by(id=client.population_id).first()
+    start_client(exp, client, population, resume=True)
 
     # set the population_experiment running_status
-    db.session.query(Client).filter_by(population_id=uid, id_exp=idexp).update(
-        {Client.status: 1}
-    )
+    db.session.query(Client).filter_by(id=uid).update({Client.status: 1})
     db.session.commit()
 
-    return experiment_details(idexp)
+    return redirect(request.referrer)
+
+
+@admin.route("/admin/pause_client/<int:uid>/<int:idexp>")
+@login_required
+def pause_client(uid, idexp):
+    check_privileges(current_user.username)
+
+    # get population_experiment and update the client_running status
+    db.session.query(Client).filter_by(id=uid).update({Client.status: 0})
+    db.session.commit()
+
+    # get client
+    client = Client.query.filter_by(id=uid).first()
+    terminate_client(client, pause=True)
+
+    return redirect(request.referrer)
 
 
 @admin.route("/admin/stop_client/<int:uid>/<int:idexp>")
@@ -1423,12 +1484,14 @@ def stop_client(uid, idexp):
     check_privileges(current_user.username)
 
     # get population_experiment and update the client_running status
-    db.session.query(Client).filter_by(population_id=uid, id_exp=idexp).update(
-        {Client.status: 0}
-    )
+    db.session.query(Client).filter_by(id=uid).update({Client.status: 0})
     db.session.commit()
 
-    return experiment_details(idexp)
+    # get client
+    client = Client.query.filter_by(id=uid).first()
+    terminate_client(client, pause=False)
+
+    return redirect(request.referrer) #experiment_details(idexp)
 
 
 @admin.route("/admin/clients/<idexp>")
@@ -1522,6 +1585,118 @@ def create_client():
     db.session.add(client)
     db.session.commit()
 
+    # create the configuration file for the client
+    # get experiment
+    exp = Exps.query.filter_by(idexp=exp_id).first()
+    # get population
+    population = Population.query.filter_by(id=population_id).first()
+
+    config = {
+        "servers": {
+            "llm": llm,
+            "llm_api_key": llm_api_key,
+            "llm_max_tokens": int(llm_max_tokens),
+            "llm_temperature": float(llm_temperature),
+            "llm_v": llm_v,
+            "llm_v_api_key": llm_v_api_key,
+            "llm_v_max_tokens": int(llm_v_max_tokens),
+            "llm_v_temperature": float(llm_v_temperature),
+            "api": f"http://{exp.server}:{exp.port}/",
+        },
+        "simulation": {
+            "name": name,
+            "population": population.name,
+            "client": "YClientWeb",
+            "days": int(days),
+            "slots": 24,
+            "percentage_new_agents_iteration": float(percentage_new_agents_iteration),
+            "percentage_removed_agents_iteration": float(percentage_removed_agents_iteration),
+            "hourly_activity": {
+                "10": 0.021,
+                "16": 0.032,
+                "8": 0.020,
+                "12": 0.024,
+                "15": 0.032,
+                "17": 0.032,
+                "23": 0.025,
+                "6": 0.017,
+                "18": 0.032,
+                "11": 0.022,
+                "13": 0.027,
+                "14": 0.030,
+                "20": 0.030,
+                "21": 0.029,
+                "7": 0.018,
+                "22": 0.027,
+                "9": 0.020,
+                "3": 0.020,
+                "5": 0.017,
+                "4": 0.018,
+                "1": 0.021,
+                "2": 0.020,
+                "0": 0.023,
+                "19": 0.031,
+            },
+            "actions_likelihood": {
+                "post": float(post),
+                "image": float(image),
+                "news": float(news),
+                "comment": float(comment),
+                "read": float(read),
+                "share": float(share),
+                "search": float(search),
+                "cast": float(vote),
+            },
+        },
+        "posts": {
+            "visibility_rounds": int(visibility_rounds),
+            "emotions": {
+                "admiration": None,
+                "amusement": None,
+                "anger": None,
+                "annoyance": None,
+                "approval": None,
+                "caring": None,
+                "confusion": None,
+                "curiosity": None,
+                "desire": None,
+                "disappointment": None,
+                "disapproval": None,
+                "disgust": None,
+                "embarrassment": None,
+                "excitement": None,
+                "fear": None,
+                "gratitude": None,
+                "grief": None,
+                "joy": None,
+                "love": None,
+                "nervousness": None,
+                "optimism": None,
+                "pride": None,
+                "realization": None,
+                "relief": None,
+                "remorse": None,
+                "sadness": None,
+                "surprise": None,
+                "trust": None,
+            },
+        },
+        "agents": {
+            "reading_from_follower_ratio": float(reading_from_follower_ratio),
+            "max_length_thread_reading": int(max_length_thread_reading),
+            "attention_window": int(attention_window),
+            "probability_of_daily_follow": float(probability_of_daily_follow),
+        },
+    }
+
+    uid = exp.db_name.split(os.sep)[1]
+
+    with open(
+        f"y_web{os.sep}experiments{os.sep}{uid}{os.sep}client_{name}-{population.name}.json",
+        "w",
+    ) as f:
+        json.dump(config, f)
+
     return experiment_details(exp_id)
 
 
@@ -1546,6 +1721,55 @@ def client_details(uid):
     client = Client.query.filter_by(id=uid).first()
     experiment = Exps.query.filter_by(idexp=client.id_exp).first()
 
-    return render_template(
-        "admin/client_details.html", client=client, experiment=experiment
+    # get population for the client
+    population = Population.query.filter_by(id=client.population_id).first()
+    # get the pages included to the population
+    pages = (
+        db.session.query(Page, Page_Population)
+        .join(Page_Population)
+        .filter(Page_Population.population_id == client.population_id)
+        .all()
     )
+
+    return render_template(
+        "admin/client_details.html",
+        client=client,
+        experiment=experiment,
+        population=population,
+        pages=pages,
+    )
+
+
+@admin.route("/admin/download/<string:ftype>/<int:uid>")
+@login_required
+def download_experiment(uid, ftype):
+    check_privileges(current_user.username)
+
+    exp = Exps.query.filter_by(idexp=uid).first()
+
+    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+    if ftype == "experiment_db":
+        filename = f"{BASE_DIR}{os.sep}{exp.db_name}"
+
+    if ftype == "population":
+        # @todo: create the population json file
+        pass
+
+    if ftype == "client":
+        # @todo: implement
+        pass
+
+    return send_file(filename, as_attachment=True)
+
+
+@app.route('/admin/progress/<int:client_id>')
+def get_progress(client_id):
+    """Return the current progress as JSON."""
+    # get client_execution
+    client_execution = Client_Execution.query.filter_by(client_id=client_id).first()
+
+    if client_execution is None:
+        return json.dumps({"progress": 0})
+    progress = int(100 * float(client_execution.elapsed_time)/float(client_execution.expected_duration_rounds)) if client_execution.expected_duration_rounds > 0 else 0
+    return json.dumps({"progress": progress})

@@ -25,7 +25,6 @@ user = Blueprint("user_actions", __name__)
 @user.route("/follow/<int:user_id>")
 @login_required
 def follow(user_id):
-
     # get the last round id from Rounds
     current_round = Rounds.query.order_by(Rounds.id.desc()).first()
 
@@ -82,7 +81,6 @@ def react():
             db.session.commit()
 
     else:
-
         reaction = Reactions(
             post_id=post_id,
             user_id=current_user.id,

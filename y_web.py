@@ -1,7 +1,7 @@
 from y_web import app, db
 
 
-def start_app(debug=True, port=8080, host="localhost"):
+def start_app(debug=False, port=8080, host="localhost"):
     """
     Start the app
 

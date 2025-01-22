@@ -14,7 +14,6 @@ def generate_population(population_name):
     population = Population.query.filter_by(name=population_name).first()
 
     for _ in range(population.size):
-
         try:
             nationality = random.sample(population.nationalities.split(","), 1)[
                 0
@@ -49,7 +48,7 @@ def generate_population(population_name):
         language = fake.random_element(
             elements=(population.languages.split(","))
         ).strip()
-        ag_type = fake.random_element(elements=(population.llm.split(","))).strip()
+        ag_type = population.llm
 
         oe = fake.random_element(elements=("inventive/curious", "consistent/cautious"))
         co = fake.random_element(

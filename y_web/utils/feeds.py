@@ -8,7 +8,9 @@ def get_feed(url):
 
     for entry in feed.entries:
         try:
-            res.append({"title": entry.title, "summary": entry.summary, "link": entry.link})
+            res.append(
+                {"title": entry.title, "summary": entry.summary, "link": entry.link}
+            )
         except:
             pass
 

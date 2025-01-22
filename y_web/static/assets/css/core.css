@@ -47727,3 +47727,72 @@ select {
   border: none;
   border-radius: 20px;
 }
+
+
+.link-tooltip:hover .mdi {
+        color: red;
+}
+
+
+
+/* Tooltip container styles */
+.link-tooltip {
+    position: relative;
+    display: inline-block;
+    cursor: pointer;
+}
+
+/* Tooltip text hidden by default */
+.link-tooltip .tooltip-text {
+    visibility: hidden;
+    width: 120px; /* Adjust width as needed */
+    background-color: black;
+    color: #fff;
+    text-align: center;
+    border-radius: 4px;
+    padding: 5px 8px;
+    position: absolute;
+    z-index: 1;
+    bottom: 125%; /* Position above the icon */
+    left: 50%;
+    transform: translateX(-50%);
+    opacity: 0;
+    transition: opacity 0.3s;
+}
+
+/* Tooltip arrow */
+.link-tooltip .tooltip-text::after {
+    content: '';
+    position: absolute;
+    top: 100%; /* Position at the bottom of the tooltip */
+    left: 50%;
+    margin-left: -5px;
+    border-width: 5px;
+    border-style: solid;
+    border-color: black transparent transparent transparent;
+}
+
+/* Show the tooltip on hover */
+.link-tooltip:hover .tooltip-text {
+    visibility: visible;
+    opacity: 1;
+}
+
+/* Active icon color */
+.mdi.active {
+    color: green;
+}
+
+
+.mdi.disabled {
+    color: grey;
+}
+
+
+.link-tooltip:hover .mdi.active {
+    color: green; /* Keep green for active state */
+}
+
+.link-tooltip:hover .mdi.disabled {
+    color: grey; /* Keep green for active state */
+}

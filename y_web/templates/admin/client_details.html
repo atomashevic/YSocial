@@ -35,9 +35,32 @@
                                 </div>
                                 <div class="box-line">
                                     <span class="left">Population</span>
-                                    <span class="right">{{ client.population_id }}</span>
+                                    <span class="right"><a href="/admin/population_details/{{ population.id }}">{{ population.name }}</a></span>
                                 </div>
-                                <hr>
+                                <div class="box-line">
+                                    <span class="left">Pages</span>
+
+                                    <span class="right">
+                                        <ul>
+                                        {% for page in pages %}
+                                            <li><a href="/admin/page_details/{{ page[0].id }}">{{ page[0].name }}</a></li>
+                                        {% endfor %}
+                                        </ul>
+                                    </span>
+                                </div>
+
+                            </div>
+                            <div class="buttons" style="display: flex; justify-content: right">
+                                <a class="link-tooltip" href="/admin/delete_client/{{ client.id }}" title="Delete"><i
+                                     class="mdi mdi-delete" style="font-size: 24px;"></i></a>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="dashboard-box">
+                        <div class="box-content">
+                            <div class="box-lines">
+
                                 <h4><b>Simulation Parameters</b></h4>
                                 <div class="box-line">
                                     <span class="left">Simulation Length (days)</span>
@@ -71,8 +94,14 @@
                                     <span class="left">Content Visibility (hours)</span>
                                     <span class="right">{{ client.visibility_rounds }}</span>
                                 </div>
-                                <hr>
-                                <h4><b>Agents' Actions Candidate Selection Likelihood</b></h4>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="dashboard-box">
+                        <div class="box-content">
+                            <div class="box-lines">
+                                 <h4><b>Agents' Actions Candidate Selection Likelihood</b></h4>
                                 <div class="box-line">
                                     <span class="left">Post new content</span>
                                     <span class="right">{{ client.post }}</span>
@@ -106,13 +135,9 @@
                                     <span class="right">{{ client.vote }}</span>
                                 </div>
                             </div>
-                            <div class="buttons" style="display: flex; justify-content: center">
-                                <a class="button is-solid live-button has-icon" href="/admin/delete_client/{{ client.id }}">
-                            <span>Delete</span>
-                        </a>
-                        </div>
                         </div>
                     </div>
+
                 </div>
 
                 <!--Dashboard box-->

@@ -62,7 +62,6 @@ def get_user_recent_posts(user_id, page, per_page=10, mode="rf", current_user=No
         ).paginate(page=page, per_page=per_page)
 
     else:
-
         # get the user posts with the most reactions
         posts = (
             Post.query.filter_by(user_id=int(user_id), comment_to=-1)

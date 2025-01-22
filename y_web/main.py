@@ -7,7 +7,6 @@ main = Blueprint("main", __name__)
 
 
 def is_admin(username):
-
     user = Admin_users.query.filter_by(username=username).first()
     if user.role != "admin":
         return False
@@ -512,7 +511,6 @@ def get_friends(user_id, page=1):
 @main.get("/thread/<int:post_id>")
 @login_required
 def get_thread(post_id):
-
     # get thread_id for post_id
     thread_id = Post.query.filter_by(id=post_id).first().thread_id
 
@@ -560,7 +558,6 @@ def get_thread(post_id):
     post_to_data = {posts[0].id: discussion_tree}
 
     for post in posts[1:]:
-
         c = Rounds.query.filter_by(id=post.round).first()
         if c is None:
             day = "None"
