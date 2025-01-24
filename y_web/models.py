@@ -365,6 +365,7 @@ class Client(db.Model):
     population_id = db.Column(
         db.Integer, db.ForeignKey("population.id"), nullable=False
     )
+    network_type = db.Column(db.String(50), default="")
 
 
 class Client_Execution(db.Model):

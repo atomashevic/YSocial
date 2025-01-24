@@ -47796,3 +47796,9 @@ select {
 .link-tooltip:hover .mdi.disabled {
     color: grey; /* Keep green for active state */
 }
+
+
+.box-line .hidden {
+    display: none;
+    visibility: hidden;
+        }

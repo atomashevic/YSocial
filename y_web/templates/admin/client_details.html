@@ -51,6 +51,8 @@
 
                             </div>
                             <div class="buttons" style="display: flex; justify-content: right">
+                                <a class="link-tooltip" href="/admin/download_agent_list/{{ client.id }}" title="Download Agent List"><i
+                                     class="mdi mdi-account-star" style="font-size: 24px;"></i></a>
                                 <a class="link-tooltip" href="/admin/delete_client/{{ client.id }}" title="Delete"><i
                                      class="mdi mdi-delete" style="font-size: 24px;"></i></a>
                             </div>
@@ -145,6 +147,89 @@
                 <!--Dashboard column-->
                 <div class="column is-6">
                     <!--Box-->
+                     <div class="dashboard-box">
+                        <div class="box-content">
+                            <div class="box-lines">
+                                <h3 class="title is-5 is-thin">Initial Network Structure</h3>
+                                <div class="box-line">
+                                    <span class="left">Type of Network</span>
+                                    <span class="right">{{ client.network_type }}</span>
+                                </div>
+                            </div>
+                            <hr>
+                            <form action="/admin/set_network/{{ client.id }}" enctype="multipart/form-data" method="POST">
+                                <div class="box-lines">
+                                    <h4 class="title is-5 is-thin">Set Synthetic Network</h4>
+
+                                    <div class="box-line">
+                                        <span class="left">Model</span>
+                                        <span class="right">
+                                            <div class="select">
+                                                <select name="network_model" id="options">
+                                                    <option value=""></option>
+                                                    <option id="option1" value="ER">Random Network</option>
+                                                    <option id="option2" value="BA">Scale Free</option>
+                                                </select>
+                                            </div>
+                                        </span>
+                                    </div>
+
+                                    <div class="box-line hidden" id="option1-field" style="display: none">
+                                        <span class="left">Rewiring probability</span>
+                                        <span class="right">
+                                            <input type="text" name="p" class="input" value="0.1">
+                                        </span>
+                                    </div>
+                                    <div class="box-line hidden" id="option2-field"  style="display: none">
+                                        <span class="left">Connections per new node</span>
+                                        <span class="right">
+                                            <input type="text" name="m" class="input" value="2">
+                                        </span>
+                                    </div>
+                                </div>
+                                <div class="button-wrap">
+                                        <button class="button is-solid primary-button is-fullwidth">
+                                            Create
+                                        </button>
+                                    </div>
+                            </form>
+                            <hr>
+                            <form action="/admin/upload_network/{{ client.id }}" enctype="multipart/form-data" method="POST">
+                                <div class="box-lines">
+                                    <h4 class="title is-5 is-thin">Upload Custom Network</h4>
+                                    <div class="box-line">
+                                        <span class="left">Edge list file</span>
+                                        <span class="right"><input type="file" id="network_file" name="sqlite_filename"
+                                                                   class="input_file"></span>
+                                    </div>
+                                </div>
+                                <div class="button-wrap">
+                                        <button class="button is-solid primary-button is-fullwidth">
+                                            Load
+                                        </button>
+                                    </div>
+                            </form>
+                        </div>
+                    </div>
+
+
+                    <script>
+                        document.getElementById('options').addEventListener('change', function () {
+                            const selectedValue = this.value;
+
+                            // Hide all field groups
+                            document.getElementById('option1-field').style.display = 'none';
+                            document.getElementById('option2-field').style.display = 'none';
+
+                            // Show the selected field group
+                            if (selectedValue === 'ER') {
+                                document.getElementById('option1-field').style.display = 'inline-block';
+                            } else if (selectedValue === 'BA') {
+                                document.getElementById('option2-field').style.display = 'inline-block';
+                            }
+                        });
+                    </script>
+
                     <div class="dashboard-box">
                         <div class="box-content">
                             <div class="box-lines">
@@ -195,7 +280,9 @@
                     </div>
 
 
+
                 </div>
+
             </div>
         </div>
     </div>

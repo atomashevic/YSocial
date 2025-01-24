@@ -210,7 +210,13 @@ def start_client_process(exp, cli, population, resume=False):
         db.session.add(ce)
         db.session.commit()
 
-    cl = YClientWeb(config_file, data_base_path, first_run=first_run)
+    # add the network file if it is the first run (and the network is specified for the client)
+    if first_run and cli.network_type is not None and cli.network_type != "":
+        path = f"{cli.name}_network.csv"
+        cl = YClientWeb(config_file, data_base_path, first_run=first_run, network=path)
+    else:
+        cl = YClientWeb(config_file, data_base_path, first_run=first_run)
+
     if resume:
         cl.days = ce.expected_duration_rounds - ce.elapsed_time
     cl.read_agents()

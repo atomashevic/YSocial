@@ -1,6 +1,6 @@
 import random
 import os
-from collections import defaultdict
+import networkx as nx
 
 from flask import (
     Blueprint,
@@ -1389,12 +1389,6 @@ def stop_experiment(uid):
 def reset_client(uid):
     check_privileges(current_user.username)
 
-    # set elapsed time to 0
-    db.session.query(Client_Execution).filter_by(client_id=int(uid)).update(
-        {Client_Execution.elapsed_time: 0}
-    )
-    db.session.commit()
-
     # delete experiment json files
     client = Client.query.filter_by(id=uid).first()
     exp = Exps.query.filter_by(idexp=client.id_exp).first()
@@ -1407,7 +1401,16 @@ def reset_client(uid):
     if os.path.exists(path):
         os.remove(path)
 
-    #todo finalize
+    # copy the original prompts.json file
+    BASE = os.path.dirname(os.path.abspath(__file__)).split("y_web")[0]
+    shutil.copy(
+        f"{BASE}data_schema{os.sep}prompts.json",
+        f"y_web{os.sep}experiments{os.sep}{exp.db_name.split(os.sep)[1]}{os.sep}prompts.json",
+    )
+
+    # delete client execution
+    db.session.query(Client_Execution).filter_by(client_id=uid).delete()
+    db.session.commit()
 
     return redirect(request.referrer)
 
@@ -1773,3 +1776,117 @@ def get_progress(client_id):
         return json.dumps({"progress": 0})
     progress = int(100 * float(client_execution.elapsed_time)/float(client_execution.expected_duration_rounds)) if client_execution.expected_duration_rounds > 0 else 0
     return json.dumps({"progress": progress})
+
+
+@admin.route("/admin/set_network/<int:uid>", methods=["POST"])
+@login_required
+def set_network(uid):
+    check_privileges(current_user.username)
+
+    # get client
+    client = Client.query.filter_by(id=uid).first()
+
+    # get populations for client uid
+    populations = Population_Experiment.query.filter_by(id_exp=uid).all()
+    # get agents for the populations
+    agents = Agent_Population.query.filter(Agent_Population.population_id.in_([p.id_population for p in populations])).all()
+    # get agent ids for all agents in populations
+    agent_ids = [a.agent_id for a in agents]
+
+    # get data from form
+    network = request.form.get("network_model")
+    if network == "BA":
+        m = int(request.form.get("m"))
+    if network == "ER":
+        p = float(request.form.get("p"))
+    else:
+        return redirect(request.referrer)
+
+    g = nx.erdos_renyi_graph(len(agent_ids), p=p) if network == "ER" else nx.barabasi_albert_graph(len(agent_ids), m=m)
+
+    # get the client experiment
+    exp = Exps.query.filter_by(idexp=client.id_exp).first()
+    # get the experiment folder
+    BASE = os.path.dirname(os.path.abspath(__file__))
+    exp_folder = exp.db_name.split(os.sep)[1]
+
+    with open(f"{BASE}{os.sep}experiments{os.sep}{exp_folder}{os.sep}{client.name}_network.csv", "w") as f:
+        for n in g.edges:
+            f.write(f"{agent_ids[n[0]]},{agent_ids[n[1]]}\n")
+        f.flush()
+
+    client.network_type = network
+    db.session.commit()
+
+    return redirect(request.referrer)
+
+
+@admin.route("/admin/upload_network/<int:uid>", methods=["POST"])
+@login_required
+def upload_network(uid):
+    check_privileges(current_user.username)
+
+    # get client
+    client = Client.query.filter_by(id=uid).first()
+
+    # get the client experiment
+    exp = Exps.query.filter_by(idexp=client.id_exp).first()
+    # get the experiment folder
+    BASE = os.path.dirname(os.path.abspath(__file__))
+    exp_folder = exp.db_name.split(os.sep)[1]
+
+    network = request.files["network_filename"]
+
+    network.save(f"{BASE}{os.sep}experiments{os.sep}{exp_folder}{os.sep}{client.name}_network_temp.csv")
+
+    agents = Agent_Population.query.filter(
+    Agent_Population.population_id.in_([p.id_population for p in populations])).all()
+    # get agent ids for all agents in populations
+    agent_map = {a.name: a.agent_id for a in agents}
+
+    try:
+        with open(f"{BASE}{os.sep}experiments{os.path.sep}{exp_folder}{os.sep}{client.name}_network.csv", "r") as o:
+            with open(f"{BASE}{os.sep}experiments{os.path.sep}{exp_folder}{os.sep}{client.name}_network_temp.csv", "r") as f:
+                for l in f:
+                    l.rstrip().split(",")
+                    o.write(f"{agent_map[l[0]]},{agent_map[l[1]]}\n")
+    except:
+        flash("File format error: provide a csv file containing two columns with agent names. No header required.", "error")
+        return redirect(request.referrer)
+
+    # delete the temp file
+    os.remove(f"{BASE}{os.sep}experiments{os.path.sep}{exp_folder}{os.sep}{client.name}_network_temp.csv")
+
+    client.network_type = network
+    db.session.commit()
+    return redirect(request.referrer)
+
+
+@admin.route("/admin/download_agent_list/<int:uid>")
+@login_required
+def download_agent_list(uid):
+    check_privileges(current_user.username)
+
+    # get client
+    client = Client.query.filter_by(id=uid).first()
+
+    # get populations associated to the client
+    populations = Population_Experiment.query.filter_by(id_exp=client.id_exp).all()
+
+    # get agents in the populations
+    agents = Agent_Population.query.filter(
+        Agent_Population.population_id.in_([p.id_population for p in populations])).all()
+
+    # get the experiment
+    exp = Exps.query.filter_by(idexp=client.id_exp).first()
+    # get the experiment folder
+    BASE = os.path.dirname(os.path.abspath(__file__))
+    exp_folder = exp.db_name.split(os.sep)[1]
+
+    with open(f"{BASE}{os.sep}experiments{os.sep}{exp_folder}{os.sep}{client.name}_agent_list.csv", "w") as f:
+        for a in agents:
+            agent = Agent.query.filter_by(id=a.agent_id).first()
+            f.write(f"{agent.name}\n")
+        f.flush()
+
+    return send_file(f"{BASE}{os.sep}experiments{os.sep}{exp_folder}{os.sep}{client.name}_agent_list.csv", as_attachment=True)
