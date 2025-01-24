@@ -1,6 +1,4 @@
 [submodule "external/YServer"]
 	path = external/YServer
 	url = https://github.com/YSocialTwin/YServer.git
-[submodule "external/YClient"]
-	path = external/YClient
-	url = https://github.com/YSocialTwin/YClient.git
+
