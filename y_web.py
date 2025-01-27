@@ -1,7 +1,7 @@
 from y_web import app, db
 
 
-def start_app(debug=False, port=8080, host="localhost"):
+def start_app(debug=False, host="localhost", port=8080): # 0.0.0.0"
     """
     Start the app
 
@@ -19,8 +19,28 @@ def start_app(debug=False, port=8080, host="localhost"):
         exp.status = 0
     db.session.commit()
 
-    app.run(debug=debug, port=port, host=host)
+    app.run(debug=debug, host=host, port=port)
 
 
 if __name__ == "__main__":
-    start_app()
+    from argparse import ArgumentParser
+
+    parser = ArgumentParser()
+
+    parser.add_argument(
+        "-x",
+        "--host",
+        default=f"localhost",
+        help="host address to run the app on",
+    )
+
+    parser.add_argument(
+        "-y",
+        "--port",
+        default=f"8080",
+        help="port to run the app on",
+    )
+
+    args = parser.parse_args()
+
+    start_app(host=args.host, port=args.port)

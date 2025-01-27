@@ -377,3 +377,11 @@ class Client_Execution(db.Model):
     expected_duration_rounds = db.Column(db.Integer, default=0)
     last_active_hour = db.Column(db.Integer, default=-1)
     last_active_day = db.Column(db.Integer, default=-1)
+
+
+class Ollama_Pull(db.Model):
+    __bind_key__ = "db_admin"
+    __tablename__ = "ollama_pull"
+    id = db.Column(db.Integer, primary_key=True)
+    model_name = db.Column(db.String(50), nullable=False)
+    status = db.Column(db.REAL, nullable=False, default=0)

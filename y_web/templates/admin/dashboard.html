@@ -10,71 +10,8 @@
 
         <div class="dashboard-body">
             <div class="columns">
-                <!--Dashboard column-->
-                <div class="column is-4">
-                    <!--Dashboard box-->
-                    <div class="dashboard-box">
-                        <h3 class="title is-5 is-thin">Analytics</h3>
-                        <div class="stat-block">
-                            <span class="stat-title">Available Simulations</span>
-                            <span class="stat-value">839</span>
-                        </div>
-
-                        <div class="box-content">
-                            <div class="box-lines">
-                                <h4 class="topheading">Longest Simulation</h4>
-                                <div class="box-line">
-                                    <span class="left">Name</span>
-                                    <span class="right">3 of 6</span>
-                                </div>
-                                <div class="box-line">
-                                    <span class="left">Rounds</span>
-                                    <span class="right">2.5k</span>
-                                </div>
-                            </div>
-                            <div class="box-lines">
-                                <h4 class="topheading">Most Crowded Simulation</h4>
-                                <div class="box-line">
-                                    <span class="left">Name</span>
-                                    <span class="right">3 of 6</span>
-                                </div>
-                                <div class="box-line">
-                                    <span class="left">Rounds</span>
-                                    <span class="right"><span class="positive">+7.8%</span>
-                                        </span>
-                                </div>
-                                <div class="box-line">
-                                    <span class="left">Agents</span>
-                                    <span class="right"><span class="negative">-2.3%</span>
-                                        </span>
-                                </div>
-                                <div class="box-line">
-                                    <span class="left">Posts/Comments</span>
-                                    <span class="right"><span>+1.4%</span>
-                                        </span>
-                                </div>
-                                <div class="box-line">
-                                    <span class="left">Reactions</span>
-                                    <span class="right"><span>+5.1%</span>
-                                        </span>
-                                </div>
-                                <div class="box-line">
-                                    <span class="left">Mentions</span>
-                                    <span class="right"><span>+5.1%</span>
-                                        </span>
-                                </div>
-                            </div>
-                            <div class="link-wrap">
-                                <a class="link">
-                                    <span>View More</span>
-                                    <i data-feather="arrow-right"></i>
-                                </a>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!--Dashboard column-->
+                     <!--Dashboard column-->
+                {% if ollamas["status"] and  ollamas["installed"] %}
                 <div class="column is-8">
                     <!--Dashboard box-->
 
@@ -84,7 +21,7 @@
                             <hr style="margin-bottom: 0px;">
                             {% for exp in experiments %}
                             <div class="box-line">
-                                <span class="left" style="width: 22%;"><a href="/admin/experiment_details/{{ experiments[exp]['experiment'].idexp }}"><b>{{ experiments[exp]['experiment'].exp_name }}</b></a></span>
+                                <span class="left" style="width: 22%;"><a href="/admin/experiment_details/{{ experiments[exp]['experiment'].idexp }}">{{ experiments[exp]['experiment'].exp_name }}</a></span>
                                 <span class="right" style="width: 60%;"></span>
                                 <span class="right" style="width: 20%;">
                                     <a class="link-tooltip" {% if experiments[exp]['experiment'].running == 0 %} href="/admin/start_experiment/{{ experiments[exp]['experiment'].idexp }}" {% endif %} title="Run">
@@ -100,6 +37,9 @@
                                     </a>
                                     <a class="link-tooltip" {% if experiments[exp]['experiment'].status== 1 %} href="/admin/join_simulation" {% endif %} title="Join" >
                                         <i class="mdi mdi-plus-box {% if experiments[exp]['experiment'].status == 0 %} disabled {% endif %}" style="font-size: 24px;"></i>
+                                    </a>
+                                    <a class="link-tooltip" {% if experiments[exp]['experiment'].status== 0 %} href="/admin/delete_simulation/{{ experiments[exp]['experiment'].idexp }}" {% endif %} title="Delete" >
+                                        <i class="mdi mdi-delete {% if experiments[exp]['experiment'].status == 1 %} disabled {% endif %}" style="font-size: 24px;"></i>
                                     </a>
 
 
@@ -183,6 +123,10 @@
                                         <a class="link-tooltip" {% if  client[0].status == 0 and experiments[exp]['experiment'].running == 1 %} href="/admin/reset_client/{{ client[0].id }}" {% endif %} title="Reset">
                                             <i class="mdi mdi-backup-restore {% if  experiments[exp]['experiment'].running == 0 %} disabled {% endif %}" style="font-size: 24px;"></i>
                                         </a>
+
+                                        <a class="link-tooltip" {% if client[0].status == 0 %} href="/admin/delete_client/{{ client[0].id }}" {% endif %} title="Delete" >
+                                        <i class="mdi mdi-delete {% if client[0].status == 1 %} disabled {% endif %}" style="font-size: 24px;"></i>
+                                    </a>
                                     </span>
 
                                 </div>
@@ -197,8 +141,159 @@
                     </div>
 
                 </div>
+                {% endif %}
 
                 <!--Dashboard column-->
+                <div class="column is-4">
+                    <!--Dashboard box-->
+                    <div class="dashboard-box">
+                        <h3 class="title is-5 is-thin">Ollama Server Status</h3>
+
+                        <div class="box-content">
+                            <div class="box-lines">
+                                <div class="box-line">
+                                    <span class="left">Installed</span>
+                                    <span class="right">  <i class="mdi mdi-checkbox-blank-circle {% if ollamas['installed'] %} active {% endif %}" style="font-size: 20px;"></i> </span>
+                                </div>
+                                <div class="box-line">
+                                    <span class="left">Running</span>
+                                    <span class="right"> <i class="mdi mdi-checkbox-blank-circle {% if ollamas['status'] %} active {% endif %}" style="font-size: 20px;"></i></span>
+                                </div>
+                                {% if not ollamas['status'] %}
+                                <div class="box-line">
+                                    <span class="left">Start Ollama</span>
+                                    <span class="right">
+                                        <a class="link-tooltip" {% if not ollamas['status'] %} href="/admin/start_ollama/" {% endif %} title="Run">
+                                            <i class="mdi mdi-play-box-outline {% if not ollamas['status'] %} active {% endif %}" style="font-size: 24px;"></i>
+                                        </a>
+                                    </span>
+                                </div>
+                                {% endif %}
+                            </div>
+
+
+                        </div>
+                    </div>
+
+                    {% if ollamas["status"] and  ollamas["installed"] %}
+
+
+                    {% if len(models) > 0 %}
+                    <div class="dashboard-box">
+                        <h3 class="title is-5 is-thin">Ollama Models Available</h3>
+
+                        <div class="box-content">
+                            <div class="box-lines">
+                                {% for model in models %}
+                                <div class="box-line">
+                                    <span class="left">{{ model }}</span>
+                                    <span class="right"><a class="link-tooltip" href="/admin/delete_model/{{ model }}" title="Delete">
+                                        <i class="mdi mdi-delete" style="font-size: 24px;"></i>
+                                </a></span>
+                                </div>
+                                {% endfor %}
+                            </div>
+
+
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <div class="dashboard-box">
+                        <h3 class="title is-5 is-thin">Ollama Pull Model</h3>
+
+                        <div class="box-content">
+                            <form action="/admin/ollama_pull" enctype="multipart/form-data" method="POST">
+                            <div class="box-lines">
+                                <div class="box-line">
+                                    <span class="left">Model Name</span>
+                                    <span class="right">
+                                        <input type="text" name="model_name" class="input" value="">
+                                    </span>
+                                </div>
+                                 <div class="box-line">
+                                    <span class="left"></span>
+                                    <span class="right">
+
+                                    <div class="button-wrap">
+                                    <button class="button is-solid primary-button is-fullwidth">
+                                        Pull Model
+                                    </button>
+                                </div>
+                                    </span>
+                                </div>
+                            </div>
+                             <div class="box-lines">
+                                {% for pull in active_pulls %}
+
+                                {% if pull[1] < 1 %}
+                                <div class="box-line">
+                                <span class="left" id="model_pull_name_{{ pull[0] }}">
+                                    {{ pull[0] }}
+                                </span>
+                                 <span class="right" style="height: 22px; width: 80%;">
+                                <div class="progress" style="height: 22px; width: 100%;" >
+                                    <div id="pull-progress-bar_{{ pull[0] }}" class="progress-bar progress-bar-striped progress_exp" role="progressbar"
+                                         aria-valuenow="{{ pull[1] }}" aria-valuemin="0" aria-valuemax="100" style="width: 0%;">
+                                        {{ pull[1] }}%
+                                    </div>
+                                </div>
+                                 </span>
+                                </div>
+                                {% endif %}
+
+                                 <script>
+                                        $(document).ready(function () {
+                                                    // Start the background progress as soon as the page loads
+                                                    $.ajax({
+                                                        url: `/admin/pull_progress/{{ pull[0] }}`,
+                                                        method: 'GET'
+                                                    });
+
+                                                    // Poll progress updates
+                                                    function pullProgress() {
+                                                        $.ajax({
+                                                            url: '/admin/pull_progress/{{ pull[0] }}',
+                                                            method: 'GET',
+                                                            dataType: 'json',
+                                                            success: function (data) {
+                                                                const model_name  = data.model_name;
+                                                                const percentage = data.progress;
+                                                                const progressBar = $('#pull-progress-bar_{{ pull[0] }}');
+
+                                                                const textContainer = document.getElementById('model_pull_name_{{ pull[0] }}');
+                                                                textContainer.textContent = model_name;
+
+                                                                // Update the progress bar width and text
+                                                                progressBar.css('width', percentage + '%');
+                                                                progressBar.text(percentage + '%');
+
+                                                                // If progress is less than 100, keep polling
+                                                                if (percentage < 100) {
+                                                                    setTimeout(pullProgress, 500);
+                                                                }
+                                                            }
+                                                        });
+                                                    }
+
+                                                    // Start polling immediately
+                                                    pullProgress();
+                                                });
+
+                                    </script>
+
+                                {% endfor %}
+
+                            </div>
+                            </form>
+
+
+
+                        </div>
+                    </div>
+
+                    {% endif %}
+                </div>
 
             </div>
         </div>

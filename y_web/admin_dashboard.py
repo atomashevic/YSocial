@@ -29,7 +29,7 @@ from .models import (
     Page_Population,
     User_Experiment,
     Client,
-    Client_Execution
+    Client_Execution, Ollama_Pull
 )
 from y_web.utils import (
     generate_population,
@@ -37,16 +37,29 @@ from y_web.utils import (
     terminate_process_on_port,
     start_server,
     start_client,
-    terminate_client
+    terminate_client,
+    start_ollama_server,
+    is_ollama_running,
+    is_ollama_installed,
+    pull_ollama_model,
+    get_ollama_models,
+    delete_ollama_model
 )
 import json
 import pathlib, shutil
 import uuid
 from . import db, app
 import re
-import ollama
+from ollama import Client as oclient
 
 admin = Blueprint("admin", __name__)
+
+
+def ollama_status():
+    return {
+        "status": is_ollama_running(),
+        "installed": is_ollama_installed(),
+    }
 
 
 def check_privileges(username):
@@ -66,6 +79,7 @@ def reload_current_user(username):
 @login_required
 def dashboard():
     check_privileges(current_user.username)
+    ollamas = ollama_status()
 
     # get all experiments
     experiments = Exps.query.all()
@@ -87,7 +101,18 @@ def dashboard():
             client_executions = cl if cl is not None else -1
             res[exp]["clients"].append((client, client_executions))
 
-    return render_template("admin/dashboard.html", experiments=res)
+    # get installed ollama models, if any
+    models = []
+    try:
+        models = get_ollama_models()
+    except:
+        pass
+
+    # get all ollama pulls
+    ollama_pulls = Ollama_Pull.query.all()
+    ollama_pulls = [(pull.model_name, float(pull.status)) for pull in ollama_pulls]
+
+    return render_template("admin/dashboard.html", experiments=res, ollamas=ollamas, models=models, active_pulls=ollama_pulls, len=len)
 
 
 @admin.route("/admin/experiments")
@@ -185,13 +210,8 @@ def populations():
     check_privileges(current_user.username)
 
     # Regular expression to match model values
-    pattern = r"model='(.*?)'"
-    models = []
-    # Extract all model values
-    for i in ollama.list():
-        models = re.findall(pattern, str(i))
 
-    models = [m for m in models if len(m) > 0]
+    models = get_ollama_models()
 
     return render_template("admin/populations.html", models=models)
 
@@ -201,13 +221,7 @@ def populations():
 def agent_data():
     check_privileges(current_user.username)
 
-    pattern = r"model='(.*?)'"
-    models = []
-    # Extract all model values
-    for i in ollama.list():
-        models = re.findall(pattern, str(i))
-
-    models = [m for m in models if len(m) > 0]
+    models = get_ollama_models()
 
     populations = Population.query.all()
     return render_template("admin/agents.html", populations=populations, models=models)
@@ -218,14 +232,7 @@ def agent_data():
 def page_data():
     check_privileges(current_user.username)
 
-    # Regular expression to match model values
-    pattern = r"model='(.*?)'"
-    models = []
-    # Extract all model values
-    for i in ollama.list():
-        models = re.findall(pattern, str(i))
-
-    models = [m for m in models if len(m) > 0]
+    models = get_ollama_models()
 
     return render_template("admin/pages.html", models=models)
 
@@ -457,7 +464,15 @@ def delete_simulation(exp_id):
         db.session.query(User_Experiment).filter_by(exp_id=exp_id).delete()
         db.session.commit()
 
-    return settings()
+        # delete the clients
+        db.session.query(Client).filter_by(id_exp=exp_id).delete()
+        db.session.commit()
+
+        # delete the client executions
+        db.session.query(Client_Execution).filter_by(id_exp=exp_id).delete()
+        db.session.commit()
+
+    return redirect(request.referrer)
 
 
 @admin.route("/admin/create_population_empty", methods=["POST", "GET"])
@@ -1335,6 +1350,7 @@ def experiment_details(uid):
 def start_experiment(uid):
     check_privileges(current_user.username)
 
+
     # get experiment
     exp = Exps.query.filter_by(idexp=uid).first()
 
@@ -1712,7 +1728,7 @@ def delete_client(uid):
     db.session.delete(client)
     db.session.commit()
 
-    return experiment_details(client.id_exp)
+    return redirect(request.referrer)
 
 
 @admin.route("/admin/client_details/<int:uid>")
@@ -1890,3 +1906,62 @@ def download_agent_list(uid):
         f.flush()
 
     return send_file(f"{BASE}{os.sep}experiments{os.sep}{exp_folder}{os.sep}{client.name}_agent_list.csv", as_attachment=True)
+
+
+@admin.route("/admin/start_ollama/", methods=["POST", "GET"])
+@login_required
+def start_ollama():
+    check_privileges(current_user.username)
+
+    # start the ollama server
+    start_ollama_server()
+
+    return redirect(request.referrer)
+
+
+@admin.route("/admin/ollama_pull/", methods=["POST"])
+@login_required
+def ollama_pull():
+    check_privileges(current_user.username)
+
+    # get model_name by form
+    model_name = request.form.get("model_name")
+
+    # pull the model from the ollama server
+    try:
+        pull_ollama_model(model_name)
+    except:
+        return redirect(request.referrer)
+
+    return redirect(request.referrer)
+
+
+@admin.route("/admin/delete_model/<string:model_name>")
+@login_required
+def delete_model(model_name):
+    check_privileges(current_user.username)
+
+    # delete the model from the ollama server
+    delete_ollama_model(model_name)
+
+    Ollama_Pull.query.filter_by(model_name=model_name).delete()
+    db.session.commit()
+
+    return redirect(request.referrer)
+
+
+@admin.route('/admin/pull_progress/<string:model_name>')
+def get_pull_progress(model_name):
+    """Return the current progress as JSON."""
+    # get client_execution
+    model = Ollama_Pull.query.filter_by(model_name=model_name).first()
+
+    if model is None:
+        return json.dumps({"progress": 0})
+    progress = int(100 * float(model.status))
+
+    if progress == 100:
+        # delete the model from the table
+        db.session.query(Ollama_Pull).delete()
+
+    return json.dumps({"progress": progress, "model_name": model.model_name})

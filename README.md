@@ -32,3 +32,29 @@ The web interface will be accessible at `http://localhost:8080`.
 
 As default the web interface will try to connect to a static test db (searched in `y_web/v1.db`).
 Such db can be obtained with a running/completed `Y Social` simulation (v1.0.0)
+
+
+# Docker compose
+
+To enable GPU support, you can use the `docker-compose.gpu.yml` file. To run the web interface with GPU support, use the following command:
+
+```bash
+docker-compose -f docker-compose.yml -f docker-compose.gpu.yml build
+```
+
+To run the docker with GPU support, you need to have the NVIDIA Container Toolkit installed on your machine. 
+You can find the installation instructions [here](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/install-guide.html).
+
+Once built the docker image, you can run the web interface with GPU support using the following command:
+
+```bash
+docker-compose up --gpus all
+```
+
+In case you are using MacOS, since GPU pass-through is not supported, you can use the `docker-compose.yml` file. 
+
+```bash
+docker-compose build
+docker-compose up
+```
+

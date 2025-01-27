@@ -1,14 +1,17 @@
 import subprocess
 import os
+import re
 import sys
 from requests import post
 import json
 import time
 import random
 from multiprocessing import Process
-from y_web.models import Client_Execution, Agent_Population, Agent, Page, Page_Population
+from y_web.models import Client_Execution, Agent_Population, Agent, Page, Page_Population, Ollama_Pull
 from y_web import db, client_processes
 import shutil
+import requests
+from ollama import Client as oclient
 
 
 def terminate_process_on_port(port):
@@ -41,26 +44,128 @@ def start_server(exp):
     :param exp: the experiment object
     """
     yserver_path = os.path.dirname(os.path.abspath(__file__)).split("y_web")[0]
-    sys.path.append(f"{yserver_path}{os.sep}external{os.sep}YServer/")
+    sys.path.append(f"{yserver_path}{os.sep}external{os.sep}YServer{os.sep}")
     BASE_DIR = os.path.dirname(os.path.abspath(__file__)).split("utils")[0]
     config = (
-        f"{BASE_DIR}/{exp.db_name.split('database_server.db')[0]}config_server.json"
+        f"{yserver_path}y_web{os.sep}{exp.db_name.split('database_server.db')[0]}config_server.json"
     )
     exp_uid = exp.db_name.split(os.sep)[1]
     flask_command = f"python {yserver_path}external{os.sep}YServer{os.sep}y_server_run.py -c {config}"
 
     # Command to run in the detached screen
     screen_command = f"screen -dmS {exp_uid} {flask_command}"
-
     print(f"Starting server for experiment {exp_uid}...")
     subprocess.run(screen_command, shell=True, check=True)
 
     # Wait for the server to start
-    time.sleep(5)
+    time.sleep(10)
     data = {"path": f"{BASE_DIR[1:]}{exp.db_name}"}
     headers = {"Content-Type": "application/json"}
     ns = f"http://{exp.server}:{exp.port}/change_db"
     post(f"{ns}", headers=headers, data=json.dumps(data))
+
+
+def is_ollama_installed():
+    # Step 1: Check if Ollama is installed
+    try:
+        subprocess.run(["ollama", "--version"], capture_output=True, text=True, check=True)
+        print("Ollama is installed.")
+        return True
+    except FileNotFoundError:
+        print("Ollama is not installed.")
+        return False
+    except subprocess.CalledProcessError as e:
+        print(f"Error checking Ollama installation: {e}")
+        return False
+
+
+def is_ollama_running():
+    # Step 2: Check if Ollama is running
+    try:
+        response = requests.get("http://127.0.0.1:11434/api/version")
+        if response.status_code == 200:
+            print("Ollama is running.")
+            return True
+        else:
+            print(f"Ollama responded but not running correctly. Status: {response.status_code}")
+            return False
+    except requests.ConnectionError:
+        print("Ollama is not running or cannot be reached.")
+        return False
+
+
+def start_ollama_server():
+
+    if is_ollama_installed() :
+        if not is_ollama_running():
+            screen_command = f"screen -dmS ollama ollama serve"
+
+            print(f"Starting ollama server...")
+            subprocess.run(screen_command, shell=True, check=True)
+
+            # Wait for the server to start
+            time.sleep(5)
+        else:
+            print("Ollama is already running.")
+    else:
+        print("Ollama is not installed.")
+
+
+def pull_ollama_model(model_name):
+    if is_ollama_running():
+        process = Process(target=start_ollama_pull, args=(model_name,))
+        process.start()
+        client_processes[model_name] = process
+
+
+def start_ollama_pull(model_name):
+    ol_client = oclient(
+        host='http://127.0.0.1:11434',
+        headers={'x-some-header': 'some-value'}
+    )
+
+    for progress in ol_client.pull(model_name, stream=True):
+
+        model = Ollama_Pull.query.filter_by(model_name=model_name).first()
+        if not model:
+            model = Ollama_Pull(model_name=model_name, status=0)
+            db.session.add(model)
+            db.session.commit()
+
+        total = progress.get('total')
+        completed = progress.get('completed')
+        if completed is not None:
+            current = float(completed) / float(total)
+            # update the model status
+            model = Ollama_Pull.query.filter_by(model_name=model_name).first()
+            model.status = current
+            db.session.commit()
+
+
+def get_ollama_models():
+    pattern = r"model='(.*?)'"
+    models = []
+
+    ol_client = oclient(
+        host='http://0.0.0.0:11434',
+        headers={'x-some-header': 'some-value'}
+    )
+
+    # Extract all model values
+    for i in ol_client.list():
+        models = re.findall(pattern, str(i))
+
+    models = [m for m in models if len(m) > 0]
+    return models
+
+
+def delete_ollama_model(model_name):
+    ol_client = oclient(
+        host='http://0.0.0.0:11434',
+        headers={'x-some-header': 'some-value'}
+    )
+
+    ol_client.delete(model_name)
 
 
 def terminate_client(cli, pause=False):
