@@ -143,22 +143,40 @@
 
                     <div class="dashboard-box">
                         <div class="box-content">
-                            <img src="{{ url_for('static', filename='assets/img/robots/header3.jpg') }}">
+                            <img src="{{ url_for('static', filename='assets/img/robots/header3.jpg') }}" style="border-radius: 10px; filter: saturate(1); opacity: 0.6;">
 
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <div class="dashboard-box">
+                        <div class="box-content">
+                            <h3 class="title is-5 is-thin">Guide</h3>
                             <div class="box-lines">
                                 <div class="box-line">
-                                    <span class="left">
-                                        {% if ollamas['status'] == 0 %}
-                                        LLM server not started
-                                        {% else %}
-                                        No experiments available
-                                        {% endif %}
+                                    <span class="left" style="width: 75%">
+                                        <h4 class="title is-6 is-thin">Running an Y Social Experiment requires a few steps:</h4>
+
+                                        Start the Ollama server
+                                        <hr>
+                                         Create an <a href="http://localhost:8080/admin/experiments">Experiment</a>
+                                        <hr>
+                                        Create one or more <a href="http://localhost:8080/admin/populations">Agent Populations</a> and assign them to the experiment
+                                        <hr>
+                                        Create one or more ad-hoc synthetic <a href="http://localhost:8080/admin/agents">agents</a>/<a href="http://localhost:8080/admin/pages">pages</a> and add them to an existing population <small>(optional)</small>
+                                        <hr>
+                                        Create and configure one or more clients for the experiment <small>(each managing a population)</small>
+                                        <hr>
+                                        Start the experiment server and run the clients
+
+                                        </ul>
                                     </span>
+                                    <span class="right" style="width: 25%; padding-left: 10px;">
+                                        <img src="{{ url_for('static', filename='assets/img/robots/robot_v.png') }}" style="border-radius: 10px; filter: saturate(1); opacity: 0.6;">
                                 </div>
                             </div>
                         </div>
                     </div>
-                {% endif %}
                 </div>
 
 
@@ -200,7 +218,7 @@
 
                     {% if len(models) > 0 %}
                     <div class="dashboard-box">
-                        <h3 class="title is-5 is-thin">Ollama Models Available</h3>
+                        <h3 class="title is-5 is-thin">Available Models</h3>
 
                         <div class="box-content">
                             <div class="box-lines">
@@ -220,7 +238,18 @@
                     {% endif %}
 
                     <div class="dashboard-box">
-                        <h3 class="title is-5 is-thin">Ollama Pull Model</h3>
+                        <h3 class="title is-5 is-thin">Add LLM Model</h3>
+                        <div class="box-lines">
+                             <div class="box-line">
+                                <span class="left">
+
+                                If the model you want to use is not available, you can pull it from the Ollama server.
+                                For a list of available models refer to the <a href="https://ollama.com/search">Ollama directory</a>.
+                                </span>
+                             </div>
+                        </div>
+
+                        <hr>
 
                         <div class="box-content">
                             <form action="/admin/ollama_pull" enctype="multipart/form-data" method="POST">
@@ -237,7 +266,7 @@
 
                                     <div class="button-wrap">
                                     <button class="button is-solid primary-button is-fullwidth">
-                                        Pull Model
+                                        Download Model
                                     </button>
                                 </div>
                                     </span>

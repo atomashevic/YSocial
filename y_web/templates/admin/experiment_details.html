@@ -18,7 +18,7 @@
 
             <div class="columns">
                 <!--Dashboard column-->
-                <div class="column is-9">
+                <div class="column is-5">
                     <!--Dashboard box-->
                     <div class="dashboard-box">
                         <h3 class="title is-5 is-thin">Experiment Summary</h3>
@@ -62,6 +62,7 @@
                         </div>
                     </div>
 
+                    {% if len(users) > 0 %}
                     <div class="dashboard-box">
                         <h3 class="title is-5 is-thin">Registered Users</h3>
 
@@ -81,6 +82,8 @@
 
                         </div>
                     </div>
+                    {% endif %}
+
                 </div>
 
                 <!--Dashboard box-->
@@ -167,9 +170,6 @@
 
                 </div>
 
-            </div>
-
-            <div class="columns">
                 <div class="column is-4">
                     <!--Box-->
                     <div class="dashboard-box is-compact">
@@ -207,6 +207,7 @@
                 </div>
 
             </div>
+
 
         </div>
     </div>

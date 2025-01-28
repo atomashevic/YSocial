@@ -210,6 +210,19 @@ def create_client():
     llm_v_max_tokens = request.form.get("llm_v_max_tokens")
     llm_v_temperature = request.form.get("llm_v_temperature")
 
+    # if name already exists, return to the previous page
+    if Client.query.filter_by(name=name).first():
+        flash("Client name already exists.", "error")
+        return redirect(request.referrer)
+
+    exp = Exps.query.filter_by(idexp=exp_id).first()
+    # get population
+    population = Population.query.filter_by(id=population_id).first()
+
+    if population is None:
+        flash("Population not found.", "error")
+        return redirect(request.referrer)
+
     # create the Client object
     client = Client(
         name=name,
@@ -246,12 +259,6 @@ def create_client():
 
     db.session.add(client)
     db.session.commit()
-
-    # create the configuration file for the client
-    # get experiment
-    exp = Exps.query.filter_by(idexp=exp_id).first()
-    # get population
-    population = Population.query.filter_by(id=population_id).first()
 
     config = {
         "servers": {
@@ -381,9 +388,11 @@ def delete_client(uid):
 
     # remove the db file on the client
     BASE_PATH = os.path.dirname(os.path.abspath(__file__)).split("y_web")[0]
-    path = f"{BASE_PATH}external{os.sep}YClient{os.sep}experiments{client.name}.db"
+    path = f"{BASE_PATH}external{os.sep}YClient{os.sep}experiments{os.sep}{client.name}.db"
     if os.path.exists(path):
         os.remove(path)
+    else:
+        print(f"File {path} does not exist.")
 
     return redirect(request.referrer)
 
