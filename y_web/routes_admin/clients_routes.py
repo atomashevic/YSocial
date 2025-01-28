@@ -379,6 +379,12 @@ def delete_client(uid):
     db.session.delete(client)
     db.session.commit()
 
+    # remove the db file on the client
+    BASE_PATH = os.path.dirname(os.path.abspath(__file__)).split("y_web")[0]
+    path = f"{BASE_PATH}external{os.sep}YClient{os.sep}experiments{client.name}.db"
+    if os.path.exists(path):
+        os.remove(path)
+
     return redirect(request.referrer)
 
 
