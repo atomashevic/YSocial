@@ -7,7 +7,7 @@ import json
 import time
 import random
 from multiprocessing import Process
-from y_web.models import Client_Execution, Agent_Population, Agent, Page, Page_Population, Ollama_Pull
+from y_web.models import Client_Execution, Agent_Population, Agent, Page, Page_Population, Ollama_Pull, Agent_Profile
 from y_web import db, client_processes
 import shutil
 import requests
@@ -246,6 +246,8 @@ def start_client_process(exp, cli, population, resume=False):
 
         res = {"agents": []}
         for a in agents:
+            custom_prompt = Agent_Profile.query.filter_by(agent_id=a.id).first().profile
+
             res["agents"].append(
                 {
                     "name": a.name,
@@ -273,6 +275,7 @@ def start_client_process(exp, cli, population, resume=False):
                     "nationality": a.nationality,
                     "toxicity": a.toxicity,
                     "is_page": 0,
+                    "prompts": custom_prompt if custom_prompt else None,
                 }
             )
 
