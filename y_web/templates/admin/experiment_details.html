@@ -37,6 +37,13 @@
                                     <span class="left">Owner</span>
                                     <span class="right">{{ experiment.owner }}</span>
                                 </div>
+                                <div class="box-line">
+                                    <span class="left">Prompts</span>
+                                    <span class="right">
+                                        <a class="link-tooltip" href="/admin/prompts/{{ experiment.idexp }}" title="Edit">
+                                            <i class="mdi mdi-credit-card" style="font-size: 24px;"></i></a>
+                                    </span>
+                                </div>
                                 {% if experiment.running == 1 %}
                                 <div class="box-line">
                                     <span class="left">Connection Endpoint</span>

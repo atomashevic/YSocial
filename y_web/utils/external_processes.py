@@ -311,9 +311,6 @@ def start_client_process(exp, cli, population, resume=False):
 
         json.dump(res, open(filename, "w"), indent=4)
 
-        # copy prompts.json into the experiment folder
-        shutil.copyfile(f"{BASE_DIR}{os.sep}data_schema{os.sep}prompts.json".replace("/y_web/utils", ""), f"{data_base_path}prompts.json")
-
         # create a client execution object
         ce = Client_Execution(
             client_id=cli.id,

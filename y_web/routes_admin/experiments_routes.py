@@ -465,3 +465,41 @@ def download_experiment(uid, ftype):
 
     return send_file(filename, as_attachment=True)
 
+
+@experiments.route("/admin/prompts/<int:uid>")
+@login_required
+def prompts(uid):
+    check_privileges(current_user.username)
+
+    # get experiment details
+    experiment = Exps.query.filter_by(idexp=uid).first()
+    # get the prompts file for the experiment
+    prompts = f"y_web{os.sep}experiments{os.sep}{experiment.db_name.split(os.sep)[1]}{os.sep}prompts.json"
+
+    # read the prompts file
+    prompts = json.load(open(prompts))
+
+    return render_template("admin/prompts.html", experiment=experiment, prompts=prompts)
+
+
+@experiments.route("/admin/update_prompts/<int:uid>", methods=["POST"])
+@login_required
+def update_prompts(uid):
+    check_privileges(current_user.username)
+
+    # get experiment details
+    experiment = Exps.query.filter_by(idexp=uid).first()
+    # get the prompts file for the experiment
+    prompts_filename = f"y_web{os.sep}experiments{os.sep}{experiment.db_name.split(os.sep)[1]}{os.sep}prompts.json"
+
+    # read the prompts file
+    prompts = json.load(open(prompts_filename))
+
+    # update the prompts
+    for key in request.form.keys():
+        prompts[key] = request.form[key]
+
+    # write the updated prompts
+    json.dump(prompts, open(prompts_filename, "w"), indent=4)
+
+    return redirect(request.referrer)

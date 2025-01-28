@@ -30,7 +30,7 @@ from y_web.utils import (
 )
 import json
 import shutil
-from . import db
+from . import db, experiment_details
 
 clientsr = Blueprint("clientsr", __name__)
 
@@ -353,13 +353,21 @@ def create_client():
 
     uid = exp.db_name.split(os.sep)[1]
 
+    BASE_DIR = os.path.dirname(os.path.abspath(__file__)).split("y_web")[0]
+
     with open(
-        f"y_web{os.sep}experiments{os.sep}{uid}{os.sep}client_{name}-{population.name}.json",
+        f"{BASE_DIR}y_web{os.sep}experiments{os.sep}{uid}{os.sep}client_{name}-{population.name}.json",
         "w",
     ) as f:
         json.dump(config, f)
 
-    return redirect(request.referrer)
+    # copy prompts.json into the experiment folder
+    data_base_path = f"{BASE_DIR}y_web{os.sep}experiments{os.sep}{uid}{os.sep}"
+    shutil.copyfile(f"{BASE_DIR}data_schema{os.sep}prompts.json".replace("/y_web/utils", ""),
+                        f"{data_base_path}prompts.json")
+
+    # load experiment_details page
+    return experiment_details(int(exp_id))
 
 
 @clientsr.route("/admin/delete_client/<int:uid>")

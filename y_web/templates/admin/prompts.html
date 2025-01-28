@@ -1,0 +1,176 @@
+{% include "admin/head.html" %}
+
+<div class="view-wrapper is-dashboard">
+    <!--Dashboard container-->
+    <div id="creator-dashboard" class="dashboard-container">
+        <!--Toolbar-->
+        {% include "admin/dash_head.html" %}
+
+
+        <div class="dashboard-body">
+            <div class="columns">
+                <!--Dashboard column-->
+                <div class="column is-8">
+                    <!--Dashboard box-->
+                    <div class="dashboard-box">
+                        <h3 class="title is-5 is-thin">LLM Prompts</h3>
+                        <div class="box-content">
+                            <form action="/admin/update_prompts/{{ experiment.idexp }}" enctype="multipart/form-data" method="POST">
+                                <div class="box-lines">
+                                    <h4 class="title is-6 is-thin">Agents Pre-prompts</h4>
+                                    <div class="box-line">
+                                        <span class="left">Roleplay</span>
+                                        <span class="right" style="width: 70%;">
+                                            <textarea rows="6" name="agent_roleplay" class="textarea">{{ prompts['agent_roleplay'] }}</textarea>
+                                        </span>
+                                    </div>
+                                    <div class="box-line">
+                                        <span class="left">Roleplay (base)</span>
+                                        <span class="right" style="width: 70%;">
+                                            <textarea rows="2" name="agent_roleplay_base" class="textarea">{{ prompts['agent_roleplay_base'] }}</textarea>
+                                        </span>
+                                    </div>
+                                    <div class="box-line">
+                                        <span class="left">Roleplay (simple)</span>
+                                        <span class="right" style="width: 70%;">
+                                            <textarea rows="4" name="agent_roleplay_simple" class="textarea">{{ prompts['agent_roleplay_simple'] }}</textarea>
+                                        </span>
+                                    </div>
+                                    <div class="box-line">
+                                        <span class="left">Roleplay (Comment & Share)</span>
+                                        <span class="right" style="width: 70%;">
+                                            <textarea rows="10" name="agent_roleplay_comments_share" class="textarea">{{ prompts['agent_roleplay_comments_share'] }}</textarea>
+                                        </span>
+                                    </div>
+                                    <hr>
+                                    <h4 class="title is-6 is-thin">Page Pre-prompts</h4>
+                                    <div class="box-line">
+                                        <span class="left">Roleplay</span>
+                                        <span class="right" style="width: 70%;">
+                                            <textarea rows="2" name="page_roleplay" class="textarea">{{ prompts['page_roleplay'] }}</textarea>
+                                        </span>
+                                    </div>
+                                    <hr>
+                                    <h4 class="title is-6 is-thin">Handler Pre-prompts</h4>
+                                    <div class="box-line">
+                                        <span class="left">Instructions</span>
+                                        <span class="right" style="width: 70%;">
+                                            <textarea rows="7" name="handler_instructions" class="textarea">{{ prompts['handler_instructions'] }}</textarea>
+                                        </span>
+                                    </div>
+                                    <div class="box-line">
+                                        <span class="left">Instructions (simple)</span>
+                                        <span class="right" style="width: 70%;">
+                                            <textarea rows="2" name="handler_instructions_simple" class="textarea">{{ prompts['handler_instructions_simple'] }}</textarea>
+                                        </span>
+                                    </div>
+                                    <div class="box-line">
+                                        <span class="left">Instructions (Topics)</span>
+                                        <span class="right" style="width: 70%;">
+                                            <textarea rows="5" name="handler_instructions_topics" class="textarea">{{ prompts['handler_instructions_topics'] }}</textarea>
+                                        </span>
+                                    </div>
+                                    <hr>
+                                    <h4 class="title is-6 is-thin">Handler Actions Provided Instructions</h4>
+                                    <div class="box-line">
+                                        <span class="left">Action Selection</span>
+                                        <span class="right" style="width: 70%;">
+                                            <textarea rows="9" name="handler_action" class="textarea">{{ prompts['handler_action'] }}</textarea>
+                                        </span>
+                                    </div>
+                                    <div class="box-line">
+                                        <span class="left">Post</span>
+                                        <span class="right" style="width: 70%;">
+                                            <textarea rows="5" name="handler_post" class="textarea">{{ prompts['handler_post'] }}</textarea>
+                                        </span>
+                                    </div>
+                                    <div class="box-line">
+                                        <span class="left">News</span>
+                                        <span class="right" style="width: 70%;">
+                                            <textarea rows="18" name="handler_news" class="textarea">{{ prompts['handler_news'] }}</textarea>
+                                        </span>
+                                    </div>
+                                     <div class="box-line">
+                                        <span class="left">Comment</span>
+                                        <span class="right" style="width: 70%;">
+                                            <textarea rows="17" name="handler_comment" class="textarea">{{ prompts['handler_comment'] }}</textarea>
+                                        </span>
+                                    </div>
+                                    <div class="box-line">
+                                        <span class="left">Comment Image</span>
+                                        <span class="right" style="width: 70%;">
+                                            <textarea rows="9" name="handler_comment_image" class="textarea">{{ prompts['handler_comment_image'] }}</textarea>
+                                        </span>
+                                    </div>
+                                    <div class="box-line">
+                                        <span class="left">Share</span>
+                                        <span class="right" style="width: 70%;">
+                                            <textarea rows="20" name="handler_share" class="textarea">{{ prompts['handler_share'] }}</textarea>
+                                        </span>
+                                    </div>
+                                    <div class="box-line">
+                                        <span class="left">Reactions</span>
+                                        <span class="right" style="width: 70%;">
+                                            <textarea rows="9" name="handler_reactions" class="textarea">{{ prompts['handler_reactions'] }}</textarea>
+                                        </span>
+                                    </div>
+                                    <div class="box-line">
+                                        <span class="left">Follow</span>
+                                        <span class="right" style="width: 70%;">
+                                            <textarea rows="10" name="handler_follow" class="textarea">{{ prompts['handler_follow'] }}</textarea>
+                                        </span>
+                                    </div>
+                                    <div class="box-line">
+                                        <span class="left">Cast Vote</span>
+                                        <span class="right" style="width: 70%;">
+                                            <textarea rows="10" name="handler_cast" class="textarea">{{ prompts['handler_cast'] }}</textarea>
+                                        </span>
+                                    </div>
+
+                                </div>
+                                <div class="button-wrap">
+                                    <button class="button is-solid primary-button is-fullwidth">
+                                        Update
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                    <!--Dashboard box-->
+
+                </div>
+
+
+                <!--Dashboard column-->
+                <div class="column is-4">
+                    <!--Box-->
+                    <div class="dashboard-box is-compact">
+                        <h3 class="title is-5 is-thin">Guide</h3>
+                        <div class="help-block">
+                            <h4>Which Simulations?</h4>
+                            <p>
+                                Here you can view all available simulations.
+                                Remember that you can only join one simulation at a time.
+                            </p>
+                            <br>
+
+                            <h4>Static vs. Dynamic</h4>
+                            <p>
+                                Simulations can be either static or dynamic.
+
+                                <br><br>
+                                Static simulations are not currently running<br>
+                                Dynamic simulations are currently running
+                            </p>
+                        </div>
+                    </div>
+
+
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+{% include "admin/footer.html" %}
