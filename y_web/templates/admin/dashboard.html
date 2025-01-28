@@ -11,10 +11,10 @@
         <div class="dashboard-body">
             <div class="columns">
                      <!--Dashboard column-->
-                {% if ollamas["status"] and  ollamas["installed"] %}
+
                 <div class="column is-8">
                     <!--Dashboard box-->
-
+                    {% if ollamas["status"] and  ollamas["installed"] %}
                     <div class="dashboard-box">
                          <h3 class="title is-5 is-thin">Experiment Dashboard</h3>
                         <div class="box-content">
@@ -139,9 +139,23 @@
                         </div>
 
                     </div>
+                     {% else %}
 
-                </div>
+                    <div class="dashboard-box">
+                        <div class="box-content">
+                            <img src="{{ url_for('static', filename='assets/img/robots/header3.jpg') }}">
+                            <div class="box-lines">
+                                <div class="box-line">
+                                    <span class="left">Start the LLM server to view the list of available experiments.
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 {% endif %}
+                </div>
+
+
 
                 <!--Dashboard column-->
                 <div class="column is-4">
@@ -231,7 +245,7 @@
                                 <span class="left" id="model_pull_name_{{ pull[0] }}">
                                     {{ pull[0] }}
                                 </span>
-                                 <span class="right" style="height: 22px; width: 80%;">
+                                 <span class="right" style="height: 22px; width: 70%;">
                                 <div class="progress" style="height: 22px; width: 100%;" >
                                     <div id="pull-progress-bar_{{ pull[0] }}" class="progress-bar progress-bar-striped progress_exp" role="progressbar"
                                          aria-valuenow="{{ pull[1] }}" aria-valuemin="0" aria-valuemax="100" style="width: 0%;">
@@ -239,6 +253,11 @@
                                     </div>
                                 </div>
                                  </span>
+                                    <span class="right" style="height: 22px; width: 10%;">
+                                        <a href="/admin/ollama_cancel_pull/{{ pull[0] }}" title="Delete">
+                                        <i class="mdi mdi-delete" style="font-size: 20px;"></i>
+                                    </a>
+                                    </span>
                                 </div>
                                 {% endif %}
 
@@ -291,7 +310,7 @@
 
                         </div>
                     </div>
-
+                    
                     {% endif %}
                 </div>
 

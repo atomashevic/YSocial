@@ -24,6 +24,8 @@ RUN pip install --break-system-packages --no-cache-dir -r external/YServer/requi
 RUN echo 'alias python="python3"' >> ~/.bashrc
 RUN ln -s /usr/bin/python3 /usr/bin/python
 RUN ollama serve &
-VOLUME ["/app"]
+VOLUME ["/app", "/root/.ollama/models"]
+
+
 
 

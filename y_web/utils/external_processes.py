@@ -168,6 +168,16 @@ def delete_ollama_model(model_name):
     ol_client.delete(model_name)
 
 
+def delete_model_pull(model_name):
+    if model_name in client_processes:
+        process = client_processes[model_name]
+        process.terminate()
+        process.join()
+
+    model = Ollama_Pull.query.filter_by(model_name=model_name).first()
+    db.session.delete(model)
+    db.session.commit()
+
 def terminate_client(cli, pause=False):
     """
     Stop the y_client

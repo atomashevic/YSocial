@@ -17,6 +17,8 @@ app = Flask(__name__, static_url_path="/static")
 
 
 client_processes = {}
+
+
 def cleanup_subprocesses():
     """Terminate all subprocesses."""
     print("Cleaning up subprocesses...")
@@ -79,9 +81,6 @@ from .auth import auth as auth_blueprint
 
 app.register_blueprint(auth_blueprint)
 
-from .admin_dashboard import admin as admin_blueprint
-
-app.register_blueprint(admin_blueprint)
 
 # blueprint for non-auth parts of app
 from .main import main as main_blueprint
@@ -92,4 +91,22 @@ from .user_interaction import user as user_blueprint
 
 app.register_blueprint(user_blueprint)
 
+
+from .admin_dashboard import admin as admin_blueprint
+
+app.register_blueprint(admin_blueprint)
+
+from .routes_admin.ollama_routes import ollama as ollama_blueprint
+
+app.register_blueprint(ollama_blueprint)
+
+
+from .routes_admin.populations_routes import population as population_blueprint
+
+app.register_blueprint(population_blueprint)
+
+
+from .routes_admin.pages_routes import pages as pages_blueprint
+
+app.register_blueprint(pages_blueprint)
 
