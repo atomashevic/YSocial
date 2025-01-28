@@ -110,3 +110,19 @@ from .routes_admin.pages_routes import pages as pages_blueprint
 
 app.register_blueprint(pages_blueprint)
 
+from .routes_admin.agents_routes import agents as agents_blueprint
+
+app.register_blueprint(agents_blueprint)
+
+from .routes_admin.users_routes import users as users_blueprint
+
+app.register_blueprint(users_blueprint)
+
+from .routes_admin.experiments_routes import experiments as experiments_blueprint
+
+app.register_blueprint(experiments_blueprint)
+
+from .routes_admin.clients_routes import clientsr as clients_blueprint
+
+app.register_blueprint(clients_blueprint)
+

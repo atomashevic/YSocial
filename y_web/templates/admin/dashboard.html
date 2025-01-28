@@ -14,7 +14,7 @@
 
                 <div class="column is-8">
                     <!--Dashboard box-->
-                    {% if ollamas["status"] and  ollamas["installed"] %}
+                    {% if len(experiments) > 0 and (ollamas["status"] and  ollamas["installed"]) %}
                     <div class="dashboard-box">
                          <h3 class="title is-5 is-thin">Experiment Dashboard</h3>
                         <div class="box-content">
@@ -144,9 +144,15 @@
                     <div class="dashboard-box">
                         <div class="box-content">
                             <img src="{{ url_for('static', filename='assets/img/robots/header3.jpg') }}">
+
                             <div class="box-lines">
                                 <div class="box-line">
-                                    <span class="left">Start the LLM server to view the list of available experiments.
+                                    <span class="left">
+                                        {% if ollamas['status'] == 0 %}
+                                        LLM server not started
+                                        {% else %}
+                                        No experiments available
+                                        {% endif %}
                                     </span>
                                 </div>
                             </div>
