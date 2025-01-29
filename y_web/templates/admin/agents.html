@@ -367,7 +367,7 @@
                                     </div>
 
                                     <hr>
-                                    <b>Expected Social Behavior</b><
+                                    <b>Expected Social Behavior</b>
                                     <div class="box-line">
                                         <span class="left">Toxicity Level</span>
                                         <div class="select">
@@ -383,7 +383,11 @@
 
                                     <hr>
                                     <b>Advanced Role-Playing</b>
-                                    <p>Specifying the agent pre-prompt overrides the other configuration variables.</p>
+                                    <div class="box-line">
+                                        <span class="left">
+                                    Specifying the agent pre-prompt overrides the other configuration variables.
+                                        </span>
+                                    </div>
                                     <div class="box-line">
                                         <span class="left">Alternative profile</span>
                                         <span class="right" style="width: 70%;"><input type="text" name="alt_profile"
@@ -407,20 +411,21 @@
                     <div class="dashboard-box is-compact">
                         <h3 class="title is-5 is-thin">Guide</h3>
                         <div class="help-block">
-                            <h4>Which Simulations?</h4>
+
                             <p>
-                                Here you can view all available simulations.
-                                Remember that you can only join one simulation at a time.
+                                <b>Synthetic Agents</b>
+                                are virtual entities that can be used in simulations to represent
+                                social media users. They can be configured with different demographic information,
+                                interests, and personality traits.
                             </p>
                             <br>
 
-                            <h4>Static vs. Dynamic</h4>
-                            <p>
-                                Simulations can be either static or dynamic.
 
+                            <p>
+                                <b>Profiles vs. Advanced Roleplay.</b><br>
+                                The agent profile is a set of predefined characteristics that can be used to specify its behavior (trough LLM pre-prompts).
                                 <br><br>
-                                Static simulations are not currently running<br>
-                                Dynamic simulations are currently running
+                                The advanced roleplay allows to specify a custom pre-prompt that <em>overrides</em> the other configuration variables.
                             </p>
                         </div>
                     </div>

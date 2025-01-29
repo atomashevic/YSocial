@@ -18,7 +18,7 @@
 
             <div class="columns">
                 <!--Dashboard column-->
-                <div class="column is-6">
+                <div class="column is-4">
                     <!--Dashboard box-->
                     <div class="dashboard-box">
                         <h3 class="title is-5 is-thin">Client</h3>
@@ -60,10 +60,9 @@
                     </div>
 
                     <div class="dashboard-box">
+                        <h3 class="title is-5 is-thin">Simulation Parameters</h3>
                         <div class="box-content">
                             <div class="box-lines">
-
-                                <h4><b>Simulation Parameters</b></h4>
                                 <div class="box-line">
                                     <span class="left">Simulation Length (days)</span>
                                     <span class="right">{{ client.days }}</span>
@@ -101,9 +100,9 @@
                     </div>
 
                     <div class="dashboard-box">
+                        <h3 class="title is-5 is-thin">Global Actions Likelihood</h3>
                         <div class="box-content">
                             <div class="box-lines">
-                                 <h4><b>Agents' Actions Candidate Selection Likelihood</b></h4>
                                 <div class="box-line">
                                     <span class="left">Post new content</span>
                                     <span class="right">{{ client.post }}</span>
@@ -140,17 +139,77 @@
                         </div>
                     </div>
 
+                    <div class="dashboard-box">
+                          <h3 class="title is-5 is-thin">LLM</h3>
+                        <div class="box-content">
+                            <div class="box-lines">
+                                <div class="box-line">
+                                    <span class="left">LLM Server</span>
+                                    <span class="right">{{ client.llm }}</span>
+                                </div>
+                                <div class="box-line">
+                                    <span class="left">API Key</span>
+                                    <span class="right">{{ client.llm_api_key }}</span>
+                                </div>
+
+                                <div class="box-line">
+                                    <span class="left">Max tokens</span>
+                                    <span class="right">{{ client.llm_max_tokens }}</span>
+                                </div>
+                                <div class="box-line">
+                                    <span class="left">Temperature</span>
+                                    <span class="right">{{ client.llm_temperature }}</span>
+                                </div>
+                                <hr>
+                                 <h3 class="title is-5 is-thin">LLLM (Image Transcription)</h3>
+                                <div class="box-line">
+                                    <span class="left">LLM Model</span>
+                                    <span class="right">{{ client.llm_v_agent }}</span>
+                                </div>
+                                 <div class="box-line">
+                                    <span class="left">LLM Server</span>
+                                    <span class="right">{{ client.llm_v }}</span>
+                                </div>
+                                <div class="box-line">
+                                    <span class="left">API Key</span>
+                                    <span class="right">{{ client.llm_v_api_key }}</span>
+                                </div>
+
+                                <div class="box-line">
+                                    <span class="left">Max tokens</span>
+                                    <span class="right">{{ client.llm_v_max_tokens }}</span>
+                                </div>
+                                <div class="box-line">
+                                    <span class="left">Temperature</span>
+                                    <span class="right">{{ client.llm_v_temperature }}</span>
+                                </div>
+                            </div>
+
+                        </div>
+                    </div>
+
                 </div>
 
                 <!--Dashboard box-->
 
                 <!--Dashboard column-->
-                <div class="column is-6">
+                <div class="column is-8">
                     <!--Box-->
+
+
                      <div class="dashboard-box">
                         <div class="box-content">
                             <div class="box-lines">
-                                <h3 class="title is-5 is-thin">Initial Network Structure</h3>
+                                <h3 class="title is-5 is-thin">Social Network Structure</h3>
+                                <div class="box-line">
+                                    <span class="left">Each client can be deployed by imposing a starting social network among the agents of its populations.
+                                    <br><br> The network can be either synthetically generated or custom-made and uploaded.
+                                        To create a custom network file download the agent name list using
+                                        <i class="mdi mdi-account-star" style="font-size: 16px;"></i>
+                                    </span>
+
+                                </div>
+                                <hr>
                                 <div class="box-line">
                                     <span class="left">Type of Network</span>
                                     <span class="right">{{ client.network_type }}</span>
@@ -229,57 +288,6 @@
                             }
                         });
                     </script>
-
-                    <div class="dashboard-box">
-                        <div class="box-content">
-                            <div class="box-lines">
-                                <h4><b>Large Language Models</b></h4>
-                                <div class="box-line">
-                                    <span class="left">LLM Server</span>
-                                    <span class="right">{{ client.llm }}</span>
-                                </div>
-                                <div class="box-line">
-                                    <span class="left">API Key</span>
-                                    <span class="right">{{ client.llm_api_key }}</span>
-                                </div>
-
-                                <div class="box-line">
-                                    <span class="left">Max tokens</span>
-                                    <span class="right">{{ client.llm_max_tokens }}</span>
-                                </div>
-                                <div class="box-line">
-                                    <span class="left">Temperature</span>
-                                    <span class="right">{{ client.llm_temperature }}</span>
-                                </div>
-                                <hr>
-                                <h4><b>Large Language Models (Image Transcription)</b></h4>
-                                <div class="box-line">
-                                    <span class="left">LLM Model</span>
-                                    <span class="right">{{ client.llm_v_agent }}</span>
-                                </div>
-                                 <div class="box-line">
-                                    <span class="left">LLM Server</span>
-                                    <span class="right">{{ client.llm_v }}</span>
-                                </div>
-                                <div class="box-line">
-                                    <span class="left">API Key</span>
-                                    <span class="right">{{ client.llm_v_api_key }}</span>
-                                </div>
-
-                                <div class="box-line">
-                                    <span class="left">Max tokens</span>
-                                    <span class="right">{{ client.llm_v_max_tokens }}</span>
-                                </div>
-                                <div class="box-line">
-                                    <span class="left">Temperature</span>
-                                    <span class="right">{{ client.llm_v_temperature }}</span>
-                                </div>
-                            </div>
-
-                        </div>
-                    </div>
-
-
 
                 </div>
 

@@ -446,11 +446,11 @@ def set_network(uid):
     client = Client.query.filter_by(id=uid).first()
 
     # get populations for client uid
-    populations = Population_Experiment.query.filter_by(id_exp=uid).all()
+    populations = Population.query.filter_by(id=client.population_id).all()
     # get agents for the populations
-    agents = Agent_Population.query.filter(Agent_Population.population_id.in_([p.id_population for p in populations])).all()
+    agents = Agent_Population.query.filter(Agent_Population.population_id.in_([p.id for p in populations])).all()
     # get agent ids for all agents in populations
-    agent_ids = [a.agent_id for a in agents]
+    agent_ids = [Agent.query.filter_by(id=a.agent_id).first().name for a in agents]
 
     # get data from form
     network = request.form.get("network_model")
@@ -469,7 +469,9 @@ def set_network(uid):
     BASE = os.path.dirname(os.path.abspath(__file__))
     exp_folder = exp.db_name.split(os.sep)[1]
 
-    with open(f"{BASE}{os.sep}experiments{os.sep}{exp_folder}{os.sep}{client.name}_network.csv", "w") as f:
+    path = f"{BASE}{os.sep}experiments{os.sep}{exp_folder}{os.sep}{client.name}_network.csv".replace(f"routes_admin{os.sep}", "")
+
+    with open(path, "w") as f:
         for n in g.edges:
             f.write(f"{agent_ids[n[0]]},{agent_ids[n[1]]}\n")
         f.flush()
@@ -498,26 +500,29 @@ def upload_network(uid):
 
     network.save(f"{BASE}{os.sep}experiments{os.sep}{exp_folder}{os.sep}{client.name}_network_temp.csv")
 
-    # get populations for client uid
-    populations = Population_Experiment.query.filter_by(id_exp=client.id_exp).all()
-
-    agents = Agent_Population.query.filter(
-    Agent_Population.population_id.in_([p.id_population for p in populations])).all()
-    # get agent ids for all agents in populations
-    agent_map = {a.name: a.agent_id for a in agents}
+    path = f"{BASE}{os.sep}experiments{os.sep}{exp_folder}{os.sep}{client.name}".replace(
+        f"routes_admin{os.sep}", "")
 
     try:
-        with open(f"{BASE}{os.sep}experiments{os.path.sep}{exp_folder}{os.sep}{client.name}_network.csv", "r") as o:
-            with open(f"{BASE}{os.sep}experiments{os.path.sep}{exp_folder}{os.sep}{client.name}_network_temp.csv", "r") as f:
+        with open(f"{path}_network.csv", "r") as o:
+            with open(f"{path}_network_temp.csv", "r") as f:
                 for l in f:
                     l.rstrip().split(",")
-                    o.write(f"{agent_map[l[0]]},{agent_map[l[1]]}\n")
+                    if Agent.query.filter_by(name=l[0]).first() and Agent.query.filter_by(name=l[1]).first():
+                        o.write(f"{l[0]},{l[1]}\n")
+                    else:
+                        flash(f"Agent {l[0]} or {l[1]} not found.", "error")
+                        os.remove(f"{path}_network_temp.csv")
+                        os.remove(f"{path}_network.csv")
+                        return redirect(request.referrer)
     except:
         flash("File format error: provide a csv file containing two columns with agent names. No header required.", "error")
+        os.remove(f"{path}_network_temp.csv")
+        os.remove(f"{path}_network.csv")
         return redirect(request.referrer)
 
     # delete the temp file
-    os.remove(f"{BASE}{os.sep}experiments{os.path.sep}{exp_folder}{os.sep}{client.name}_network_temp.csv")
+    os.remove(f"{path}_network_temp.csv")
 
     client.network_type = network
     db.session.commit()

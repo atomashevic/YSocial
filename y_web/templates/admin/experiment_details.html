@@ -18,7 +18,7 @@
 
             <div class="columns">
                 <!--Dashboard column-->
-                <div class="column is-5">
+                <div class="column is-4">
                     <!--Dashboard box-->
                     <div class="dashboard-box">
                         <h3 class="title is-5 is-thin">Experiment Summary</h3>
@@ -89,10 +89,11 @@
                 <!--Dashboard box-->
 
                 <!--Dashboard column-->
-                <div class="column is-3">
+                <div class="column is-4">
                     <!--Box-->
 
                     <div class="dashboard-box">
+                        <h3 class="title is-5 is-thin">YServer</h3>
                         <div class="box-content">
                             <div class="box-line">
                                 <span class="left">Web Interface</span>
@@ -133,7 +134,7 @@
 
                     <div class="dashboard-box">
                         <div class="box-content">
-                            <h3 class="title is-5 is-thin">Clients</h3>
+                            <h3 class="title is-5 is-thin">YClients</h3>
                             <hr style="margin-bottom: 5px; margin-top: 5px;">
                             {% if len(clients) == 0 %}
                             <div class="box-line">
@@ -175,31 +176,31 @@
                     <div class="dashboard-box is-compact">
                         <h3 class="title is-5 is-thin">Guide</h3>
                         <div class="help-block">
-                            <h4>Web Interface</h4>
-                            <p>
-                                The web interface allows you to control the experiment and view the results.
-                                It can be activated only for one experiment at a time.
-                            </p>
-                            <br>
 
-                            <h4>YServer Execution</h4>
                             <p>
-                                The YServer is the main component of the experiment. It is responsible for
-                                the execution
-                                of the experiment.
-                                When the YServer is running, populations can connect to it and participate
-                                in the
-                                experiment.
+                                <b>Web Interface</b> allows to interact with the experiment through an online social platform-like interface.<br><br>
+                                <i class="mdi mdi-select-all" style="font-size: 16px;"></i> activates the experiment's web interface.<br>
+                                <i class="mdi mdi-plus-box" style="font-size: 16px;"></i> access the web interface.
+                                <br><br>
+                                <em>Note: Only one web interface can be active at a time, even for non-running experiments.</em>
                             </p>
-                            <br>
-                            {% if experiment.running == 1 and len(experiment_populations)>0 %}
-                            <h4>YClient</h4>
+                            <hr>
                             <p>
-                                The YClient is a component that can be used to simulate a population in the
-                                experiment.
-                                Each YClient simulates a population of agents.
+                                <b>YServer</b>
+                                 is the main component of the experiment. It is responsible for
+                                the execution of the experiment.
                             </p>
-                            {% endif %}
+                            <p>
+                                <b>YClients.</b>
+                                Each client simulates a population of agents. Clients can be started and stopped while the server is running.<br>
+                            </p>
+                            <hr>
+                            <p>
+                                <b>Prompts</b> specify the instruction that the LLM agents will be required to follow during the experiment.<br><br>
+
+                                <i class="mdi mdi-credit-card" style="font-size: 16px;"></i> allows to edit the prompts to tune them to the simulation needs.
+                            </p>
+
                         </div>
                     </div>
 

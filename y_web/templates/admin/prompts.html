@@ -147,21 +147,157 @@
                     <div class="dashboard-box is-compact">
                         <h3 class="title is-5 is-thin">Guide</h3>
                         <div class="help-block">
-                            <h4>Which Simulations?</h4>
                             <p>
-                                Here you can view all available simulations.
-                                Remember that you can only join one simulation at a time.
+                                <b>A dialogue for two.</b><br>
+                                To simulate a synthetic agent actions YSocial creates a chat between two entities: <br><br>
+                                <em>The Agent</em>: which has to generate text or taking decisions leveraging its profile;<br>
+                                <em>The Handler</em>: which provides instructions to the agent and evaluate its results (e.g., identifying article topics, elicited emotions).
                             </p>
-                            <br>
-
-                            <h4>Static vs. Dynamic</h4>
+                            <hr>
                             <p>
-                                Simulations can be either static or dynamic.
-
-                                <br><br>
-                                Static simulations are not currently running<br>
-                                Dynamic simulations are currently running
+                                <b>Prompts Customization</b>
+                                Prompts can access agent profile variables and can be customized to fit the specific needs of the simulation using the synthax <code>{ variable }</code>.<br>
+                                Here is the list of available variables:
                             </p>
+                        </div>
+                        <div class="box-content">
+                                <div class="box-lines">
+                                    Agent features
+                                    <div class="box-line">
+                                        <span class="left"><code>{self.name}</code></span>
+                                        <span class="right" style="width: 40%;">
+                                            The agent name.
+                                        </span>
+                                    </div>
+                                    <div class="box-line">
+                                        <span class="left"><code>{self.age}</code></span>
+                                        <span class="right" style="width: 40%;">
+                                            The agent age.
+                                        </span>
+                                    </div>
+                                    <div class="box-line">
+                                        <span class="left"><code>{self.nationality}</code></span>
+                                        <span class="right" style="width: 40%;">
+                                            The agent nationality.
+                                        </span>
+                                    </div>
+                                    <div class="box-line">
+                                        <span class="left"><code>{self.gender}</code></span>
+                                        <span class="right" style="width: 40%;">
+                                            The agent gender.
+                                        </span>
+                                    </div>
+                                    <div class="box-line">
+                                        <span class="left"><code>{self.leaning}</code></span>
+                                        <span class="right" style="width: 40%;">
+                                            The agent political leaning.
+                                        </span>
+                                    </div>
+                                    <div class="box-line">
+                                        <span class="left"><code>{','.join(interest)}</code></span>
+                                        <span class="right" style="width: 40%;">
+                                            A subset of agent's interests.
+                                        </span>
+                                    </div>
+                                    <div class="box-line">
+                                        <span class="left"><code>{self.education_level}</code></span>
+                                        <span class="right" style="width: 40%;">
+                                            The agent education level.
+                                        </span>
+                                    </div>
+                                          <div class="box-line">
+                                        <span class="left"><code>{self.toxicity}</code></span>
+                                        <span class="right" style="width: 40%;">
+                                            The agent expected toxicity.
+                                        </span>
+                                    </div>
+                                    <div class="box-line">
+                                        <span class="left"><code>{self.language}</code></span>
+                                        <span class="right" style="width: 40%;">
+                                            The agent spoken language.
+                                        </span>
+                                    </div>
+                                    <br>
+                                    Big-5 Personality Traits
+                                    <div class="box-line">
+                                        <span class="left"><code>{self.oe}</code></span>
+                                        <span class="right" style="width: 40%;">
+                                            Openness to Experience.
+                                        </span>
+                                    </div>
+                                    <div class="box-line">
+                                        <span class="left"><code>{self.co}</code></span>
+                                        <span class="right" style="width: 40%;">
+                                            Conscientiousness.
+                                        </span>
+                                    </div>
+                                    <div class="box-line">
+                                        <span class="left"><code>{self.ex}</code></span>
+                                        <span class="right" style="width: 40%;">
+                                            Extraversion.
+                                        </span>
+                                    </div>
+                                    <div class="box-line">
+                                        <span class="left"><code>{self.ag}</code></span>
+                                        <span class="right" style="width: 40%;">
+                                            Agreeableness.
+                                        </span>
+                                    </div>
+                                    <div class="box-line">
+                                        <span class="left"><code>{self.ne}</code></span>
+                                        <span class="right" style="width: 40%;">
+                                            Neuroticism.
+                                        </span>
+                                    </div>
+
+                                    <br>
+                                    News Pages
+                                    <div class="box-line">
+                                        <span class="left"><code>{website.name}</code></span>
+                                        <span class="right" style="width: 40%;">
+                                            The Website name.
+                                        </span>
+                                    </div>
+                                    <div class="box-line">
+                                        <span class="left"><code>{website.leaning}</code></span>
+                                        <span class="right" style="width: 40%;">
+                                            The Website political leaning (if available).
+                                        </span>
+                                    </div>
+                                    <div class="box-line">
+                                        <span class="left"><code>{article.title}</code></span>
+                                        <span class="right" style="width: 40%;">
+                                            The Article title.
+                                        </span>
+                                    </div>
+                                    <div class="box-line">
+                                        <span class="left"><code>{article.summary}</code></span>
+                                        <span class="right" style="width: 40%;">
+                                            The Article summary.
+                                        </span>
+                                    </div>
+                                    <br>
+                                    Contents
+                                    <div class="box-line">
+                                        <span class="left"><code>{descr}</code></span>
+                                        <span class="right" style="width: 40%;">
+                                            The image textual description.
+                                        </span>
+                                    </div>
+                                    <div class="box-line">
+                                        <span class="left"><code>{post_text}</code></span>
+                                        <span class="right" style="width: 40%;">
+                                            The post text.
+                                        </span>
+                                    </div>
+                                    <div class="box-line">
+                                        <span class="left"><code>{conv}</code></span>
+                                        <span class="right" style="width: 40%;">
+                                            A discussion thread.
+                                        </span>
+                                    </div>
+
+                                </div>
                         </div>
                     </div>
 
