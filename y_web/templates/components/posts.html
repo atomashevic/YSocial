@@ -9,10 +9,15 @@
                 <div class="image">
                     <img
                             src="https://via.placeholder.com/300x300"
-                            data-demo-src="{{ url_for('static', filename='assets/img/users/'+ str(item['author_id']) +'.png') }}"
+                            {% if item['profile_pic'] == "" %}
+                                data-demo-src="{{ url_for('static', filename='assets/img/users/'+ str(item['author_id']) +'.png') }}"
+                            {% else %}
+                                data-demo-src="{{ item['profile_pic'] }}"
+                            {% endif %}
                             data-user-popover="1"
                             alt=""
                     />
+
                 </div>
                 <div class="user-info">
                     <a href="/profile/{{ item['author_id'] }}/recent/1">{{ item["author"] }}</a>
@@ -204,8 +209,12 @@
                     <div class="image">
                         <img
                                 src="https://via.placeholder.com/300x300"
-                                data-demo-src="{{ url_for('static', filename='assets/img/users/'+ str(cm['author_id']) +'.png') }}"
-                                data-user-popover="1"
+                                {% if cm['profile_pic'] == "" %}
+                                    data-demo-src="{{ url_for('static', filename='assets/img/users/'+ str(cm['author_id']) +'.png') }}"
+                                {% else %}
+                                    data-demo-src="{{ cm['profile_pic'] }}"
+                                {% endif %}
+                                   data-user-popover="1"
                                 alt=""
                         />
                     </div>

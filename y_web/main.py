@@ -1,7 +1,7 @@
 from flask import Blueprint, render_template, redirect
 from flask_login import login_required, current_user
 from .data_access import *
-from .models import Admin_users, Images
+from .models import Admin_users, Images, Page
 
 main = Blueprint("main", __name__)
 
@@ -144,8 +144,20 @@ def profile_logged(user_id, page=1, mode="recent"):
 
     mentions = get_unanswered_mentions(current_user.id)
 
+    profile_pic = ""
+
+    # is the agent a page?
+    if user.is_page == 1:
+        pg = Page.query.filter_by(name=user.username).first()
+        if page is not None:
+            profile_pic = pg.logo
+    else:
+        ag = Agent.query.filter_by(name=user.username).first()
+        profile_pic = ag.profile_pic if ag is not None and ag.profile_pic is not None else ""
+
     return render_template(
         "profile.html",
+        profile_pic=profile_pic,
         user=res,
         enumerate=enumerate,
         username=user.username,
@@ -283,9 +295,19 @@ def feed(user_id="all", timeline="timeline", mode="rf", page=1):
             else:
                 text = c.tweet.split(":")[-1]
 
+            profile_pic = ""
+            if author.is_page == 1:
+                pg = Page.query.filter_by(name=c.username).first()
+                if page is not None:
+                    profile_pic = pg.logo
+            else:
+                ag = Agent.query.filter_by(name=c.username).first()
+                profile_pic = ag.profile_pic if ag is not None and ag.profile_pic is not None else ""
+
             cms.append(
                 {
                     "post_id": c.id,
+                    "profile_pic": profile_pic,
                     "author": author,
                     "author_id": int(c.user_id),
                     "post": augment_text(text),
@@ -336,10 +358,21 @@ def feed(user_id="all", timeline="timeline", mode="rf", page=1):
         # get elicited emotions names
         emotions = get_elicited_emotions(post.id)
 
+        aa = User_mgmt.query.filter_by(id=post.user_id).first()
+        profile_pic = ""
+        if aa.is_page == 1:
+            pg = Page.query.filter_by(name=aa.username).first()
+            if pg is not None:
+                profile_pic = pg.logo
+        else:
+            ag = Agent.query.filter_by(name=aa.username).first()
+            profile_pic = ag.profile_pic if ag.profile_pic is not None else ""
+
         res.append(
             {
                 "article": art,
                 "image": image,
+                "profile_pic": profile_pic,
                 "thread_id": post.thread_id,
                 "post_id": post.id,
                 "author": User_mgmt.query.filter_by(id=post.user_id).first().username,

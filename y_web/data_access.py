@@ -12,7 +12,9 @@ from .models import (
     Interests,
     User_interest,
     Post_topics,
-    Images
+    Images,
+    Page,
+    Agent
 )
 from sqlalchemy.sql.expression import func
 from sqlalchemy import desc
@@ -100,10 +102,21 @@ def get_user_recent_posts(user_id, page, per_page=10, mode="rf", current_user=No
             else:
                 text = c.tweet.split(":")[-1]
 
+            # is the agent a page?
+            profile_pic = ""
+            if c.is_page == 1:
+                page = Page.query.filter_by(name=c.username).first()
+                if page is not None:
+                    profile_pic = page.logo
+            else:
+                ag = Agent.query.filter_by(name=c.username).first()
+                profile_pic = ag.profile_pic if ag is not None and ag.profile_pic is not None else ""
+
             cms.append(
                 {
                     "post_id": c.id,
                     "author": author,
+                    "profile_pic": profile_pic,
                     "author_id": int(c.user_id),
                     "post": augment_text(text),
                     "round": c.round,
@@ -153,12 +166,25 @@ def get_user_recent_posts(user_id, page, per_page=10, mode="rf", current_user=No
         if image is None:
             image = ""
 
+        # is the agent a page?
+        author = User_mgmt.query.filter_by(id=post.user_id).first()
+
+        profile_pic = ""
+        if author.is_page == 1:
+            page = Page.query.filter_by(name=author.username).first()
+            if page is not None:
+                profile_pic = page.logo
+        else:
+            ag = Agent.query.filter_by(name=author.username).first()
+            profile_pic = ag.profile_pic if ag is not None and ag.profile_pic is not None else ""
+
         res.append(
             {
                 "article": art,
                 "image": image,
                 "thread_id": post.thread_id,
                 "post_id": post.id,
+                "profile_pic": profile_pic,
                 "author": User_mgmt.query.filter_by(id=post.user_id).first().username,
                 "author_id": int(post.user_id),
                 "post": augment_text(post.tweet.split(":")[-1]),
@@ -527,10 +553,21 @@ def get_posts_associated_to_hashtags(hashtag_id, page, per_page=10, current_user
 
             emotions = get_elicited_emotions(c.id)
 
+            # is the agent a page?
+            if c.is_page == 1:
+                page = Page.query.filter_by(name=c.username).first()
+                if page is not None:
+                    profile_pic = page.logo
+            else:
+                ag = Agent.query.filter_by(name=c.username).first()
+                profile_pic = ag.profile_pic if ag is not None and ag.profile_pic is not None else ""
+
+
             cms.append(
                 {
                     "post_id": c.id,
                     "author": author,
+                    "profile_pic": profile_pic,
                     "author_id": int(c.user_id),
                     "post": augment_text(c.tweet.split(":")[-1]),
                     "round": c.round,
@@ -581,10 +618,23 @@ def get_posts_associated_to_hashtags(hashtag_id, page, per_page=10, current_user
         if image is None:
             image = ""
 
+        # is the agent a page?
+        author = User_mgmt.query.filter_by(id=post.user_id).first()
+
+        if author.is_page == 1:
+            page = Page.query.filter_by(name=author.username).first()
+            if page is not None:
+                profile_pic = page.logo
+        else:
+            # get agent profile pic
+            ag = Agent.query.filter_by(name=author.username).first()
+            profile_pic = ag.profile_pic if ag is not None and ag.profile_pic is not None else ""
+
         res.append(
             {
                 "article": art,
                 "image": image,
+                "profile_pic": profile_pic,
                 "thread_id": post.thread_id,
                 "post_id": post.id,
                 "author": User_mgmt.query.filter_by(id=post.user_id).first().username,
@@ -658,10 +708,20 @@ def get_posts_associated_to_interest(interest_id, page, per_page=10, current_use
             # get elicited emotions names
             emotions = get_elicited_emotions(c.id)
 
+            # is the agent a page?
+            if c.is_page == 1:
+                page = Page.query.filter_by(name=c.username).first()
+                if page is not None:
+                    profile_pic = page.logo
+            else:
+                ag = Agent.query.filter_by(name=c.username).first()
+                profile_pic = ag.profile_pic if ag is not None and ag.profile_pic is not None else ""
+
             cms.append(
                 {
                     "post_id": c.id,
                     "author": author,
+                    "profile_pic": profile_pic,
                     "author_id": int(c.user_id),
                     "post": augment_text(c.tweet.split(":")[-1]),
                     "round": c.round,
@@ -709,10 +769,22 @@ def get_posts_associated_to_interest(interest_id, page, per_page=10, current_use
         if image is None:
             image = ""
 
+        # is the agent a page?
+        author = User_mgmt.query.filter_by(id=post.user_id).first()
+
+        if author.is_page == 1:
+            page = Page.query.filter_by(name=author.username).first()
+            if page is not None:
+                profile_pic = page.logo
+        else:
+            ag = Agent.query.filter_by(name=author.username).first()
+            profile_pic = ag.profile_pic if ag is not None and ag.profile_pic is not None else ""
+
         res.append(
             {
                 "article": art,
                 "image": image,
+                "profile_pic": profile_pic,
                 "thread_id": post.thread_id,
                 "post_id": post.id,
                 "author": User_mgmt.query.filter_by(id=post.user_id).first().username,
@@ -787,10 +859,20 @@ def get_posts_associated_to_emotion(emotion_id, page, per_page=10, current_user=
             # get elicited emotions names
             emotions = get_elicited_emotions(c.id)
 
+            # is the agent a page?
+            if c.is_page == 1:
+                page = Page.query.filter_by(name=c.username).first()
+                if page is not None:
+                    profile_pic = page.logo
+            else:
+                ag = Agent.query.filter_by(name=c.username).first()
+                profile_pic = ag.profile_pic if ag is not None and ag.profile_pic is not None else ""
+
             cms.append(
                 {
                     "post_id": c.id,
                     "author": author,
+                    "profile_pic": profile_pic,
                     "author_id": int(c.user_id),
                     "post": augment_text(c.tweet.split(":")[-1]),
                     "round": c.round,
@@ -838,12 +920,24 @@ def get_posts_associated_to_emotion(emotion_id, page, per_page=10, current_user=
         if image is None:
             image = ""
 
+        # is the agent a page?
+        author = User_mgmt.query.filter_by(id=post.user_id).first()
+
+        if author.is_page == 1:
+            page = Page.query.filter_by(name=author.username).first()
+            if page is not None:
+                profile_pic = page.logo
+        else:
+            ag = Agent.query.filter_by(name=author.username).first()
+            profile_pic = ag.profile_pic if ag is not None and ag.profile_pic is not None else ""
+
         res.append(
             {
                 "article": art,
                 "image": image,
                 "thread_id": post.thread_id,
                 "post_id": post.id,
+                "profile_pic": profile_pic,
                 "author": User_mgmt.query.filter_by(id=post.user_id).first().username,
                 "author_id": int(post.user_id),
                 "post": augment_text(post.tweet.split(":")[-1]),

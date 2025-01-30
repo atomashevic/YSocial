@@ -268,6 +268,7 @@ class Agent(db.Model):
     nationality = db.Column(db.String(50))
     crecsys = db.Column(db.String(50))
     frecsys = db.Column(db.String(50))
+    profile_pic = db.Column(db.String(400), default="")
 
 
 class Agent_Population(db.Model):

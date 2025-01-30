@@ -17,12 +17,17 @@
                                 data-demo-src="{{ url_for('static', filename='assets/img/demo/bg/4.png') }}"
                                 alt=""
                         />
-                        <div class="avatar">
+                        <div class="avatar" style="background-color: white">
                             <img
                                     id="user-avatar"
                                     class="avatar-image"
-                                    data-demo-src="{{ url_for('static', filename='assets/img/users/'+ str(user_id) +'.png') }}"
+                                    {% if profile_pic =="" %}
+                                        data-demo-src="{{ url_for('static', filename='assets/img/users/'+ str(user_id) +'.png') }}"
+                                    {% else %}
+                                        data-demo-src="{{ profile_pic }}"
+                                    {% endif %}
                                     alt=""
+
                             />
 
                             {% if logged_id != user_id %}
