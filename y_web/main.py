@@ -1,7 +1,7 @@
 from flask import Blueprint, render_template, redirect
 from flask_login import login_required, current_user
 from .data_access import *
-from .models import Admin_users
+from .models import Admin_users, Images
 
 main = Blueprint("main", __name__)
 
@@ -321,6 +321,10 @@ def feed(user_id="all", timeline="timeline", mode="rf", page=1):
                 "source": Websites.query.filter_by(id=article.website_id).first().name,
             }
 
+        image = Images.query.filter_by(id=post.image_id).first()
+        if image is None:
+            image = ""
+
         c = Rounds.query.filter_by(id=post.round).first()
         if c is None:
             day = "None"
@@ -335,6 +339,7 @@ def feed(user_id="all", timeline="timeline", mode="rf", page=1):
         res.append(
             {
                 "article": art,
+                "image": image,
                 "thread_id": post.thread_id,
                 "post_id": post.id,
                 "author": User_mgmt.query.filter_by(id=post.user_id).first().username,
@@ -527,8 +532,11 @@ def get_thread(post_id):
         day = c.day
         hour = c.hour
 
+    image = Images.query.filter_by(id=posts[0].image_id).first()
+
     discussion_tree = {
         "post": augment_text(posts[0].tweet),
+        "image": image,
         "post_id": posts[0].id,
         "author": User_mgmt.query.filter_by(id=posts[0].user_id).first().username,
         "author_id": posts[0].user_id,

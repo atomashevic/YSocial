@@ -12,6 +12,7 @@ from .models import (
     Interests,
     User_interest,
     Post_topics,
+    Images
 )
 from sqlalchemy.sql.expression import func
 from sqlalchemy import desc
@@ -148,10 +149,14 @@ def get_user_recent_posts(user_id, page, per_page=10, mode="rf", current_user=No
         # get elicited emotions names
 
         emotions = get_elicited_emotions(post.id)
+        image = Images.query.filter_by(id=post.image_id).first()
+        if image is None:
+            image = ""
 
         res.append(
             {
                 "article": art,
+                "image": image,
                 "thread_id": post.thread_id,
                 "post_id": post.id,
                 "author": User_mgmt.query.filter_by(id=post.user_id).first().username,
@@ -572,9 +577,14 @@ def get_posts_associated_to_hashtags(hashtag_id, page, per_page=10, current_user
 
         emotions = get_elicited_emotions(post.id)
 
+        image = Images.query.filter_by(id=post.image_id).first()
+        if image is None:
+            image = ""
+
         res.append(
             {
                 "article": art,
+                "image": image,
                 "thread_id": post.thread_id,
                 "post_id": post.id,
                 "author": User_mgmt.query.filter_by(id=post.user_id).first().username,
@@ -695,10 +705,14 @@ def get_posts_associated_to_interest(interest_id, page, per_page=10, current_use
             hour = c.hour
 
         emotions = get_elicited_emotions(post.id)
+        image = Images.query.filter_by(id=post.image_id).first()
+        if image is None:
+            image = ""
 
         res.append(
             {
                 "article": art,
+                "image": image,
                 "thread_id": post.thread_id,
                 "post_id": post.id,
                 "author": User_mgmt.query.filter_by(id=post.user_id).first().username,
@@ -820,10 +834,14 @@ def get_posts_associated_to_emotion(emotion_id, page, per_page=10, current_user=
             hour = c.hour
 
         emotions = get_elicited_emotions(post.id)
+        image = Images.query.filter_by(id=post.image_id).first()
+        if image is None:
+            image = ""
 
         res.append(
             {
                 "article": art,
+                "image": image,
                 "thread_id": post.thread_id,
                 "post_id": post.id,
                 "author": User_mgmt.query.filter_by(id=post.user_id).first().username,
