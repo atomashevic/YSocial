@@ -120,6 +120,7 @@ def create_agent():
     ne = request.form.get("ne")
     toxicity = request.form.get("toxicity")
     alt_profile = request.form.get("alt_profile")
+    profile_pic = request.form.get("profile_pic")
 
     agent = Agent(
         name=name,
@@ -140,6 +141,7 @@ def create_agent():
         gender=gender,
         crecsys=recsys_type,
         frecsys=frecsys_type,
+        profile_pic=profile_pic,
     )
 
     db.session.add(agent)
