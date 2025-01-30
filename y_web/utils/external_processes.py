@@ -9,7 +9,7 @@ import random
 from multiprocessing import Process
 from y_web.models import Client_Execution, Agent_Population, Agent, Page, Page_Population, Ollama_Pull, Agent_Profile
 from y_web import db, client_processes
-import shutil
+
 import requests
 from ollama import Client as oclient
 
@@ -178,6 +178,7 @@ def delete_model_pull(model_name):
     db.session.delete(model)
     db.session.commit()
 
+
 def terminate_client(cli, pause=False):
     """
     Stop the y_client
@@ -246,7 +247,11 @@ def start_client_process(exp, cli, population, resume=False):
 
         res = {"agents": []}
         for a in agents:
-            custom_prompt = Agent_Profile.query.filter_by(agent_id=a.id).first().profile
+
+            custom_prompt = Agent_Profile.query.filter_by(agent_id=a.id).first()
+
+            if custom_prompt:
+                custom_prompt = custom_prompt.profile
 
             res["agents"].append(
                 {
@@ -335,6 +340,7 @@ def start_client_process(exp, cli, population, resume=False):
     if resume:
         cl.days = ce.expected_duration_rounds - ce.elapsed_time
     cl.read_agents()
+    cl.add_feeds()
     run_simulation(cl, cli.id, filename)
 
 
