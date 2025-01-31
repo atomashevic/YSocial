@@ -574,3 +574,35 @@ def download_agent_list(uid):
 
     return send_file(f"{BASE}{os.sep}experiments{os.sep}{exp_folder}{os.sep}{client.name}_agent_list.csv", as_attachment=True)
 
+
+@clientsr.route("/admin/update_agents_activity/<int:uid>", methods=["POST"])
+@login_required
+def update_agents_activity(uid):
+    check_privileges(current_user.username)
+
+    # get data from form
+    activity = {}
+    for x in range(0, 24):
+        activity[str(x)] = float(request.args.get(str(x)))
+
+    # get client details
+    client = Client.query.filter_by(id=uid).first()
+    experiment = Exps.query.filter_by(idexp=client.id_exp).first()
+    population = Population.query.filter_by(id=client.population_id).first()
+
+    BASE = os.path.dirname(os.path.abspath(__file__))
+    exp_folder = experiment.db_name.split(os.sep)[1]
+
+    path = f"{BASE}{os.sep}experiments{os.sep}{exp_folder}{os.sep}client_{client.name}-{population.name}.json".replace(
+        f"routes_admin{os.sep}", "")
+
+    if os.path.exists(path):
+        with open(path, "r") as f:
+            config = json.load(f)
+            config["simulation"]["hourly_activity"] = activity
+            # save the new configuration
+            json.dump(config, open(path, "w"), indent=4)
+    else:
+        flash("Configuration file not found.", "error")
+
+    return redirect(request.referrer)
