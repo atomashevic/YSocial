@@ -11,6 +11,14 @@
                 <!--Dashboard column-->
                 <div class="column is-8">
                     <!--Dashboard box-->
+
+                    {% for message in get_flashed_messages() %}
+                    <div class="alert alert-warning">
+                        <button type="button" class="close" data-dismiss="alert">&times;</button>
+                        {{ message }}
+                    </div>
+                    {% endfor %}
+
                     <div class="dashboard-box">
                         <h3 class="title is-5 is-thin">Registered Users</h3>
 
