@@ -296,7 +296,7 @@ def start_client_process(exp, cli, population, resume=False):
                     "password": f"{p.name}",
                     "age": 0,
                     "type": p.pg_type,
-                    "leaning": "",
+                    "leaning": p.leaning,
                     "interests": [[], 0],
                     "oe": "",
                     "co": "",

@@ -300,6 +300,7 @@ class Page(db.Model):
     keywords = db.Column(db.String(200))
     logo = db.Column(db.String(300))
     pg_type = db.Column(db.String(100))
+    leaning = db.Column(db.String(50), default="")
 
 
 class Population_Experiment(db.Model):

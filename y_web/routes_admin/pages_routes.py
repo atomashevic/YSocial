@@ -53,6 +53,7 @@ def create_page():
     keywords = request.form.get("keywords")
     logo = request.form.get("logo")
     pg_type = request.form.get("pg_type")
+    leaning = request.form.get("leaning")
 
     page = Page(
         name=name,
@@ -62,6 +63,7 @@ def create_page():
         keywords=keywords,
         logo=logo,
         pg_type=pg_type,
+        leaning=leaning,
     )
 
     db.session.add(page)
