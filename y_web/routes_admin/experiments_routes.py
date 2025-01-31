@@ -63,6 +63,13 @@ def join_simulation():
     user_id = (
         db.session.query(User_mgmt).filter_by(username=current_user.username).first().id
     )
+
+    # check which experiment is active
+    exp = Exps.query.filter_by(status=1).first()
+    if exp is None:
+        flash("No active experiment. Please load an experiment.")
+        return redirect(request.referrer)
+
     # route the simulation home for the user
     return redirect(f"/feed/{user_id}/feed/rf/1")
 
