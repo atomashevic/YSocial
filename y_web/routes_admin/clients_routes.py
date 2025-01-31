@@ -422,8 +422,16 @@ def client_details(uid):
 
     activity = config["simulation"]["hourly_activity"]
 
+    data = []
+    idx = []
+    for x in range(0, 24):
+        idx.append(str(x))
+        data.append(activity[str(x)])
+
     return render_template(
         "admin/client_details.html",
+        data=data,
+        idx=idx,
         activity=activity,
         client=client,
         experiment=experiment,

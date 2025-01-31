@@ -281,10 +281,41 @@
 
 
                     <div class="dashboard-box">
+                        <h3 class="title is-5 is-thin">Percentage Active Agents per Hour</h3>
+                        <small>Default values fitted on longitudinal <a href="https://zenodo.org/records/14669616">Bluesy Data</a></small>
+                            <div class="box-content">
+
+                            <canvas id="activity_rates" style="width:100%;max-width:700px"></canvas>
+                            <script>
+                                new Chart("activity_rates", {
+                                    type: 'bar',
+                                    data: {
+                                        datasets: [{
+                                            label: 'Hourly activity rates',
+                                          data:  {{ data }},
+                                        }],
+                                        labels: {{ idx|tojson  }}
+                                      },
+                                    options: {
+                                        scales: {
+                                            y: {
+                                                beginAtZero: true
+                                            },
+                                            x: {
+                                                min: 0,
+                                                max: 100,
+                                              }
+                                        }
+                                    }
+
+                                });
+                            </script>
+                        </div>
+
                         <form action="/admin/update_agents_activity/{{ client.id }}" enctype="multipart/form-data" method="POST">
                         <div class="box-content">
                             <div class="box-lines">
-                                <h3 class="title is-5 is-thin">Percentage of Hourly Active agents</h3>
+
                                 <div class="box-line">
                                    <div class="left" style="text-align: center; padding: 2px;">0 <input type="text" name="0" class="input" value="{{ activity['0'] }}"></div>
                                     <div class="left" style="text-align: center; padding: 2px;">1 <input type="text" name="1" class="input" value="{{ activity['1'] }}"></div>
