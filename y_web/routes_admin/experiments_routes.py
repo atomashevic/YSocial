@@ -126,7 +126,7 @@ def change_active_experiment(exp_id):
 
     reload_current_user(uname)
 
-    return experiment_details(exp_id)
+    return redirect(request.referrer)
 
 
 @experiments.route("/admin/upload_database", methods=["POST"])
