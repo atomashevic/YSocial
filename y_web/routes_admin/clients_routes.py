@@ -407,12 +407,29 @@ def client_details(uid):
         .all()
     )
 
+    # get the client configuration file
+    BASE = os.path.dirname(os.path.abspath(__file__))
+    exp_folder = experiment.db_name.split(os.sep)[1]
+
+    path = f"{BASE}{os.sep}experiments{os.sep}{exp_folder}{os.sep}client_{client.name}-{population.name}.json".replace(
+        f"routes_admin{os.sep}", "")
+
+    if os.path.exists(path):
+        with open(path, "r") as f:
+            config = json.load(f)
+    else:
+        config = None
+
+    activity = config["simulation"]["hourly_activity"]
+
     return render_template(
         "admin/client_details.html",
+        activity=activity,
         client=client,
         experiment=experiment,
         population=population,
         pages=pages,
+
     )
 
 
