@@ -233,7 +233,7 @@
                                         <span class="right">
                                             <div class="select">
                                                 <select name="network_model" id="options">
-                                                    <option value="></option>
+                                                    <option value=""></option>
                                                     <option id="option1" value="ER">Random Network</option>
                                                     <option id="option2" value="BA">Scale Free</option>
                                                 </select>
@@ -278,7 +278,22 @@
                             </form>
                         </div>
                     </div>
+                            <script>
+                        document.getElementById('options').addEventListener('change', function () {
+                            const selectedValue = this.value;
 
+                            // Hide all field groups
+                            document.getElementById('option1-field').style.display = 'none';
+                            document.getElementById('option2-field').style.display = 'none';
+
+                            // Show the selected field group
+                            if (selectedValue === 'ER') {
+                                document.getElementById('option1-field').style.display = 'inline-block';
+                            } else if (selectedValue === 'BA') {
+                                document.getElementById('option2-field').style.display = 'inline-block';
+                            }
+                        });
+                    </script>
 
                     <div class="dashboard-box">
                         <h3 class="title is-5 is-thin">Percentage Active Agents per Hour</h3>
@@ -324,53 +339,52 @@
                                     <div class="left" style="text-align: center; padding: 2px;">4 <input type="text" name="4" class="input" value="{{ activity['4'] }}"></div>
                                     <div class="left" style="text-align: center; padding: 2px;">5 <input type="text" name="5" class="input" value="{{ activity['5'] }}"></div>
                                     <div class="left" style="text-align: center; padding: 2px;">6 <input type="text" name="6" class="input" value="{{ activity['6'] }}"></div>
-                                    <div class="left" style="text-align: center; padding: 2px;">7 <input type="text" name="0" class="input" value="{{ activity['7'] }}"></div>
-                                    <div class="left" style="text-align: center; padding: 2px;">8 <input type="text" name="1" class="input" value="{{ activity['8'] }}"></div>
-                                    <div class="left" style="text-align: center; padding: 2px;">9 <input type="text" name="2" class="input" value="{{ activity['9'] }}"></div>
-                                    <div class="left" style="text-align: center; padding: 2px;">10 <input type="text" name="3" class="input" value="{{ activity['10'] }}"></div>
-                                    <div class="left" style="text-align: center; padding: 2px;">11 <input type="text" name="4" class="input" value="{{ activity['11'] }}"></div>
+                                    <div class="left" style="text-align: center; padding: 2px;">7 <input type="text" name="7" class="input" value="{{ activity['7'] }}"></div>
+                                    <div class="left" style="text-align: center; padding: 2px;">8 <input type="text" name="8" class="input" value="{{ activity['8'] }}"></div>
+                                    <div class="left" style="text-align: center; padding: 2px;">9 <input type="text" name="9" class="input" value="{{ activity['9'] }}"></div>
+                                    <div class="left" style="text-align: center; padding: 2px;">10 <input type="text" name="10" class="input" value="{{ activity['10'] }}"></div>
+                                    <div class="left" style="text-align: center; padding: 2px;">11 <input type="text" name="11" class="input" value="{{ activity['11'] }}"></div>
                                 </div>
                                  <div class="box-line">
-                                    <div class="left" style="text-align: center; padding: 2px;">12 <input type="text" name="0" class="input" value="{{ activity['12'] }}"></div>
-                                    <div class="left" style="text-align: center; padding: 2px;">13 <input type="text" name="1" class="input" value="{{ activity['13'] }}"></div>
-                                    <div class="left" style="text-align: center; padding: 2px;">14 <input type="text" name="2" class="input" value="{{ activity['14'] }}"></div>
-                                    <div class="left" style="text-align: center; padding: 2px;">15 <input type="text" name="3" class="input" value="{{ activity['15'] }}"></div>
-                                    <div class="left" style="text-align: center; padding: 2px;">16 <input type="text" name="4" class="input" value="{{ activity['16'] }}"></div>
-                                    <div class="left" style="text-align: center; padding: 2px;">17 <input type="text" name="5" class="input" value="{{ activity['17'] }}"></div>
-                                    <div class="left" style="text-align: center; padding: 2px;">18 <input type="text" name="6" class="input" value="{{ activity['18'] }}"></div>
-                                    <div class="left" style="text-align: center; padding: 2px;">19 <input type="text" name="0" class="input" value="{{ activity['19'] }}"></div>
-                                    <div class="left" style="text-align: center; padding: 2px;">20 <input type="text" name="1" class="input" value="{{ activity['20'] }}"></div>
-                                    <div class="left" style="text-align: center; padding: 2px;">21 <input type="text" name="2" class="input" value="{{ activity['21'] }}"></div>
-                                    <div class="left" style="text-align: center; padding: 2px;">22 <input type="text" name="3" class="input" value="{{ activity['22'] }}"></div>
-                                    <div class="left" style="text-align: center; padding: 2px;">23 <input type="text" name="4" class="input" value="{{ activity['23'] }}"></div>
+                                    <div class="left" style="text-align: center; padding: 2px;">12 <input type="text" name="12" class="input" value="{{ activity['12'] }}"></div>
+                                    <div class="left" style="text-align: center; padding: 2px;">13 <input type="text" name="13" class="input" value="{{ activity['13'] }}"></div>
+                                    <div class="left" style="text-align: center; padding: 2px;">14 <input type="text" name="14" class="input" value="{{ activity['14'] }}"></div>
+                                    <div class="left" style="text-align: center; padding: 2px;">15 <input type="text" name="15" class="input" value="{{ activity['15'] }}"></div>
+                                    <div class="left" style="text-align: center; padding: 2px;">16 <input type="text" name="16" class="input" value="{{ activity['16'] }}"></div>
+                                    <div class="left" style="text-align: center; padding: 2px;">17 <input type="text" name="17" class="input" value="{{ activity['17'] }}"></div>
+                                    <div class="left" style="text-align: center; padding: 2px;">18 <input type="text" name="18" class="input" value="{{ activity['18'] }}"></div>
+                                    <div class="left" style="text-align: center; padding: 2px;">19 <input type="text" name="19" class="input" value="{{ activity['19'] }}"></div>
+                                    <div class="left" style="text-align: center; padding: 2px;">20 <input type="text" name="20" class="input" value="{{ activity['20'] }}"></div>
+                                    <div class="left" style="text-align: center; padding: 2px;">21 <input type="text" name="21" class="input" value="{{ activity['21'] }}"></div>
+                                    <div class="left" style="text-align: center; padding: 2px;">22 <input type="text" name="22" class="input" value="{{ activity['22'] }}"></div>
+                                    <div class="left" style="text-align: center; padding: 2px;">23 <input type="text" name="23" class="input" value="{{ activity['23'] }}"></div>
                                 </div>
 
                             </div>
                         </div>
-                        <div class="button-wrap">
-                            <button class="button is-solid primary-button is-fullwidth">
-                                Update
-                            </button>
-                        </div>
+
+                            <div class="box-content">
+                                <div class="box-lines">
+                                    <div class="box-line">
+                                        <div class="left">
+                                            <div class="button-wrap">
+                                                <button class="button is-solid primary-button is-fullwidth">
+                                                    Update
+                                                </button>
+                                            </div>
+                                        </div>
+                                        <div class="right">
+                                            <a class="link-tooltip" href="/admin/reset_agents_activity/{{ client.id }}" title="Reset">
+                                                <i class="mdi mdi-backup-restore" style="font-size: 24px;"></i>
+                                            </a>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                         </form>
                     </div>
 
-                    <script>
-                        document.getElementById('options').addEventListener('change', function () {
-                            const selectedValue = this.value;
 
-                            // Hide all field groups
-                            document.getElementById('option1-field').style.display = 'none';
-                            document.getElementById('option2-field').style.display = 'none';
-
-                            // Show the selected field group
-                            if (selectedValue === 'ER') {
-                                document.getElementById('option1-field').style.display = 'inline-block';
-                            } else if (selectedValue === 'BA') {
-                                document.getElementById('option2-field').style.display = 'inline-block';
-                            }
-                        });
-                    </script>
 
                 </div>
 

@@ -424,6 +424,8 @@ def client_details(uid):
 
     data = []
     idx = []
+
+    print(activity)
     for x in range(0, 24):
         idx.append(str(x))
         data.append(activity[str(x)])
@@ -487,9 +489,11 @@ def set_network(uid):
 
     path = f"{BASE}{os.sep}experiments{os.sep}{exp_folder}{os.sep}{client.name}_network.csv".replace(f"routes_admin{os.sep}", "")
 
+    # since the network is undirected and Y assume directed relations we need to write the edges in both directions
     with open(path, "w") as f:
         for n in g.edges:
             f.write(f"{agent_ids[n[0]]},{agent_ids[n[1]]}\n")
+            f.write(f"{agent_ids[n[1]]},{agent_ids[n[0]]}\n")
         f.flush()
 
     client.network_type = network
@@ -582,8 +586,8 @@ def update_agents_activity(uid):
 
     # get data from form
     activity = {}
-    for x in range(0, 24):
-        activity[str(x)] = float(request.args.get(str(x)))
+    for x in request.form:
+        activity[str(x)] = float(request.form.get(str(x)))
 
     # get client details
     client = Client.query.filter_by(id=uid).first()
@@ -606,3 +610,57 @@ def update_agents_activity(uid):
         flash("Configuration file not found.", "error")
 
     return redirect(request.referrer)
+
+
+@clientsr.route("/admin/reset_agents_activity/<int:uid>")
+@login_required
+def reset_agents_activity(uid):
+    check_privileges(current_user.username)
+
+    # get client details
+    client = Client.query.filter_by(id=uid).first()
+    experiment = Exps.query.filter_by(idexp=client.id_exp).first()
+    population = Population.query.filter_by(id=client.population_id).first()
+
+    BASE = os.path.dirname(os.path.abspath(__file__))
+    exp_folder = experiment.db_name.split(os.sep)[1]
+
+    path = f"{BASE}{os.sep}experiments{os.sep}{exp_folder}{os.sep}client_{client.name}-{population.name}.json".replace(
+        f"routes_admin{os.path.sep}", "")
+
+    if os.path.exists(path):
+        with open(path, "r") as f:
+            config = json.load(f)
+            config["simulation"]["hourly_activity"] = {
+                "10": 0.021,
+                "16": 0.032,
+                "8": 0.020,
+                "12": 0.024,
+                "15": 0.032,
+                "17": 0.032,
+                "23": 0.025,
+                "6": 0.017,
+                "18": 0.032,
+                "11": 0.022,
+                "13": 0.027,
+                "14": 0.030,
+                "20": 0.030,
+                "21": 0.029,
+                "7": 0.018,
+                "22": 0.027,
+                "9": 0.020,
+                "3": 0.020,
+                "5": 0.017,
+                "4": 0.018,
+                "1": 0.021,
+                "2": 0.020,
+                "0": 0.023,
+                "19": 0.031,
+            }
+            # save the new configuration
+            json.dump(config, open(path, "w"), indent=4)
+    else:
+        flash("Configuration file not found.", "error")
+
+    return redirect(request.referrer)
+
