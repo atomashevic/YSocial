@@ -198,6 +198,7 @@ class Admin_users(UserMixin, db.Model):
     password = db.Column(db.String(80), nullable=False)
     last_seen = db.Column(db.String(30), nullable=False)
     role = db.Column(db.String(10), nullable=False)
+    llm = db.Column(db.String(50), default="")
 
 
 class Exps(db.Model):

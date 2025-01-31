@@ -3,41 +3,60 @@ import re
 
 
 class ContentAnnotator(object):
-    def __init__(self, config):
-        self.config_list = [
-            {
-                "model": "llama3.1",
-                "base_url": "http://127.0.0.1:11434/v1",
-                "timeout": 10000,
-                "api_type": "open_ai",
-                "api_key": "NULL",
-                # "price": [0, 0],
-            }
-        ]
+    def __init__(self, llm=None):
+        """
+        Initialize the content annotator.
 
-        self.annotator = AssistantAgent(
-            name=f"Annotator",
-            llm_config={
-                "config_list": self.config_list,
-                "temperature": 0,
-                "max_tokens": -1,
-            },
-            system_message="You are a clever and efficient text annotator. Act as specified by the Handler.",
-            max_consecutive_auto_reply=1,
-        )
+        :param config:
+        """
 
-        self.handler = AssistantAgent(
-            name=f"Handler",
-            llm_config={
-                "config_list": self.config_list,
-                "temperature": 0,
-                "max_tokens": -1,
-            },
-            system_message="You are the Handler which provides task details to the annotator.",
-            max_consecutive_auto_reply=0,
-        )
+        if llm is not None:
+
+            self.config_list = [
+                {
+                    "model": llm,
+                    "base_url": "http://127.0.0.1:11434/v1",
+                    "timeout": 10000,
+                    "api_type": "open_ai",
+                    "api_key": "NULL",
+                    # "price": [0, 0],
+                }
+            ]
+
+            self.annotator = AssistantAgent(
+                name=f"Annotator",
+                llm_config={
+                    "config_list": self.config_list,
+                    "temperature": 0,
+                    "max_tokens": -1,
+                },
+                system_message="You are a clever and efficient text annotator. Act as specified by the Handler.",
+                max_consecutive_auto_reply=1,
+            )
+
+            self.handler = AssistantAgent(
+                name=f"Handler",
+                llm_config={
+                    "config_list": self.config_list,
+                    "temperature": 0,
+                    "max_tokens": -1,
+                },
+                system_message="You are the Handler which provides task details to the annotator.",
+                max_consecutive_auto_reply=0,
+            )
+        else:
+            self.annotator = None
+            self.handler = None
+            self.config_list = None
 
     def annotate_emotions(self, text):
+        """
+        Annotate the emotions in the text.
+        :param text: the text to annotate
+        :return:
+        """
+        if self.annotator is None: return []
+
         self.handler.initiate_chat(
             self.annotator,
             silent=True,
@@ -52,6 +71,14 @@ class ContentAnnotator(object):
         return emotions
 
     def annotate_topics(self, text):
+        """
+        Annotate the topics in the text.
+
+        :param text: the text to annotate
+        :return:
+        """
+        if self.annotator is None: return []
+
         self.handler.initiate_chat(
             self.annotator,
             silent=True,
@@ -70,6 +97,11 @@ class ContentAnnotator(object):
         return topics
 
     def __clean_emotion(self, text):
+        """
+        Clean the emotion annotation.
+        :param text: the text to clean
+        :return:
+        """
         emotions = {
             "admiration": None,
             "amusement": None,

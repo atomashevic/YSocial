@@ -3,15 +3,10 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager
 import shutil
 import os
-
-
 import signal
 import atexit
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-
-# init SQLAlchemy so we can use it later in our models
-
 
 app = Flask(__name__, static_url_path="/static")
 
@@ -42,13 +37,13 @@ signal.signal(signal.SIGINT, signal_handler)
 atexit.register(cleanup_subprocesses)
 
 # check if the database dashboard.db exists in the db directory, if not copy from data_schema
-if not os.path.exists(f"{BASE_DIR}/db/dashboard.db"):
+if not os.path.exists(f"{BASE_DIR}{os.sep}db{os.sep}dashboard.db"):
     shutil.copyfile(
-        f"{BASE_DIR}/../data_schema/database_dashboard.db",
-        f"{BASE_DIR}/db/dashboard.db",
+        f"{BASE_DIR}{os.sep}..{os.sep}data_schema{os.sep}database_dashboard.db",
+        f"{BASE_DIR}{os.sep}db{os.sep}dashboard.db",
     )
     shutil.copyfile(
-        f"{BASE_DIR}/../data_schema/database_clean_server.db", f"{BASE_DIR}/db/dummy.db"
+        f"{BASE_DIR}{os.sep}..{os.sep}data_schema{os.sep}database_clean_server.db", f"{BASE_DIR}{os.sep}db{os.sep}dummy.db"
     )
 
 

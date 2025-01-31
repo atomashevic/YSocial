@@ -15,6 +15,7 @@ from .models import (
     User_interest,
     Post_topics,
     Reactions,
+    Admin_users
 )
 from flask import request
 from .llm_annotations import ContentAnnotator
@@ -118,14 +119,15 @@ def publish_post():
     post.thread_id = post.id
     db.session.commit()
 
+    user = Admin_users.query.filter_by(username=current_user.username).first()
+    llm = user.llm if user.llm != "" else "llama3.1"
+
     # @todo: add image support, link support and topic annotation
-    annotator = ContentAnnotator({})
+    annotator = ContentAnnotator(llm=llm)
     emotions = annotator.annotate_emotions(text)
     hashtags = annotator.extract_components(text, c_type="hashtags")
     mentions = annotator.extract_components(text, c_type="mentions")
     topics = annotator.annotate_topics(text)
-
-    print(emotions, hashtags, mentions, topics)
 
     for topic in topics:
         res = Interests.query.filter_by(interest=topic).first()
@@ -221,8 +223,11 @@ def publish_comment():
         mention.answered = 1
         db.session.commit()
 
+    user = Admin_users.query.filter_by(username=current_user.username).first()
+    llm = user.llm if user.llm != "" else "llama3.1"
+
     # @todo: add image support, link support and topic annotation
-    annotator = ContentAnnotator({})
+    annotator = ContentAnnotator(llm=llm)
     emotions = annotator.annotate_emotions(text)
     hashtags = annotator.extract_components(text, c_type="hashtags")
     mentions = annotator.extract_components(text, c_type="mentions")

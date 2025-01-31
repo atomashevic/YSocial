@@ -31,21 +31,10 @@ import json
 import pathlib, shutil
 import uuid
 from y_web import db, app
+from y_web.utils.miscellanea import check_privileges, reload_current_user
 
 experiments = Blueprint("experiments", __name__)
 
-
-def check_privileges(username):
-    user = Admin_users.query.filter_by(username=username).first()
-
-    if user.role != "admin":
-        return redirect(url_for("main.index"))
-    return
-
-
-def reload_current_user(username):
-    user = db.session.query(User_mgmt).filter_by(username=username).first()
-    login_user(user, remember=True, force=True)
 
 @experiments.route("/admin/experiments")
 @login_required

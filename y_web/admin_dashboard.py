@@ -4,8 +4,7 @@ from flask import (
     Blueprint,
     render_template,
     redirect,
-    url_for,
-    send_file,
+    url_for
 )
 from flask_login import login_user, login_required, current_user
 
@@ -22,7 +21,8 @@ from y_web.utils import (
     get_ollama_models,
 )
 
-from . import db
+from .utils import check_privileges
+
 
 admin = Blueprint("admin", __name__)
 
@@ -32,19 +32,6 @@ def ollama_status():
         "status": is_ollama_running(),
         "installed": is_ollama_installed(),
     }
-
-
-def check_privileges(username):
-    user = Admin_users.query.filter_by(username=username).first()
-
-    if user.role != "admin":
-        return redirect(url_for("main.index"))
-    return
-
-
-def reload_current_user(username):
-    user = db.session.query(User_mgmt).filter_by(username=username).first()
-    login_user(user, remember=True, force=True)
 
 
 @admin.route("/admin/dashboard")

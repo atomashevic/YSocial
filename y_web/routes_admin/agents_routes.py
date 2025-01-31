@@ -3,14 +3,11 @@ import random
 from flask import (
     Blueprint,
     render_template,
-    redirect,
-    url_for,
     request,
 )
 from flask_login import login_required, current_user
 
 from y_web.models import (
-    Admin_users,
     Population,
     Agent,
     Agent_Population,
@@ -21,17 +18,10 @@ from y_web.utils import (
 )
 
 from y_web import db
+from y_web.utils.miscellanea import check_privileges
 import re
 
 agents = Blueprint("agents", __name__)
-
-
-def check_privileges(username):
-    user = Admin_users.query.filter_by(username=username).first()
-
-    if user.role != "admin":
-        return redirect(url_for("main.index"))
-    return
 
 
 @agents.route("/admin/agents")

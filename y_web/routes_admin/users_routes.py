@@ -3,8 +3,6 @@ import os
 from flask import (
     Blueprint,
     render_template,
-    redirect,
-    url_for,
     request,
     abort
 )
@@ -17,25 +15,24 @@ from y_web.models import (
     User_Experiment
 )
 
+from y_web.utils import (
+    get_ollama_models
+)
+
 from y_web import db, app
+from y_web.utils.miscellanea import check_privileges
 
 
 users = Blueprint("users", __name__)
 
 
-def check_privileges(username):
-    user = Admin_users.query.filter_by(username=username).first()
-
-    if user.role != "admin":
-        return redirect(url_for("main.index"))
-    return
-
-
 @users.route("/admin/users")
 @login_required
 def user_data():
+    print("HERE")
     check_privileges(current_user.username)
-    return render_template("admin/users.html")
+    models = get_ollama_models()
+    return render_template("admin/users.html", m=models)
 
 
 @users.route("/admin/user_data")
@@ -109,7 +106,6 @@ def update():
     return "", 204
 
 
-
 @users.route("/admin/user_details/<int:uid>")
 @login_required
 def user_details(uid):
@@ -151,8 +147,9 @@ def add_user():
     email = request.form.get("email")
     password = request.form.get("password")
     role = request.form.get("role")
+    llm = request.form.get("llm")
 
-    user = Admin_users(username=username, email=email, password=password, role=role)
+    user = Admin_users(username=username, email=email, password=password, role=role, llm=llm)
 
     db.session.add(user)
     db.session.commit()

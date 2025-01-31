@@ -5,7 +5,6 @@ from flask import (
     Blueprint,
     render_template,
     redirect,
-    url_for,
     request,
     flash,
     send_file,
@@ -14,7 +13,6 @@ from flask_login import login_required, current_user
 
 from y_web.models import (
     Exps,
-    Admin_users,
     Population,
     Agent,
     Agent_Population,
@@ -31,16 +29,9 @@ from y_web.utils import (
 import json
 import shutil
 from . import db, experiment_details
+from y_web.utils.miscellanea import check_privileges
 
 clientsr = Blueprint("clientsr", __name__)
-
-
-def check_privileges(username):
-    user = Admin_users.query.filter_by(username=username).first()
-
-    if user.role != "admin":
-        return redirect(url_for("main.index"))
-    return
 
 
 @clientsr.route("/admin/reset_client/<int:uid>")
