@@ -716,9 +716,11 @@
 
                     <!-- Load more posts -->
                     <div class="load-more-wrap narrow-top has-text-centered">
+                        {% if page-1>0 %}
                         <a href="#" class="load-more-button"
                            onclick="window.location.href = '/feed/{{user_id}}/{{timeline}}/{{mode}}/{{ page-1 }}';">Previous
                             Page</a>
+                        {% endif %}
                         <a href="#" class="load-more-button"
                            onclick="window.location.href = '/feed/{{user_id}}/{{timeline}}/{{mode}}/{{ page+1 }}';">Next
                             Page</a>
