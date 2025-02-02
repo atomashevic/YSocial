@@ -14,7 +14,7 @@ from .models import (
     Post_topics,
     Images,
     Page,
-    Agent
+    Agent, Admin_users
 )
 from sqlalchemy.sql.expression import func
 from sqlalchemy import desc
@@ -41,13 +41,13 @@ def get_user_recent_posts(user_id, page, per_page=10, mode="rf", current_user=No
             Post.query.filter_by(user_id=int(user_id), comment_to=-1).order_by(
                 desc(Post.id)
             )
-        ).paginate(page=page, per_page=per_page)
+        ).paginate(page=page, per_page=per_page, error_out=False)
     elif mode == "comments":
         posts = (
             Post.query.filter(
                 Post.user_id == int(user_id), Post.comment_to != -1
             ).order_by(desc(Post.id))
-        ).paginate(page=page, per_page=per_page)
+        ).paginate(page=page, per_page=per_page, error_out=False)
 
     elif mode == "liked":
         # get posts liked by the user
@@ -55,14 +55,14 @@ def get_user_recent_posts(user_id, page, per_page=10, mode="rf", current_user=No
             Post.query.join(Reactions, Reactions.post_id == Post.id)
             .filter(Reactions.type == "like", Reactions.user_id == int(user_id))
             .order_by(desc(Post.id))
-        ).paginate(page=page, per_page=per_page)
+        ).paginate(page=page, per_page=per_page, error_out=False)
 
     elif mode == "disliked":
         posts = (
             Post.query.join(Reactions, Reactions.post_id == Post.id)
             .filter(Reactions.type == "dislike", Reactions.user_id == int(user_id))
             .order_by(desc(Post.id))
-        ).paginate(page=page, per_page=per_page)
+        ).paginate(page=page, per_page=per_page, error_out=False)
 
     else:
         # get the user posts with the most reactions
@@ -72,7 +72,7 @@ def get_user_recent_posts(user_id, page, per_page=10, mode="rf", current_user=No
             .add_columns(func.count(Reactions.id).label("count"))
             .group_by(Post.id)
             .order_by(desc("count"))
-        ).paginate(page=page, per_page=per_page)
+        ).paginate(page=page, per_page=per_page, error_out=False)
 
     res = []
 
@@ -358,7 +358,7 @@ def get_user_friends(user_id, limit=12, page=1):
             .having(func.count(Follow.follower_id) % 2 == 1)
             .join(User_mgmt, Follow.follower_id == User_mgmt.id)
             .add_columns(User_mgmt.username, User_mgmt.id)
-            .paginate(page=page, per_page=limit)
+            .paginate(page=page, per_page=limit, error_out=False)
         )
 
         for f in followee.items:
@@ -386,7 +386,7 @@ def get_user_friends(user_id, limit=12, page=1):
             .having(func.count(Follow.user_id) % 2 == 1)
             .join(User_mgmt, Follow.user_id == User_mgmt.id)
             .add_columns(User_mgmt.username, User_mgmt.id)
-            .paginate(page=page, per_page=limit)
+            .paginate(page=page, per_page=limit, error_out=False)
         )
 
         for f in followers.items:
@@ -530,7 +530,7 @@ def get_posts_associated_to_hashtags(hashtag_id, page, per_page=10, current_user
         Post.query.join(Post_hashtags, Post.id == Post_hashtags.post_id)
         .filter(Post_hashtags.hashtag_id == hashtag_id)
         .order_by(desc(Post.id))
-        .paginate(page=page, per_page=per_page)
+        .paginate(page=page, per_page=per_page, error_out=False)
     )
 
     res = []
@@ -686,7 +686,7 @@ def get_posts_associated_to_interest(interest_id, page, per_page=10, current_use
         Post.query.join(Post_topics, Post.id == Post_topics.post_id)
         .filter(Post_topics.topic_id == interest_id)
         .order_by(desc(Post.id))
-        .paginate(page=page, per_page=per_page)
+        .paginate(page=page, per_page=per_page, error_out=False)
     )
 
     res = []
@@ -837,7 +837,7 @@ def get_posts_associated_to_emotion(emotion_id, page, per_page=10, current_user=
         Post.query.join(Post_emotions, Post.id == Post_emotions.post_id)
         .filter(Post_emotions.emotion_id == emotion_id)
         .order_by(desc(Post.id))
-        .paginate(page=page, per_page=per_page)
+        .paginate(page=page, per_page=per_page, error_out=False)
     )
 
     res = []
@@ -859,13 +859,15 @@ def get_posts_associated_to_emotion(emotion_id, page, per_page=10, current_user=
             # get elicited emotions names
             emotions = get_elicited_emotions(c.id)
 
+            user = User_mgmt.query.filter_by(username=author).first()
+
             # is the agent a page?
-            if c.is_page == 1:
-                page = Page.query.filter_by(name=c.username).first()
+            if user.is_page == 1:
+                page = Page.query.filter_by(name=user.username).first()
                 if page is not None:
                     profile_pic = page.logo
             else:
-                ag = Agent.query.filter_by(name=c.username).first()
+                ag = Agent.query.filter_by(name=user.username).first()
                 profile_pic = ag.profile_pic if ag is not None and ag.profile_pic is not None else ""
 
             cms.append(

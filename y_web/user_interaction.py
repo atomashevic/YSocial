@@ -1,4 +1,4 @@
-from flask import Blueprint
+from flask import Blueprint, redirect
 from flask_login import login_required, current_user
 from . import db
 from .models import (
@@ -58,7 +58,8 @@ def follow(user_id):
     db.session.add(new_follow)
     db.session.commit()
 
-    return {"message": "User followed successfully", "status": 200}
+    return redirect(request.referrer)
+#    return {"message": "User followed successfully", "status": 200}
 
 
 @user.route("/react_to_content")
