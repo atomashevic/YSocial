@@ -279,8 +279,22 @@
                             </div>
                             <div style="text-align: center">
                                 <a href="{{ url_for('main.profile')}}/{{ logged_id }}/recent/1">
-                                    <div class="mdi mdi-home-outline"
-                                         style="font-size: 30px; color: rgba(255, 255, 255, 1);"></div>
+
+                                     <div class="avatar">
+                                        <img
+                                                id="user-avatar"
+                                                class="avatar-image"
+                                                {% if profile_pic =="" %}
+                                                    data-demo-src="{{ url_for('static', filename='assets/img/users/'+ str(user_id) +'.png') }}"
+                                                {% else %}
+                                                    data-demo-src="{{ profile_pic }}"
+                                                {% endif %}
+                                                alt=""
+                                                width="50%"
+
+                                        />
+
+                                     </div>
                                 </a>
                             </div>
 

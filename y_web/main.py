@@ -466,10 +466,25 @@ def get_post_hashtags(hashtag_id, page=1):
 
     trending_ht = get_trending_hashtags()
 
+    # get user profile pic
+    user = User_mgmt.query.filter_by(id=current_user.id).first()
+    profile_pic = ""
+    if user.is_page == 1:
+        pg = Page.query.filter_by(name=user.username).first()
+        if pg is not None:
+            profile_pic = pg.logo
+    else:
+        try:
+            ag = Agent.query.filter_by(name=user.username).first()
+            profile_pic = ag.profile_pic if ag is not None and ag.profile_pic is not None else ""
+        except:
+            profile_pic = ""
+
     return render_template(
         "hashtag.html",
         items=res,
         page=page,
+        profile_pic=profile_pic,
         username=current_user.username,
         user_id=int(current_user.id),
         enumerate=enumerate,
@@ -500,10 +515,25 @@ def get_post_interest(interest_id, page=1):
 
     trending_tp = get_trending_topics()
 
+    # get user profile pic
+    user = User_mgmt.query.filter_by(id=current_user.id).first()
+    profile_pic = ""
+    if user.is_page == 1:
+        pg = Page.query.filter_by(name=user.username).first()
+        if pg is not None:
+            profile_pic = pg.logo
+    else:
+        try:
+            ag = Agent.query.filter_by(name=user.username).first()
+            profile_pic = ag.profile_pic if ag is not None and ag.profile_pic is not None else ""
+        except:
+            profile_pic = ""
+
     return render_template(
         "interest.html",
         items=res,
         page=page,
+        profile_pic=profile_pic,
         username=current_user.username,
         user_id=int(current_user.id),
         enumerate=enumerate,
@@ -535,10 +565,25 @@ def get_post_emotion(emotion_id, page=1):
 
     trending_tp = get_trending_emotions()
 
+    # get user profile pic
+    user = User_mgmt.query.filter_by(id=current_user.id).first()
+    profile_pic = ""
+    if user.is_page == 1:
+        pg = Page.query.filter_by(name=user.username).first()
+        if pg is not None:
+            profile_pic = pg.logo
+    else:
+        try:
+            ag = Agent.query.filter_by(name=user.username).first()
+            profile_pic = ag.profile_pic if ag is not None and ag.profile_pic is not None else ""
+        except:
+            profile_pic = ""
+
     return render_template(
         "emotions.html",
         items=res,
         page=page,
+        profile_pic=profile_pic,
         username=current_user.username,
         user_id=int(current_user.id),
         enumerate=enumerate,
@@ -681,9 +726,25 @@ def get_thread(post_id):
     trending_ht = get_trending_hashtags()
     mentions = get_unanswered_mentions(current_user.id)
 
+    # get user profile pic
+    user = User_mgmt.query.filter_by(id=current_user.id).first()
+    profile_pic = ""
+    if user.is_page == 1:
+        pg = Page.query.filter_by(name=user.username).first()
+        if pg is not None:
+            profile_pic = pg.logo
+    else:
+        try:
+            ag = Agent.query.filter_by(name=user.username).first()
+            profile_pic = ag.profile_pic if ag is not None and ag.profile_pic is not None else ""
+        except:
+            profile_pic = ""
+
     return render_template(
         "thread.html",
         thread=discussion_tree,
+        profile_pic=profile_pic,
+        user_id= current_user.id,
         username=current_user.username,
         logged_username=current_user.username,
         logged_id=int(current_user.id),

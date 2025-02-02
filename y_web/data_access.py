@@ -102,14 +102,15 @@ def get_user_recent_posts(user_id, page, per_page=10, mode="rf", current_user=No
             else:
                 text = c.tweet.split(":")[-1]
 
+            user = User_mgmt.query.filter_by(username=author).first()
             # is the agent a page?
             profile_pic = ""
-            if c.is_page == 1:
-                page = Page.query.filter_by(name=c.username).first()
+            if user.is_page == 1:
+                page = Page.query.filter_by(name=user.username).first()
                 if page is not None:
                     profile_pic = page.logo
             else:
-                ag = Agent.query.filter_by(name=c.username).first()
+                ag = Agent.query.filter_by(name=user.username).first()
                 profile_pic = ag.profile_pic if ag is not None and ag.profile_pic is not None else ""
 
             cms.append(
