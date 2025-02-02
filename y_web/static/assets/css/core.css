@@ -16047,7 +16047,7 @@ button.button {
     opacity: .8
 }
 
-.like-wrapper .like-button, .dislike-wrapper .dislike-button {
+.like-wrapper .like-button, .dislike-wrapper .dislike-button, .like-wrapper .share-button {
     position: relative;
     width: 43px;
     height: 43px;
@@ -16097,18 +16097,6 @@ button.button {
     box-shadow: 0px 5px 43px rgba(247,20,22,.18);
 }
 
-/*.like-wrapper .like-button.is-active .like-overlay, .dislike-wrapper .dislike-button.is-active .dislike-overlay {
-    transform: scale(1)
-}
-
-.like-wrapper .like-button.is-active i.not-liked, .dislike-wrapper .dislike-button.is-active i.not-liked {
-    display: none
-}
-
-.like-wrapper .like-button.is-active i.is-liked, .dislike-wrapper .dislike-button.is-active i.is-liked {
-    display: block
-}
-*/
 
 
 
@@ -26197,8 +26185,10 @@ position: absolute;
 
 .card.is-post .comments-wrap .comments-body .is-comment .media-content .controls .like-count,
 .card.is-post .comments-wrap .comments-body .is-comment .media-content .controls .dislike-count,
+.card.is-post .comments-wrap .comments-body .is-comment .media-content .controls .share-count,
 .shop-wrapper .cart-container .cart-content .cart-summary .is-post.summary-card .comments-wrap .comments-body .is-comment .media-content .controls .like-count,
-.shop-wrapper .cart-container .cart-content .cart-summary .is-post.summary-card .comments-wrap .comments-body .is-comment .media-content .controls .dislike-count{
+.shop-wrapper .cart-container .cart-content .cart-summary .is-post.summary-card .comments-wrap .comments-body .is-comment .media-content .controls .dislike-count
+.shop-wrapper .cart-container .cart-content .cart-summary .is-post.summary-card .comments-wrap .comments-body .is-comment .media-content .controls .share-count{
     display: flex;
     justify-content: flex-start;
     align-items: center;
@@ -26207,6 +26197,7 @@ position: absolute;
 
 .card.is-post .comments-wrap .comments-body .is-comment .media-content .controls .like-count span,
 .card.is-post .comments-wrap .comments-body .is-comment .media-content .controls .dislike-count span,
+.card.is-post .comments-wrap .comments-body .is-comment .media-content .controls .share-count span,
 .shop-wrapper .cart-container .cart-content .cart-summary .is-post.summary-card .comments-wrap .comments-body .is-comment .media-content .controls .like-count span {
     display: block;
     font-size: .8rem;
@@ -26216,6 +26207,7 @@ position: absolute;
 
 .card.is-post .comments-wrap .comments-body .is-comment .media-content .controls .like-count svg,
 .card.is-post .comments-wrap .comments-body .is-comment .media-content .controls .dislike-count svg,
+.card.is-post .comments-wrap .comments-body .is-comment .media-content .controls .share-count svg,
 .shop-wrapper .cart-container .cart-content .cart-summary .is-post.summary-card .comments-wrap .comments-body .is-comment .media-content .controls .like-count svg {
     position: relative;
     top: -1px;

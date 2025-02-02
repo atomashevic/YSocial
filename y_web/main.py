@@ -299,12 +299,15 @@ def feed(user_id="all", timeline="timeline", mode="rf", page=1):
                 text = c.tweet.split(":")[-1]
 
             profile_pic = ""
-            if author.is_page == 1:
-                pg = Page.query.filter_by(name=c.username).first()
+
+            user = User_mgmt.query.filter_by(id=c.user_id).first()
+
+            if user.is_page == 1:
+                pg = Page.query.filter_by(name=user.username).first()
                 if page is not None:
                     profile_pic = pg.logo
             else:
-                ag = Agent.query.filter_by(name=c.username).first()
+                ag = Agent.query.filter_by(name=user.username).first()
                 profile_pic = ag.profile_pic if ag is not None and ag.profile_pic is not None else ""
 
             cms.append(
@@ -312,6 +315,7 @@ def feed(user_id="all", timeline="timeline", mode="rf", page=1):
                     "post_id": c.id,
                     "profile_pic": profile_pic,
                     "author": author,
+                    "shared_from": -1 if c.shared_from == -1 else (c.shared_from, db.session.query(User_mgmt).join(Post, User_mgmt.id == Post.user_id).filter(Post.id == c.shared_from).first().username),
                     "author_id": int(c.user_id),
                     "post": augment_text(text),
                     "round": c.round,
@@ -331,6 +335,7 @@ def feed(user_id="all", timeline="timeline", mode="rf", page=1):
                         post_id=c.id, user_id=current_user.id, type="dislike"
                     ).first()
                     is None,
+                    "is_shared": len(Post.query.filter_by(shared_from=c.id).all()),
                     "emotions": emotions,
                 }
             )
@@ -374,12 +379,15 @@ def feed(user_id="all", timeline="timeline", mode="rf", page=1):
             except:
                 profile_pic = ""
 
+        # get the post.shared_from
+
         res.append(
             {
                 "article": art,
                 "image": image,
                 "profile_pic": profile_pic,
                 "thread_id": post.thread_id,
+                "shared_from": -1 if post.shared_from == -1 else (post.shared_from, db.session.query(User_mgmt).join(Post, User_mgmt.id == Post.user_id).filter(Post.id == post.shared_from).first().username),
                 "post_id": post.id,
                 "author": User_mgmt.query.filter_by(id=post.user_id).first().username,
                 "author_id": int(post.user_id),
@@ -401,6 +409,7 @@ def feed(user_id="all", timeline="timeline", mode="rf", page=1):
                     post_id=post.id, user_id=current_user.id, type="dislike"
                 ).first()
                 is None,
+                "is_shared": len(Post.query.filter_by(shared_from=post.id).all()),
                 "comments": cms,
                 "t_comments": len(cms),
                 "emotions": emotions,
@@ -651,6 +660,8 @@ def get_thread(post_id):
     discussion_tree = {
         "post": augment_text(posts[0].tweet),
         "image": image,
+        "shared_from": -1 if posts[0].shared_from == -1 else (posts[0].shared_from, db.session.query(User_mgmt).join(Post, User_mgmt.id == Post.user_id).filter(Post.id == posts[0].shared_from).first().username),
+
         "post_id": posts[0].id,
         "author": User_mgmt.query.filter_by(id=posts[0].user_id).first().username,
         "author_id": posts[0].user_id,
@@ -672,6 +683,7 @@ def get_thread(post_id):
             post_id=posts[0].id, user_id=current_user.id, type="dislike"
         ).first()
         is None,
+        "is_shared": len(Post.query.filter_by(shared_from=posts[0].id).all()),
         "emotions": get_elicited_emotions(posts[0].id),
     }
 
@@ -711,15 +723,17 @@ def get_thread(post_id):
                 post_id=post.id, user_id=current_user.id, type="dislike"
             ).first()
             is None,
+            "is_shared": len(Post.query.filter_by(shared_from=post.id).all()),
             "emotions": get_elicited_emotions(post.id),
         }
 
         parent = post.comment_to
         reverse_map[post.id] = parent
 
-        post_to_child[parent].append(post.id)
-        post_to_child[post.id] = []
-        post_to_data[post.id] = data
+        if parent != -1:
+            post_to_child[parent].append(post.id)
+            post_to_child[post.id] = []
+            post_to_data[post.id] = data
 
     tree = __expand_tree(post_to_child, post_to_data)
     discussion_tree = tree[root]

@@ -62,6 +62,38 @@ def follow(user_id):
 #    return {"message": "User followed successfully", "status": 200}
 
 
+@user.route("/share_content")
+@login_required
+def share_content():
+    post_id = request.args.get("post_id")
+
+    # get the post
+    original = Post.query.filter_by(id=post_id).first()
+    current_round = Rounds.query.order_by(Rounds.id.desc()).first()
+
+    post = Post(
+        tweet=original.tweet,
+        round=current_round.id,
+        user_id=current_user.id,
+        comment_to=-1,
+        shared_from=post_id,
+    )
+
+    db.session.add(post)
+    db.session.commit()
+
+    # get topics of the original post
+    topics_id = Post_topics.query.filter_by(post_id=post_id).all()
+    # add the topics to the shared post
+    for t in topics_id:
+        ti = Post_topics(post_id=post.id, topic_id=t.topic_id)
+        db.session.add(ti)
+        db.session.commit()
+
+    return redirect(request.referrer)
+
+
+
 @user.route("/react_to_content")
 @login_required
 def react():

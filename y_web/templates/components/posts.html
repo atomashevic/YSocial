@@ -75,6 +75,11 @@
         <div class="card-body">
             <!-- Post body text -->
             <div class="post-text">
+                {% if item["shared_from"] != -1 %}
+                <div style="text-align: right; border-bottom: 2px solid #f4f4f4; margin-bottom: 5px;">
+                    <p><small>Shared from: <a href="/thread/{{ item['shared_from'][0] }}">{{ item['shared_from'][1] }}</a></small></p>
+                </div>
+                {% endif %}
                 <p>
                     {{ item["post"]|safe }}
                     {% if item['image'] != "" and item["article"] == 0  %}
@@ -118,6 +123,16 @@
             </div>
             <!-- Post statistics -->
             <div class="social-count">
+
+                <div class="likes-count" id="share-count-{{ item['post_id'] }}">
+                    <div class="like-wrapper" id="share-{{ item['post_id'] }}">
+                        <a class="share-button" id="s{{ item['post_id']}}" >
+                        <i data-feather="repeat"></i>
+                        <span id="span-{{item['post_id']}}">{{ item['is_shared'] }}</span> </a>
+                    </div>
+                </div>
+
+
                 <div class="likes-count" id="likes-count-{{ item['post_id'] }}">
                     <div class="like-wrapper" id="like-{{ item['post_id'] }}">
                         <a class="like-button" id="l{{ item['post_id']}}" {% if not bool(item["is_liked"]) %} style="background: #6aa3e7;"{% endif %} >
@@ -238,17 +253,20 @@
                         </div>
                     </div>
                     <div class="controls">
-
                         <div class="like-count" id="like-count-{{cm['post_id']}}">
-                        <i data-feather="thumbs-up" {% if not bool(cm["is_liked"]) %}style="stroke: #69a2e6;"{% endif
-                        %}></i>
-                        <span {% if not bool(cm["is_liked"]) %}style="color: #69a2e6;"{% endif %}>{{ cm["likes"]
-                        }}</span>
-                    </div>
-                    <div class="dislike-count" id="dislike-count-{{ cm['post_id'] }}">
-                    <i data-feather="thumbs-down" {% if not bool(cm["is_disliked"]) %}style="stroke: #69a2e6;"{% endif %} ></i>
-                    <span {% if not bool(cm["is_disliked"]) %} style="color: #69a2e6;"{% endif %}>{{ cm["dislikes"] }}</span>
-                </div>
+                            <i data-feather="thumbs-up" {% if not bool(cm["is_liked"]) %}style="stroke: #69a2e6;"{% endif %}></i>
+                            <span {% if not bool(cm["is_liked"]) %}style="color: #69a2e6;"{% endif %}>{{ cm["likes"] }}</span>
+                        </div>
+
+                        <div class="dislike-count" id="dislike-count-{{ cm['post_id'] }}">
+                            <i data-feather="thumbs-down" {% if not bool(cm["is_disliked"]) %}style="stroke: #69a2e6;"{% endif %} ></i>
+                            <span {% if not bool(cm["is_disliked"]) %} style="color: #69a2e6;"{% endif %}>{{ cm["dislikes"] }}</span>
+                        </div>
+                        <div class="share-count" id="share-count-{{ cm['post_id'] }}">
+                            <i data-feather="repeat"></i>
+                            <span>{{ cm["is_shared"] }}</span>
+                        </div>
+
                 <!-- <div class="reply" style="text-align: right">
                    <a href="#">Reply</a>
                  </div> -->

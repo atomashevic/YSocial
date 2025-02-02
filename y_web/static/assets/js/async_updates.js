@@ -82,6 +82,36 @@ $(document).on('click','#add_comment',function(e) {
       })
     });
 
+$(document).on('click','.share-button',function(e) {
+
+        var col = rgbToHex(e.target.style.background);
+
+      if (rgbToHex(e.target.style.background) !== "#6aa3e7"){
+          var elem_id = e.target.getAttribute('id').slice(1);
+          e.target.style.background = '#6aa3e7';
+          e.target.style.color = '#ffffff';
+
+          var p = document.getElementById(`share-count-${elem_id}`);
+          p.firstElementChild.firstElementChild.style.stroke = "#ffffff";
+          p.firstElementChild.firstElementChild.firstElementChild.style.stroke = "#ffffff";
+          p.firstElementChild.firstElementChild.lastElementChild.style.color = "#ffffff";
+          var count = p.firstElementChild.firstElementChild.lastElementChild;
+          let currentValue = parseInt(count.textContent, 10);
+
+          currentValue++;
+          count.textContent = currentValue;
+
+        }
+      e.preventDefault();
+      $.ajax({
+        type:'GET',
+        url:'/share_content',
+        data: {
+            post_id: elem_id,
+        },
+      })
+    });
+
 $(document).on('click','.like-button',function(e)
                    {
 
@@ -273,6 +303,40 @@ $(document).on('click','.dislike-count',function(e) {
         data: {
             post_id: elem_id,
             action: "dislike",
+        },
+      })
+    });
+
+
+$(document).on('click','.share-count',function(e) {
+
+    let idc = e.target.id;
+    if (e.target.id){
+        idc = e.target.id;
+    }
+    else{
+        idc = e.target.parentElement.id;
+    }
+    let base = document.getElementById(idc);
+    let elem_id = idc.split('-')[2];
+
+    if (rgbToHex(base.lastElementChild.style.color) !== "#69a2e6") {
+
+        base.firstElementChild.style.stroke = "#69a2e6";
+        base.lastElementChild.style.color = "#69a2e6"
+
+        let currentValue = parseInt(base.lastElementChild.textContent, 10);
+        currentValue++;
+        base.lastElementChild.textContent = currentValue;
+
+    }
+
+    e.preventDefault();
+      $.ajax({
+        type:'GET',
+        url:'/share_content',
+        data: {
+            post_id: elem_id,
         },
       })
     });

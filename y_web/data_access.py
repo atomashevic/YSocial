@@ -19,6 +19,7 @@ from .models import (
 from sqlalchemy.sql.expression import func
 from sqlalchemy import desc
 from y_web.utils.text_utils import *
+from y_web import db
 
 
 def get_user_recent_posts(user_id, page, per_page=10, mode="rf", current_user=None):
@@ -118,6 +119,7 @@ def get_user_recent_posts(user_id, page, per_page=10, mode="rf", current_user=No
                     "post_id": c.id,
                     "author": author,
                     "profile_pic": profile_pic,
+                    "shared_from": -1 if c.shared_from == -1 else (c.shared_from, db.session.query(User_mgmt).join(Post, User_mgmt.id == Post.user_id).filter(Post.id == c.shared_from).first().username),
                     "author_id": int(c.user_id),
                     "post": augment_text(text),
                     "round": c.round,
@@ -137,6 +139,7 @@ def get_user_recent_posts(user_id, page, per_page=10, mode="rf", current_user=No
                         post_id=c.id, user_id=current_user, type="dislike"
                     ).first()
                     is None,
+                    "is_shared": len(Post.query.filter_by(shared_from=c.id).all()),
                     "emotions": emotions,
                 }
             )
@@ -184,6 +187,7 @@ def get_user_recent_posts(user_id, page, per_page=10, mode="rf", current_user=No
                 "article": art,
                 "image": image,
                 "thread_id": post.thread_id,
+                "shared_from": -1 if post.shared_from == -1 else (post.shared_from, db.session.query(User_mgmt).join(Post, User_mgmt.id == Post.user_id).filter(Post.id == post.shared_from).first().username),
                 "post_id": post.id,
                 "profile_pic": profile_pic,
                 "author": User_mgmt.query.filter_by(id=post.user_id).first().username,
@@ -208,6 +212,7 @@ def get_user_recent_posts(user_id, page, per_page=10, mode="rf", current_user=No
                     post_id=post.id, user_id=current_user, type="dislike"
                 ).first()
                 is None,
+                "is_shared": len(Post.query.filter_by(shared_from=post.id).all()),
                 "comments": cms,
                 "t_comments": len(cms),
                 "emotions": emotions,
@@ -569,6 +574,7 @@ def get_posts_associated_to_hashtags(hashtag_id, page, per_page=10, current_user
                     "post_id": c.id,
                     "author": author,
                     "profile_pic": profile_pic,
+                    "shared_from": -1 if c.shared_from == -1 else (c.shared_from, db.session.query(User_mgmt).join(Post, User_mgmt.id == Post.user_id).filter(Post.id == c.shared_from).first().username),
                     "author_id": int(c.user_id),
                     "post": augment_text(c.tweet.split(":")[-1]),
                     "round": c.round,
@@ -588,6 +594,7 @@ def get_posts_associated_to_hashtags(hashtag_id, page, per_page=10, current_user
                         post_id=c.id, user_id=current_user, type="dislike"
                     ).first()
                     is None,
+                    "is_shared": len(Post.query.filter_by(shared_from=c.id).all()),
                     "emotions": emotions,
                 }
             )
@@ -637,6 +644,7 @@ def get_posts_associated_to_hashtags(hashtag_id, page, per_page=10, current_user
                 "image": image,
                 "profile_pic": profile_pic,
                 "thread_id": post.thread_id,
+                "shared_from": -1 if post.shared_from == -1 else (post.shared_from, db.session.query(User_mgmt).join(Post, User_mgmt.id == Post.user_id).filter(Post.id == post.shared_from).first().username),
                 "post_id": post.id,
                 "author": User_mgmt.query.filter_by(id=post.user_id).first().username,
                 "author_id": int(post.user_id),
@@ -660,6 +668,7 @@ def get_posts_associated_to_hashtags(hashtag_id, page, per_page=10, current_user
                     post_id=post.id, user_id=current_user, type="dislike"
                 ).first()
                 is None,
+                "is_shared": len(Post.query.filter_by(shared_from=post.id).all()),
                 "comments": cms,
                 "t_comments": len(cms),
                 "emotions": emotions,
@@ -723,6 +732,7 @@ def get_posts_associated_to_interest(interest_id, page, per_page=10, current_use
                     "post_id": c.id,
                     "author": author,
                     "profile_pic": profile_pic,
+                    "shared_from": -1 if c.shared_from == -1 else (c.shared_from, db.session.query(User_mgmt).join(Post, User_mgmt.id == Post.user_id).filter(Post.id == c.shared_from).first().username),
                     "author_id": int(c.user_id),
                     "post": augment_text(c.tweet.split(":")[-1]),
                     "round": c.round,
@@ -742,6 +752,7 @@ def get_posts_associated_to_interest(interest_id, page, per_page=10, current_use
                         post_id=c.id, user_id=current_user, type="dislike"
                     ).first()
                     is None,
+                    "is_shared": len(Post.query.filter_by(shared_from=c.id).all()),
                     "emotions": emotions,
                 }
             )
@@ -787,6 +798,7 @@ def get_posts_associated_to_interest(interest_id, page, per_page=10, current_use
                 "image": image,
                 "profile_pic": profile_pic,
                 "thread_id": post.thread_id,
+                "shared_from": -1 if post.shared_from == -1 else (post.shared_from, db.session.query(User_mgmt).join(Post, User_mgmt.id == Post.user_id).filter(Post.id == post.shared_from).first().username),
                 "post_id": post.id,
                 "author": User_mgmt.query.filter_by(id=post.user_id).first().username,
                 "author_id": int(post.user_id),
@@ -810,6 +822,7 @@ def get_posts_associated_to_interest(interest_id, page, per_page=10, current_use
                     post_id=post.id, user_id=current_user, type="dislike"
                 ).first()
                 is None,
+                "is_shared": len(Post.query.filter_by(shared_from=post.id).all()),
                 "comments": cms,
                 "t_comments": len(cms),
                 "emotions": emotions,
@@ -876,6 +889,7 @@ def get_posts_associated_to_emotion(emotion_id, page, per_page=10, current_user=
                     "post_id": c.id,
                     "author": author,
                     "profile_pic": profile_pic,
+                    "shared_from": -1 if c.shared_from == -1 else (c.shared_from, db.session.query(User_mgmt).join(Post, User_mgmt.id == Post.user_id).filter(Post.id == c.shared_from).first().username),
                     "author_id": int(c.user_id),
                     "post": augment_text(c.tweet.split(":")[-1]),
                     "round": c.round,
@@ -895,6 +909,7 @@ def get_posts_associated_to_emotion(emotion_id, page, per_page=10, current_user=
                         post_id=c.id, user_id=current_user, type="dislike"
                     ).first()
                     is None,
+                    "is_shared": len(Post.query.filter_by(shared_from=c.id).all()),
                     "emotions": emotions,
                 }
             )
@@ -939,6 +954,7 @@ def get_posts_associated_to_emotion(emotion_id, page, per_page=10, current_user=
                 "article": art,
                 "image": image,
                 "thread_id": post.thread_id,
+                "shared_from": -1 if post.shared_from == -1 else (post.shared_from, db.session.query(User_mgmt).join(Post, User_mgmt.id == Post.user_id).filter(Post.id == post.shared_from).first().username),
                 "post_id": post.id,
                 "profile_pic": profile_pic,
                 "author": User_mgmt.query.filter_by(id=post.user_id).first().username,
@@ -963,6 +979,7 @@ def get_posts_associated_to_emotion(emotion_id, page, per_page=10, current_user=
                     post_id=post.id, user_id=current_user, type="dislike"
                 ).first()
                 is None,
+                "is_shared": len(Post.query.filter_by(shared_from=post.id).all()),
                 "comments": cms,
                 "t_comments": len(cms),
                 "emotions": emotions,
