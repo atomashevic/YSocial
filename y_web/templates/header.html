@@ -174,7 +174,7 @@
                                             <div class="image">
                                                 <img
                                                         src="https://via.placeholder.com/400x400"
-                                                        data-demo-src="{{ url_for('static', filename='assets/img/users/'+ str(logged_id)+'.png') }}"
+                                                        data-demo-src="{{ url_for('static', filename='assets/img/users/'+ str(logged_id) + '.png') }}"
                                                         alt=""
                                                 />
                                             </div>
@@ -187,6 +187,18 @@
                                         </div>
                                     </div>
                                 </a>
+                                <a href="/edit_profile/{{ logged_id }}" class="account-item">
+                                    <div class="media">
+                                        <div class="icon-wrap">
+                                            <i data-feather="edit"></i>
+                                        </div>
+                                        <div class="media-content">
+                                            <h3>Edit Profile</h3>
+                                            <small>Let's make some updates!</small>
+                                        </div>
+                                    </div>
+                                </a>
+
                                 {% if is_admin==True %}
                                 <hr class="account-divider"/>
                                 <a href="/admin/dashboard" class="account-item">

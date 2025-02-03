@@ -1,7 +1,10 @@
-from flask import Blueprint, render_template, redirect
+from crypt import methods
+
+from flask import Blueprint, render_template, redirect, request, flash
 from flask_login import login_required, current_user
 from .data_access import *
 from .models import Admin_users, Images, Page
+from werkzeug.security import generate_password_hash
 from y_web import db
 import numpy as np
 
@@ -180,6 +183,80 @@ def profile_logged(user_id, page=1, mode="recent"):
         mentions=mentions,
         is_admin=is_admin(current_user.username),
     )
+
+
+@main.get("/edit_profile/<int:user_id>")
+@login_required
+def edit_profile(user_id):
+    user = User_mgmt.query.filter_by(id=user_id).first()
+
+    profile_pic = ""
+
+    # is the agent a page?
+    if user.is_page == 1:
+        pg = Page.query.filter_by(name=user.username).first()
+        if pg is not None:
+            profile_pic = pg.logo
+    else:
+        ag = Agent.query.filter_by(name=user.username).first()
+        profile_pic = ag.profile_pic if ag is not None and ag.profile_pic is not None else ""
+
+    return render_template(
+        "edit_profile.html",
+        user=user,
+        profile_pic=profile_pic,
+        is_page=user.is_page,
+        enumerate=enumerate,
+        username=user.username,
+        len=len,
+        user_id=int(user_id),
+        logged_username=current_user.username,
+        str=str,
+        logged_id=current_user.id,
+        bool=bool,
+        is_admin=is_admin(current_user.username),
+    )
+
+
+@main.route("/update_profile_data/<int:user_id>", methods=["POST"])
+@login_required
+def update_profile_data(user_id):
+    user = User_mgmt.query.filter_by(id=user_id).first()
+
+    user.email = request.form.get("email")
+    user.gender = request.form.get("gender")
+    user.nationality = request.form.get("nationality")
+    user.language = request.form.get("language")
+    user.leaning = request.form.get("leaning")
+    user.education_level = request.form.get("education_level")
+    user.recsys_type = request.form.get("recsys_type")
+    user.frecsys_type = request.form.get("frecsys_type")
+    user.age = int(request.form.get("age"))
+    # profile_pic = request.form.get("profile_pic")
+
+    db.session.commit()
+
+    return redirect(request.referrer)
+
+
+@main.route("/update_password/<int:user_id>", methods=["POST"])
+@login_required
+def update_password(user_id):
+    user = User_mgmt.query.filter_by(id=user_id).first()
+
+    npassword = request.form.get("new_password")
+    npassword2 = request.form.get("new_password2")
+
+    if npassword != npassword2:
+        # return an error message
+        flash("The provided passwords do not match.")
+        return redirect(request.referrer)
+
+    pwd = generate_password_hash(npassword, method="pbkdf2:sha256")
+    user.password = pwd
+    db.session.commit()
+
+    return redirect(request.referrer)
 
 
 @main.get("/feed")

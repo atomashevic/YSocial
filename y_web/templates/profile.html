@@ -148,7 +148,7 @@
                     <!-- html/partials/pages/profile/timeline/widgets/basic-infos-widget.html -->
                     {% if is_page != 1 %}
                     <div class="box-heading">
-                        <h4>Basic Infos</h4>
+                        <h4>About Me</h4>
                     </div>
 
                     <div class="basic-infos-wrapper">
@@ -257,15 +257,16 @@
 
                     <!-- Star Hashtags widget -->
                     <!-- html/partials/pages/profile/timeline/widgets/star-friends-widget.html -->
+                    {% if len(hashtags) > 0 %}
                     <div class="box-heading">
                         <h4>Frequently used Hashtags</h4>
                         <div class="dropdown is-neutral is-spaced is-right dropdown-trigger">
                             <div>
-                                <div class="button">
+                                <!-- <div class="button">
                                     <i data-feather="more-vertical"></i>
-                                </div>
+                                </div> -->
                             </div>
-                            <div class="dropdown-menu" role="menu">
+                            <!-- <div class="dropdown-menu" role="menu">
                                 <div class="dropdown-content">
                                     <a class="dropdown-item">
                                         <div class="media">
@@ -277,7 +278,7 @@
                                         </div>
                                     </a>
                                 </div>
-                            </div>
+                            </div> -->
                         </div>
                     </div>
                     <div class="friend-cards-list">
@@ -297,6 +298,7 @@
                             </div>
                         </div>
                     </div>
+                    {% endif %}
                 </div>
 
                 <div class="column is-8">
