@@ -160,6 +160,7 @@ def profile_logged(user_id, page=1, mode="recent"):
     return render_template(
         "profile.html",
         profile_pic=profile_pic,
+        is_page=user.is_page,
         user=res,
         enumerate=enumerate,
         username=user.username,

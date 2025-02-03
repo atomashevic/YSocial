@@ -129,9 +129,12 @@
                             <h2>{{ user["user_data"]["username"] }}</h2>
                         </div>
 
+
                         <div class="subheader-end is-hidden-mobile">
+                            {% if is_page != 1 %}
                             <span>{{ user['total_followee']}}</span>
                             <span>Followee</span>
+                            {% endif %}
                         </div>
 
                     </div>
@@ -139,9 +142,11 @@
             </div>
 
             <div class="columns">
+
                 <div id="profile-timeline-widgets" class="column is-4">
                     <!-- Basic Infos widget -->
                     <!-- html/partials/pages/profile/timeline/widgets/basic-infos-widget.html -->
+                    {% if is_page != 1 %}
                     <div class="box-heading">
                         <h4>Basic Infos</h4>
                     </div>
@@ -202,10 +207,11 @@
                             </div>
                         </div>
                     </div>
+                    {% endif %}
 
                     <!-- Star friends widget -->
                     <!-- html/partials/pages/profile/timeline/widgets/star-friends-widget.html -->
-                    {% if username != logged_username %}
+                    {% if username != logged_username and is_page!=1 %}
                     <div class="box-heading">
                         <h4>Mutual Friends</h4>
                         <div class="dropdown is-neutral is-spaced is-right dropdown-trigger">
@@ -303,9 +309,14 @@
                                     onclick="window.location.href = '/profile/{{ user['user_data']['id'] }}/recent/1';">
                                 Posts
                             </button>
+                            {% if is_page != 1 %}
                             <button type="button" class="button {% if mode == 'comments' %}is-active{% endif %}"
                                     onclick="window.location.href = '/profile/{{ user['user_data']['id'] }}/comments/1';">
                                 Comments
+                            </button>
+                            <button type="button" class="button {% if mode == 'shares' %}is-active{% endif %}"
+                                    onclick="window.location.href = '/profile/{{ user['user_data']['id'] }}/shares/1';">
+                                Shares
                             </button>
                             <button type="button" class="button {% if mode == 'liked' %}is-active{% endif %}"
                                     onclick="window.location.href = '/profile/{{ user['user_data']['id'] }}/liked/1';">
@@ -315,6 +326,7 @@
                                     onclick="window.location.href = '/profile/{{ user['user_data']['id'] }}/disliked/1';">
                                 Dilikes
                             </button>
+                            {% endif %}
 
                         </div>
                     </div>

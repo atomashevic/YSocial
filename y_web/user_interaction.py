@@ -77,6 +77,9 @@ def share_content():
         user_id=current_user.id,
         comment_to=-1,
         shared_from=post_id,
+        image_id = original.image_id,
+        news_id = original.news_id,
+        post_img = original.post_img
     )
 
     db.session.add(post)

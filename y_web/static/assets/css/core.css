@@ -28733,7 +28733,8 @@ position: absolute;
     height: 110px;
     width: 110px;
     border-radius: 50%;
-    z-index: 1
+    z-index: 1;
+    box-shadow: 3px 3px 3px rgba(.30,.40,.40,.18) !important;
 }
 
 .cover-bg .avatar .avatar-image {

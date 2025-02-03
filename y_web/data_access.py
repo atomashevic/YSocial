@@ -65,6 +65,14 @@ def get_user_recent_posts(user_id, page, per_page=10, mode="rf", current_user=No
             .order_by(desc(Post.id))
         ).paginate(page=page, per_page=per_page, error_out=False)
 
+    elif mode == "shares":
+
+        # get all posts of user_id having shared_from is not -1
+        posts = (
+            Post.query.filter(Post.user_id == int(user_id), Post.shared_from != -1)
+            .order_by(desc(Post.id))
+        ).paginate(page=page, per_page=per_page, error_out=False)
+
     else:
         # get the user posts with the most reactions
         posts = (
@@ -78,7 +86,7 @@ def get_user_recent_posts(user_id, page, per_page=10, mode="rf", current_user=No
     res = []
 
     for post in posts.items:
-        if mode not in ["recent", "comments", "liked", "disliked"]:
+        if mode not in ["recent", "comments", "liked", "disliked", "shares"]:
             post = post[0]
 
         comments = (
