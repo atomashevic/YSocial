@@ -640,8 +640,7 @@
                                     <div id="link-suboption" class="is-autocomplete is-suboption is-hidden">
                                         <div
                                                 id="link-autocpl-wrapper"
-                                                class="control is-location-wrapper has-margin"
-                                        >
+                                                class="control is-location-wrapper has-margin">
                     <textarea
                             id="link_post"
                             rows="1"
@@ -664,7 +663,7 @@
                                 <div id="extended-options" class="compose-options is-hidden">
                                     <div class="columns is-multiline is-full">
 
-                                        <!-- Mood action -->
+                                        <!--
                                         <div class="column is-6 is-narrower">
                                             <div
                                                     id="extended-show-activities"
@@ -675,7 +674,7 @@
                                                 <span>Share Link</span>
                                             </div>
                                         </div>
-
+                                        -->
 
                                         <!-- Share link action -->
                                         <div class="column is-6 is-narrower">
@@ -693,12 +692,12 @@
                                 <div id="basic-options" class="compose-options">
                                     <!-- Upload action -->
 
-                                    <!-- Mood action -->
+                                    <!-- Mood
                                     <div id="show-activities" class="compose-option">
                                         <img src="{{ url_for('static', filename='assets/img/icons/emoji/emoji-1.svg') }}"
                                              alt=""/>
                                         <span>Activity</span>
-                                    </div>
+                                    </div> -->
                                     <!-- Expand action -->
                                     <div id="open-extended-options" class="compose-option">
                                         <i data-feather="more-horizontal"></i>
@@ -798,7 +797,6 @@
 
 <!-- Feed pages js -->
 <script src="{{ url_for('static', filename='assets/js/feed.js') }}"></script>
-
 <script src="{{ url_for('static', filename='assets/js/webcam.js') }}"></script>
 <script src="{{ url_for('static', filename='assets/js/compose.js') }}"></script>
 <script src="{{ url_for('static', filename='assets/js/autocompletes.js') }}"></script>

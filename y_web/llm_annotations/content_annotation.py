@@ -19,7 +19,7 @@ class ContentAnnotator(object):
                     "timeout": 10000,
                     "api_type": "open_ai",
                     "api_key": "NULL",
-                    # "price": [0, 0],
+                    "price": [0, 0],
                 }
             ]
 

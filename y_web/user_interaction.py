@@ -15,10 +15,11 @@ from .models import (
     User_interest,
     Post_topics,
     Reactions,
-    Admin_users
+    Admin_users,
+    Images
 )
 from flask import request
-from .llm_annotations import ContentAnnotator
+from .llm_annotations import ContentAnnotator, Annotator
 
 user = Blueprint("user_actions", __name__)
 
@@ -96,7 +97,6 @@ def share_content():
     return redirect(request.referrer)
 
 
-
 @user.route("/react_to_content")
 @login_required
 def react():
@@ -135,8 +135,23 @@ def react():
 @login_required
 def publish_post():
     text = request.args.get("post")
-    annotation = request.args.get("annotation")
     url = request.args.get("url")
+
+    img_id = None
+    if url is not None and url != "":
+
+        llm_v = "minicpm-v"
+        image_annotator = Annotator(llm_v)
+        annotation = image_annotator.annotate(url)
+
+        img = Images.query.filter_by(url=url).first()
+        if img is None:
+            img = Images(url=url, description=annotation, article_id=-1)
+            db.session.add(img)
+            db.session.commit()
+            img_id = img.id
+        else:
+            img_id = img.id
 
     # get the last round id from Rounds
     current_round = Rounds.query.order_by(Rounds.id.desc()).first()
@@ -147,6 +162,7 @@ def publish_post():
         round=current_round.id,
         user_id=current_user.id,
         comment_to=-1,
+        image_id = img_id,
     )
 
     db.session.add(post)
@@ -156,9 +172,8 @@ def publish_post():
     db.session.commit()
 
     user = Admin_users.query.filter_by(username=current_user.username).first()
-    llm = user.llm if user.llm != "" else "llama3.1"
+    llm = user.llm if user.llm != "" else "llama3.2:latest"
 
-    # @todo: add image support, link support and topic annotation
     annotator = ContentAnnotator(llm=llm)
     emotions = annotator.annotate_emotions(text)
     hashtags = annotator.extract_components(text, c_type="hashtags")
