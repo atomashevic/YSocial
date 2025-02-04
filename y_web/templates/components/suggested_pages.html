@@ -1,9 +1,9 @@
 <!-- Suggested friends widget -->
 <!-- /partials/widgets/suggested-friends-1-widget.html -->
-{% if len(sfollow)>0 %}
+{% if len(spages)>0 %}
 <div class="card">
     <div class="card-heading is-bordered">
-        <h4>Suggested Friends</h4>
+        <h4>Suggested Pages</h4>
         <div class="dropdown is-spaced is-right dropdown-trigger">
             <div>
                 <!--<div class="button">
@@ -46,25 +46,24 @@
     </div>
     <div class="card-body no-padding">
         <!-- Suggested friend -->
-
-        {% for friend in sfollow %}
+        {% for page in spages %}
 
         <div class="add-friend-block transition-block">
             <img
                     src="https://via.placeholder.com/300x300"
-                    {% if friend['profile_pic'] != "" %}
-                        data-demo-src="{{ friend['profile_pic'] }}"
+                    {% if page['profile_pic'] != "" %}
+                        data-demo-src="{{ page['profile_pic'] }}"
                     {% else %}
-                         data-demo-src="{{ url_for('static', filename='assets/img/users/'+ str(friend['id']) +'.png') }}"
+                         data-demo-src="{{ url_for('static', filename='assets/img/users/'+ str(page['id']) +'.png') }}"
                     {% endif %}
                     data-user-popover="9"
                     alt=""
             />
             <div class="page-meta">
-                <span><a href="/profile/{{ friend['id'] }}/recent/1">{{ friend['username']|safe }}</a></span>
+                <span><a href="/profile/{{ page['id'] }}/recent/1">{{ page['username']|safe }}</a></span>
             </div>
             <div class="add-friend add-transition">
-                <a href="/follow/{{ user_id }}/{{ friend['id'] }}"><i data-feather="user-plus"></i></a>
+                <a href="/follow/{{ user_id }}/{{ page['id'] }}"><i data-feather="user-plus"></i></a>
             </div>
         </div>
         {% endfor %}

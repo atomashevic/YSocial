@@ -303,7 +303,9 @@ def feed(user_id="all", timeline="timeline", mode="rf", page=1):
 
     trending_ht = get_trending_hashtags()
     mentions = get_unanswered_mentions(current_user.id)
-    sfollow = get_suggested_users(user_id)
+    sfollow = get_suggested_users(user_id, pages=False)
+
+    spages = get_suggested_users(user_id, pages=True)
 
     # get user profile pic
     if user_id != "all":
@@ -342,6 +344,7 @@ def feed(user_id="all", timeline="timeline", mode="rf", page=1):
         mentions=mentions,
         is_admin=is_admin(current_user.username),
         sfollow=sfollow,
+        spages=spages,
     )
 
 

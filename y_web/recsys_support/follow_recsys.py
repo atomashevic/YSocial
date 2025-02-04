@@ -9,7 +9,7 @@ from y_web import db
 import numpy as np
 
 
-def get_suggested_users(user_id):
+def get_suggested_users(user_id, pages=False):
     """
     Get follow suggestions for a user.
 
@@ -26,7 +26,18 @@ def get_suggested_users(user_id):
     if len(users) == 0:
         users = __follow_suggestions("", user.id, 5, 1.5)
 
-    res = [{"username": user.username, "id": user.id, "profile_pic": ""} for user in users]
+    if not pages:
+        res = [{"username": user.username, "id": user.id, "profile_pic": ""} for user in users if user.is_page != 1]
+    else:
+        res = [{"username": user.username, "id": user.id, "profile_pic": ""} for user in users if user.is_page == 1]
+        if len(res) == 0:
+            # get random Users with is_page = 1 that user_id is not following
+            pages = User_mgmt.query.filter_by(is_page=1).order_by(func.random()).limit(5)
+
+            for page in pages:
+                # check if user_id is following the page
+                if Follow.query.filter_by(user_id=user_id, follower_id=page.id).first() is None:
+                    res.append({"username": page.username, "id": page.id, "profile_pic": ""})
 
     for user in res:
         if User_mgmt.query.filter_by(id=user["id"]).first().is_page == 1:
