@@ -345,14 +345,14 @@ def get_user_friends(user_id, limit=12, page=1):
     # get number
     number_followees = len(
         list(
-            Follow.query.filter_by(user_id=user_id)
+            Follow.query.filter(Follow.user_id==user_id, Follow.follower_id != user_id)
             .group_by(Follow.follower_id)
             .having(func.count(Follow.follower_id) % 2 == 1)
         )
     )
     number_followers = len(
         list(
-            Follow.query.filter_by(follower_id=user_id)
+            Follow.query.filter(Follow.follower_id==user_id, Follow.user_id != user_id)
             .group_by(Follow.user_id)
             .having(func.count(Follow.user_id) % 2 == 1)
         )
@@ -368,7 +368,7 @@ def get_user_friends(user_id, limit=12, page=1):
 
     if page * limit - number_followees < limit:
         followee = (
-            Follow.query.filter_by(user_id=user_id)
+            Follow.query.filter(Follow.user_id==user_id, Follow.follower_id != user_id)
             .group_by(Follow.follower_id)
             .having(func.count(Follow.follower_id) % 2 == 1)
             .join(User_mgmt, Follow.follower_id == User_mgmt.id)
@@ -385,20 +385,19 @@ def get_user_friends(user_id, limit=12, page=1):
                         list(Reactions.query.filter_by(user_id=f.id))
                     ),
                     "number_followers": len(
-                        list(Follow.query.filter_by(user_id=f.id, action="follow"))
+                        list(Follow.query.filter(Follow.follower_id == f.id, Follow.user_id != f.id).group_by(Follow.user_id).having(func.count(Follow.user_id) % 2 == 1))
                     ),
                     "number_followees": len(
-                        list(Follow.query.filter_by(follower_id=f.id, action="follow"))
+                        list(Follow.query.filter(Follow.user_id == f.id, Follow.follower_id != f.id).group_by(Follow.follower_id).having(func.count(Follow.follower_id) % 2 == 1))
                     ),
                 }
             )
 
     if number_followers - page * limit < limit:
         followers = (
-            Follow.query.filter_by(follower_id=user_id)
-            .filter_by(follower_id=user_id)
+            Follow.query.filter(Follow.follower_id==user_id, Follow.user_id != user_id)
             .group_by(Follow.user_id)
-            .having(func.count(Follow.user_id) % 2 == 1)
+            .having(func.count(Follow.follower_id) % 2 == 1)
             .join(User_mgmt, Follow.user_id == User_mgmt.id)
             .add_columns(User_mgmt.username, User_mgmt.id)
             .paginate(page=page, per_page=limit, error_out=False)
@@ -413,10 +412,10 @@ def get_user_friends(user_id, limit=12, page=1):
                         list(Reactions.query.filter_by(user_id=f.id))
                     ),
                     "number_followers": len(
-                        list(Follow.query.filter_by(user_id=f.id, action="follow"))
+                        list(Follow.query.filter(Follow.follower_id == f.id, Follow.user_id != f.id).group_by(Follow.user_id).having(func.count(Follow.user_id) % 2 == 1))
                     ),
                     "number_followees": len(
-                        list(Follow.query.filter_by(follower_id=f.id, action="follow"))
+                        list(Follow.query.filter(Follow.user_id == f.id, Follow.follower_id != f.id).group_by(Follow.follower_id).having(func.count(Follow.follower_id) % 2 == 1))
                     ),
                 }
             )

@@ -112,7 +112,7 @@ def profile_logged(user_id, page=1, mode="recent"):
     # get user total number of followers
     total_followee = len(
         list(
-            Follow.query.filter_by(user_id=user_id)
+            Follow.query.filter(Follow.user_id==user_id, Follow.follower_id != user_id)
             .group_by(Follow.follower_id)
             .having(func.count(Follow.follower_id) % 2 == 1)
         )
@@ -121,7 +121,7 @@ def profile_logged(user_id, page=1, mode="recent"):
     # get user total followee
     total_followers = len(
         list(
-            Follow.query.filter_by(follower_id=user_id)
+            Follow.query.filter(Follow.follower_id==user_id, Follow.user_id != user_id)
             .group_by(Follow.user_id)
             .having(func.count(Follow.user_id) % 2 == 1)
         )
