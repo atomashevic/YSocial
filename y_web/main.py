@@ -1,14 +1,10 @@
-from crypt import methods
-
-from attr.validators import instance_of
 from flask import Blueprint, render_template, redirect, request, flash
 from flask_login import login_required, current_user
 from .data_access import *
 from .models import Admin_users, Images, Page
 from werkzeug.security import generate_password_hash
 from y_web import db
-import numpy as np
-from y_web.recsys_support import get_suggested_posts
+from y_web.recsys_support import get_suggested_posts, get_suggested_users
 
 main = Blueprint("main", __name__)
 
@@ -307,7 +303,7 @@ def feed(user_id="all", timeline="timeline", mode="rf", page=1):
 
     trending_ht = get_trending_hashtags()
     mentions = get_unanswered_mentions(current_user.id)
-    sfollow = suggested_users()
+    sfollow = get_suggested_users(user_id)
 
     # get user profile pic
     if user_id != "all":
@@ -661,27 +657,6 @@ def get_thread(post_id):
     )
 
 
-def suggested_users():
-    # add YServer to path
-    users = __follow_suggestions("random", current_user.id, 5, 0)
-
-    res = [{"username": user.username, "id": user.id, "profile_pic": ""} for user in users]
-
-    for user in res:
-        if User_mgmt.query.filter_by(id=user["id"]).first().is_page == 1:
-            pg = Page.query.filter_by(name=user["username"]).first()
-            if pg is not None:
-                user["profile_pic"] = pg.logo
-        else:
-            try:
-                ag = Agent.query.filter_by(name=user["username"]).first()
-                user["profile_pic"] = ag.profile_pic if ag is not None and ag.profile_pic is not None else ""
-            except:
-                user["profile_pic"] = ""
-
-    return res
-
-
 def __expand_tree(post_to_child, post_to_data):
     for pid, clds in post_to_child.items():
         for cl in clds:
@@ -696,141 +671,6 @@ def recursive_visit(data):
     else:
         for c in data["children"]:
             return recursive_visit(c)
-
-
-def __follow_suggestions(rectype, user_id, n_neighbors, leaning_biased):
-    """
-    Get follow suggestions for a user based on the follow recommender system.
-
-    :param rectype:
-    :param user_id:
-    :param n_neighbors:
-    :param leaning_biased:
-    :return:
-    """
-
-    res = {}
-
-    if rectype == "random":
-        # get random users
-        users = User_mgmt.query.order_by(func.random()).limit(n_neighbors)
-
-        for user in users:
-            res[user.id] = 1 / n_neighbors
-
-    if rectype == "preferential_attachment":
-        # get random nodes ordered by degree
-        followers = (
-            (
-                db.session.query(
-                    Follow, func.count(Follow.user_id).label("total")
-                ).filter(Follow.action == "follow")
-            )
-            .group_by(Follow.follower_id)
-            .order_by(func.count(Follow.user_id).desc())
-        ).limit(n_neighbors)
-
-        for follower in followers:
-            res[follower[0].follower_id] = int(follower[1])
-
-        # normalize pa to probabilities
-        total_degree = sum(res.values())
-        res = {k: v / total_degree for k, v in res.items()}
-
-    if rectype == "common_neighbors":
-        first_order_followers, candidates = __get_two_hops_neighbors(user_id)
-
-        for target, neighbors in candidates.items():
-            res[target] = len(neighbors & first_order_followers)
-
-        total = sum(res.values())
-        # normalize cn to probabilities
-        res = {k: v / total for k, v in res.items() if v > 0}
-
-    if rectype == "jaccard":
-        first_order_followers, candidates = __get_two_hops_neighbors(user_id)
-
-        for candidate in candidates:
-            res[candidate] = len(first_order_followers & candidates[candidate]) / len(
-                first_order_followers | candidates[candidate]
-            )
-
-        total = sum(res.values())
-        res = {k: v / total for k, v in res.items() if v > 0}
-
-    elif rectype == "adamic_adar":
-        first_order_followers, candidates = __get_two_hops_neighbors(user_id)
-
-        res = {}
-        for target, neighbors in candidates.items():
-            res[target] = neighbors & first_order_followers
-
-        for target in res:
-            res[target] = sum(
-                [
-                    1 / np.log(len(Follow.query.filter_by(user_id=neighbor).all()))
-                    for neighbor in res[target]
-                ]
-            )
-
-        total = sum([v for v in res.values() if v != np.inf])
-        res = {k: v / total for k, v in res.items() if v > 0 and v != np.inf}
-
-    l_source = User_mgmt.query.filter_by(id=user_id).first().leaning
-    leanings = __get_users_leanings(res.keys())
-    for user in res:
-        if leanings[user] == l_source:
-            res[user] = res[user] * leaning_biased
-
-    res = [k for k, v in res.items() if v > 0]
-    users = [User_mgmt.query.filter_by(id=user).first() for user in res]
-    return users
-
-
-def __get_two_hops_neighbors(node_id):
-    """
-    Get the two hops neighbors of a user.
-
-    :param node_id: the user id
-    :return: the two hops neighbors
-    """
-    # (node_id, direct_neighbors)
-    first_order_followers = set(
-        [
-            f.follower_id
-            for f in Follow.query.filter_by(user_id=node_id, action="follow")
-        ]
-    )
-    # (direct_neighbors, second_order_followers)
-    second_order_followers = Follow.query.filter(
-        Follow.user_id.in_(first_order_followers), Follow.action == "follow"
-    )
-    # (second_order_followers, third_order_followers)
-    third_order_followers = Follow.query.filter(
-        Follow.user_id.in_([f.follower_id for f in second_order_followers]),
-        Follow.action == "follow",
-    )
-
-    candidate_to_follower = {}
-    for node in third_order_followers:
-        if node.user_id not in candidate_to_follower:
-            candidate_to_follower[node.user_id] = set()
-        candidate_to_follower[node.user_id].add(node.follower_id)
-
-    return first_order_followers, candidate_to_follower
-
-
-def __get_users_leanings(agents):
-    """
-    Get the political leaning of a list of users.
-
-    :param agents: the list of users
-    :return: the political leaning of the users
-    """
-    leanings = {}
-    for agent in agents:
-        leanings[agent] = User_mgmt.query.filter_by(id=agent).first().leaning
-    return leanings
 
 
 def __get_discussions(posts, username, page):

@@ -24,15 +24,15 @@ from .llm_annotations import ContentAnnotator, Annotator
 user = Blueprint("user_actions", __name__)
 
 
-@user.route("/follow/<int:user_id>")
+@user.route("/follow/<int:user_id>/<int:follower_id>")
 @login_required
-def follow(user_id):
+def follow(user_id, follower_id):
     # get the last round id from Rounds
     current_round = Rounds.query.order_by(Rounds.id.desc()).first()
 
     # check
     followed = (
-        Follow.query.filter_by(follower_id=user_id, user_id=current_user.id)
+        Follow.query.filter_by(user_id=user_id, follower_id=follower_id)
         .order_by(Follow.id.desc())
         .first()
     )

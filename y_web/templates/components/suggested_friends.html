@@ -52,7 +52,7 @@
             <img
                     src="https://via.placeholder.com/300x300"
                     {% if friend['profile_pic'] != "" %}
-                        data-demo-src="{{ friend['profile_pic'] }}}"
+                        data-demo-src="{{ friend['profile_pic'] }}"
                     {% else %}
                          data-demo-src="{{ url_for('static', filename='assets/img/users/'+ str(friend['id']) +'.png') }}"
                     {% endif %}
@@ -63,7 +63,7 @@
                 <span><a href="/profile/{{ friend['id'] }}/recent/1">{{ friend['username']|safe }}</a></span>
             </div>
             <div class="add-friend add-transition">
-                <a href="/follow/{{ friend['id'] }}"><i data-feather="user-plus"></i></a>
+                <a href="/follow/{{ user_id }}/{{ friend['id'] }}"><i data-feather="user-plus"></i></a>
             </div>
         </div>
         {% endfor %}
