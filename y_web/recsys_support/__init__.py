@@ -1,0 +1,1 @@
+from .content_recsys import get_suggested_posts

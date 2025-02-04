@@ -1,5 +1,6 @@
 from crypt import methods
 
+from attr.validators import instance_of
 from flask import Blueprint, render_template, redirect, request, flash
 from flask_login import login_required, current_user
 from .data_access import *
@@ -7,6 +8,7 @@ from .models import Admin_users, Images, Page
 from werkzeug.security import generate_password_hash
 from y_web import db
 import numpy as np
+from y_web.recsys_support import get_suggested_posts
 
 main = Blueprint("main", __name__)
 
@@ -273,226 +275,31 @@ def feed(user_id="all", timeline="timeline", mode="rf", page=1):
         page = 1
 
     max_post_per_page = 10
+    username = ""
+    posts, additional = None, None
 
     if user_id == "all":
-        # get the latest 20 posts paginated along with their comments
-        if mode == "rf":
-            posts = (
-                Post.query.filter_by(comment_to=-1)
-                .order_by(desc(Post.id))
-                .paginate(page=page, per_page=max_post_per_page, error_out=False)
-            )
-        if mode == "rfp":
-            posts = (
-                Post.query.filter_by(comment_to=-1)
-                .join(Reactions, Post.id == Reactions.post_id)
-                .add_columns(func.count(Reactions.id).label("count"))
-                .group_by(Post.id)
-                .order_by(desc("count"))
-            ).paginate(page=page, per_page=max_post_per_page, error_out=False)
+        posts, additional = get_suggested_posts("all", "", page, max_post_per_page)
 
-        username = ""
     elif user_id != "all":
-        if timeline == "timeline":
-            username = User_mgmt.query.filter_by(id=int(user_id)).first().username
-            if mode == "rf":
-                posts = (
-                    Post.query.filter_by(user_id=int(user_id), comment_to=-1)
-                    .order_by(desc(Post.id))
-                    .paginate(page=page, per_page=max_post_per_page, error_out=False)
-                )
-            # @todo: fix this
-            if mode == "rfp":
-                posts = (
-                    Post.query.filter_by(user_id=int(user_id), comment_to=-1)
-                    .join(Reactions, Post.id == Reactions.post_id)
-                    .add_columns(func.count(Reactions.id).label("count"))
-                    .group_by(Post.id)
-                    .order_by(desc("count"))
-                ).paginate(page=page, per_page=max_post_per_page, error_out=False)
-        else:
-            # get users' followees
-            username = User_mgmt.query.filter_by(id=int(user_id)).first().username
 
-            # only get the posts of the followees that were not unfollowed
-            followers = list(
-                Follow.query.filter_by(user_id=int(user_id))
-                .group_by(Follow.follower_id)
-                .having(func.count(Follow.follower_id) % 2 == 1)
-            )
-            users = [f.follower_id for f in followers]
-            users.append(user_id)
+        user = User_mgmt.query.filter_by(id=int(user_id)).first()
+        recsys = user.recsys_type
 
-            if mode == "rf":
-                # get the posts of the followee
-                posts = (
-                    Post.query.filter(
-                        Post.user_id.in_(users),
-                        Post.comment_to == -1,
-                    )
-                    .order_by(desc(Post.id))
-                    .paginate(page=page, per_page=max_post_per_page, error_out=False)
-                )
+        posts, additional = get_suggested_posts(user_id, recsys, page, max_post_per_page)
+        username = user.username
 
-            if mode == "rfp":
-                # get posts from followee ordered by likes and reverse chronologically
-                posts = (
-                    Post.query.filter(
-                        Post.user_id.in_(users),
-                        Post.comment_to == -1,
-                    )
-                    .join(Reactions, Post.id == Reactions.post_id)
-                    .add_columns(func.count(Reactions.post_id).label("count"))
-                    .group_by(Post.id)
-                    .order_by(desc("count"))
-                    .paginate(page=page, per_page=max_post_per_page, error_out=False)
-                )
+    res, res_additional = [], []
 
-    res = []
+    if posts is not None:
+        res = __get_discussions(posts, username, page)
+    if additional is not None:
+        res_additional = __get_discussions(additional, username, page)
 
-    for post in posts.items:
-        if mode != "rf":
-            post = post[0]
-
-        comments = (
-            Post.query.filter_by(thread_id=post.id)
-            .join(User_mgmt, Post.user_id == User_mgmt.id)
-            .add_columns(User_mgmt.username)
-            .all()
-        )
-
-        cms = []
-        idx = 0
-        for c, author in comments:
-            if idx == 0:
-                idx = 1
-                continue
-
-            # get elicited emotions names
-            emotions = get_elicited_emotions(c.id)
-
-            if username == author:
-                text = c.tweet.split(":")[-1].replace(f"@{username}", "")
-            else:
-                text = c.tweet.split(":")[-1]
-
-            profile_pic = ""
-
-            user = User_mgmt.query.filter_by(id=c.user_id).first()
-
-            if user.is_page == 1:
-                pg = Page.query.filter_by(name=user.username).first()
-                if page is not None:
-                    profile_pic = pg.logo
-            else:
-                ag = Agent.query.filter_by(name=user.username).first()
-                profile_pic = ag.profile_pic if ag is not None and ag.profile_pic is not None else ""
-
-            cms.append(
-                {
-                    "post_id": c.id,
-                    "profile_pic": profile_pic,
-                    "author": author,
-                    "shared_from": -1 if c.shared_from == -1 else (c.shared_from, db.session.query(User_mgmt).join(Post, User_mgmt.id == Post.user_id).filter(Post.id == c.shared_from).first().username),
-                    "author_id": int(c.user_id),
-                    "post": augment_text(text),
-                    "round": c.round,
-                    "day": Rounds.query.filter_by(id=c.round).first().day,
-                    "hour": Rounds.query.filter_by(id=c.round).first().hour,
-                    "likes": len(
-                        list(Reactions.query.filter_by(post_id=c.id, type="like"))
-                    ),
-                    "dislikes": len(
-                        list(Reactions.query.filter_by(post_id=c.id, type="dislike"))
-                    ),
-                    "is_liked": Reactions.query.filter_by(
-                        post_id=c.id, user_id=current_user.id, type="like"
-                    ).first()
-                    is None,
-                    "is_disliked": Reactions.query.filter_by(
-                        post_id=c.id, user_id=current_user.id, type="dislike"
-                    ).first()
-                    is None,
-                    "is_shared": len(Post.query.filter_by(shared_from=c.id).all()),
-                    "emotions": emotions,
-                }
-            )
-
-        article = Articles.query.filter_by(id=post.news_id).first()
-        if article is None:
-            art = 0
-        else:
-            art = {
-                "title": article.title,
-                "summary": strip_tags(article.summary),
-                "url": article.link,
-                "source": Websites.query.filter_by(id=article.website_id).first().name,
-            }
-
-        image = Images.query.filter_by(id=post.image_id).first()
-        if image is None:
-            image = ""
-
-        c = Rounds.query.filter_by(id=post.round).first()
-        if c is None:
-            day = "None"
-            hour = "00"
-        else:
-            day = c.day
-            hour = c.hour
-
-        # get elicited emotions names
-        emotions = get_elicited_emotions(post.id)
-
-        aa = User_mgmt.query.filter_by(id=post.user_id).first()
-        profile_pic = ""
-        if aa.is_page == 1:
-            pg = Page.query.filter_by(name=aa.username).first()
-            if pg is not None:
-                profile_pic = pg.logo
-        else:
-            try:
-                ag = Agent.query.filter_by(name=aa.username).first()
-                profile_pic = ag.profile_pic if ag.profile_pic is not None else ""
-            except:
-                profile_pic = ""
-
-        # get the post.shared_from
-
-        res.append(
-            {
-                "article": art,
-                "image": image,
-                "profile_pic": profile_pic,
-                "thread_id": post.thread_id,
-                "shared_from": -1 if post.shared_from == -1 else (post.shared_from, db.session.query(User_mgmt).join(Post, User_mgmt.id == Post.user_id).filter(Post.id == post.shared_from).first().username),
-                "post_id": post.id,
-                "author": User_mgmt.query.filter_by(id=post.user_id).first().username,
-                "author_id": int(post.user_id),
-                "post": augment_text(post.tweet.split(":")[-1]),
-                "round": post.round,
-                "day": day,
-                "hour": hour,
-                "likes": len(
-                    list(Reactions.query.filter_by(post_id=post.id, type="like"))
-                ),
-                "dislikes": len(
-                    list(Reactions.query.filter_by(post_id=post.id, type="dislike"))
-                ),
-                "is_liked": Reactions.query.filter_by(
-                    post_id=post.id, user_id=current_user.id, type="like"
-                ).first()
-                is None,
-                "is_disliked": Reactions.query.filter_by(
-                    post_id=post.id, user_id=current_user.id, type="dislike"
-                ).first()
-                is None,
-                "is_shared": len(Post.query.filter_by(shared_from=post.id).all()),
-                "comments": cms,
-                "t_comments": len(cms),
-                "emotions": emotions,
-            }
-        )
+    # combine the posts and additional posts
+    if len(res_additional) > 0:
+        for add in res_additional:
+            res.append(add)
 
     # not enough posts to display
     if len(res) == 0 and page > 1:
@@ -503,7 +310,11 @@ def feed(user_id="all", timeline="timeline", mode="rf", page=1):
     sfollow = suggested_users()
 
     # get user profile pic
-    user = User_mgmt.query.filter_by(id=user_id).first()
+    if user_id != "all":
+        user = User_mgmt.query.filter_by(id=user_id).first()
+    else:
+        user = User_mgmt.query.filter_by(id=current_user.id).first()
+
     profile_pic = ""
     if user.is_page == 1:
         pg = Page.query.filter_by(name=user.username).first()
@@ -521,7 +332,7 @@ def feed(user_id="all", timeline="timeline", mode="rf", page=1):
         items=res,
         page=page,
         profile_pic=profile_pic,
-        user_id=int(user_id),
+        user_id=user_id,
         timeline=timeline,
         username=username,
         mode=mode,
@@ -1020,3 +831,152 @@ def __get_users_leanings(agents):
     for agent in agents:
         leanings[agent] = User_mgmt.query.filter_by(id=agent).first().leaning
     return leanings
+
+
+def __get_discussions(posts, username, page):
+
+    res = []
+
+    for post in posts.items:
+
+        try:
+            post = post[0]
+        except:
+            pass
+
+        comments = (
+            Post.query.filter(Post.thread_id == post.id, Post.id != post.id)
+            .join(User_mgmt, Post.user_id == User_mgmt.id)
+            .add_columns(User_mgmt.username)
+            .all()
+        )
+
+        cms = []
+        for c, author in comments:
+            # get elicited emotions names
+            emotions = get_elicited_emotions(c.id)
+
+            if username == author:
+                text = c.tweet.split(":")[-1].replace(f"@{username}", "")
+            else:
+                text = c.tweet.split(":")[-1]
+
+            profile_pic = ""
+
+            user = User_mgmt.query.filter_by(id=c.user_id).first()
+
+            if user.is_page == 1:
+                pg = Page.query.filter_by(name=user.username).first()
+                if page is not None:
+                    profile_pic = pg.logo
+            else:
+                ag = Agent.query.filter_by(name=user.username).first()
+                profile_pic = ag.profile_pic if ag is not None and ag.profile_pic is not None else ""
+
+            cms.append(
+                {
+                    "post_id": c.id,
+                    "profile_pic": profile_pic,
+                    "author": author,
+                    "shared_from": -1 if c.shared_from == -1 else (c.shared_from, db.session.query(User_mgmt).join(Post, User_mgmt.id == Post.user_id).filter(Post.id == c.shared_from).first().username),
+                    "author_id": int(c.user_id),
+                    "post": augment_text(text),
+                    "round": c.round,
+                    "day": Rounds.query.filter_by(id=c.round).first().day,
+                    "hour": Rounds.query.filter_by(id=c.round).first().hour,
+                    "likes": len(
+                        list(Reactions.query.filter_by(post_id=c.id, type="like"))
+                    ),
+                    "dislikes": len(
+                        list(Reactions.query.filter_by(post_id=c.id, type="dislike"))
+                    ),
+                    "is_liked": Reactions.query.filter_by(
+                        post_id=c.id, user_id=current_user.id, type="like"
+                    ).first()
+                    is None,
+                    "is_disliked": Reactions.query.filter_by(
+                        post_id=c.id, user_id=current_user.id, type="dislike"
+                    ).first()
+                    is None,
+                    "is_shared": len(Post.query.filter_by(shared_from=c.id).all()),
+                    "emotions": emotions,
+                }
+            )
+
+        article = Articles.query.filter_by(id=post.news_id).first()
+        if article is None:
+            art = 0
+        else:
+            art = {
+                "title": article.title,
+                "summary": strip_tags(article.summary),
+                "url": article.link,
+                "source": Websites.query.filter_by(id=article.website_id).first().name,
+            }
+
+        image = Images.query.filter_by(id=post.image_id).first()
+        if image is None:
+            image = ""
+
+        c = Rounds.query.filter_by(id=post.round).first()
+        if c is None:
+            day = "None"
+            hour = "00"
+        else:
+            day = c.day
+            hour = c.hour
+
+        # get elicited emotions names
+        emotions = get_elicited_emotions(post.id)
+
+        aa = User_mgmt.query.filter_by(id=post.user_id).first()
+        profile_pic = ""
+        if aa.is_page == 1:
+            pg = Page.query.filter_by(name=aa.username).first()
+            if pg is not None:
+                profile_pic = pg.logo
+        else:
+            try:
+                ag = Agent.query.filter_by(name=aa.username).first()
+                profile_pic = ag.profile_pic if ag.profile_pic is not None else ""
+            except:
+                profile_pic = ""
+
+        # get the post.shared_from
+
+        res.append(
+            {
+                "article": art,
+                "image": image,
+                "profile_pic": profile_pic,
+                "thread_id": post.thread_id,
+                "shared_from": -1 if post.shared_from == -1 else (post.shared_from, db.session.query(User_mgmt).join(Post, User_mgmt.id == Post.user_id).filter(Post.id == post.shared_from).first().username),
+                "post_id": post.id,
+                "author": User_mgmt.query.filter_by(id=post.user_id).first().username,
+                "author_id": int(post.user_id),
+                "post": augment_text(post.tweet.split(":")[-1]),
+                "round": post.round,
+                "day": day,
+                "hour": hour,
+                "likes": len(
+                    list(Reactions.query.filter_by(post_id=post.id, type="like"))
+                ),
+                "dislikes": len(
+                    list(Reactions.query.filter_by(post_id=post.id, type="dislike"))
+                ),
+                "is_liked": Reactions.query.filter_by(
+                    post_id=post.id, user_id=current_user.id, type="like"
+                ).first()
+                is None,
+                "is_disliked": Reactions.query.filter_by(
+                    post_id=post.id, user_id=current_user.id, type="dislike"
+                ).first()
+                is None,
+                "is_shared": len(Post.query.filter_by(shared_from=post.id).all()),
+                "comments": cms,
+                "t_comments": len(cms),
+                "emotions": emotions,
+            }
+        )
+
+    return res
