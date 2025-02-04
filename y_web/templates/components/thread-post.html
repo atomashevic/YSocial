@@ -22,12 +22,20 @@
                         {{ thread["post"]|safe }}
                     </p>
 
-                    <div class="card-footer_inner">
-                        <div class="likers-text">
+                    <div class="card-footer">
+                        <sèam class="likers-text" style="display: inline">
                             {% if len(thread['emotions']) > 0 %}
-                            <p>Emotions</p>
+                            <p style="font-size: .8rem">Emotions</p>
                             {% for em in thread['emotions'] %}
                             <a class="mdi {{ em[1] }}" title="{{ em[0] }}" href="/emotion/{{ em[2] }}/1"></a>
+                            {% endfor %}
+                            {% endif %}
+                        </sèam>
+                         <div class="likers-text" style="display: inline">
+                            {% if len(thread['topics']) > 0 %}
+                            <p style="font-size: .8rem">Topics</p>
+                            {% for tp in thread['topics'] %}
+                            <a  href="/interest/{{ tp[0] }}/1" style="font-size: .8rem; border: #00b2ff 1px solid; padding: 2px; border-radius: 10%"> {{ tp[1] }}</a>
                             {% endfor %}
                             {% endif %}
                         </div>

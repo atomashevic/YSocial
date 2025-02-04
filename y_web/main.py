@@ -501,10 +501,45 @@ def get_friends(user_id, page=1):
     )
     mentions = get_unanswered_mentions(current_user.id)
 
+    profile_pic_follower = {}
+
+    for f in followers:
+        u = User_mgmt.query.filter_by(id=f['id']).first()
+
+        if u.is_page == 1:
+            pg = Page.query.filter_by(name=f['username']).first()
+            if pg is not None:
+                profile_pic_follower[f['id']] = pg.logo
+        else:
+            try:
+                ag = Agent.query.filter_by(name=f['username']).first()
+                profile_pic_follower[f['id']] = ag.profile_pic if ag is not None and ag.profile_pic is not None else ""
+            except:
+                profile_pic_follower[f['id']] = ""
+
+    profile_pic_followee = {}
+
+    for f in followees:
+
+        u = User_mgmt.query.filter_by(id=f['id']).first()
+
+        if u.is_page == 1:
+            pg = Page.query.filter_by(name=f['username']).first()
+            if pg is not None:
+                profile_pic_followee[f['id']] = pg.logo
+        else:
+            try:
+                ag = Agent.query.filter_by(name=f['username']).first()
+                profile_pic_followee[f['id']] = ag.profile_pic if ag is not None and ag.profile_pic is not None else ""
+            except:
+                profile_pic_followee[f['id']] = ""
+
     return render_template(
         "friends.html",
         followers=followers,
+        profile_pic_follower=profile_pic_follower,
         followees=followees,
+        profile_pic_followee=profile_pic_followee,
         page=page,
         username=current_user.username,
         enumerate=enumerate,
@@ -570,6 +605,7 @@ def get_thread(post_id):
         is None,
         "is_shared": len(Post.query.filter_by(shared_from=posts[0].id).all()),
         "emotions": get_elicited_emotions(posts[0].id),
+        "topics": get_topics(posts[0].id)
     }
 
     reverse_map = {posts[0].id: None}
@@ -610,15 +646,17 @@ def get_thread(post_id):
             is None,
             "is_shared": len(Post.query.filter_by(shared_from=post.id).all()),
             "emotions": get_elicited_emotions(post.id),
+            "topics": get_topics(post.id)
         }
 
         parent = post.comment_to
         reverse_map[post.id] = parent
 
         if parent != -1:
-            post_to_child[parent].append(post.id)
-            post_to_child[post.id] = []
-            post_to_data[post.id] = data
+            if parent in post_to_child:
+                post_to_child[parent].append(post.id)
+                post_to_child[post.id] = []
+                post_to_data[post.id] = data
 
     tree = __expand_tree(post_to_child, post_to_data)
     discussion_tree = tree[root]
@@ -816,6 +854,7 @@ def __get_discussions(posts, username, page):
                 "comments": cms,
                 "t_comments": len(cms),
                 "emotions": emotions,
+                "topics": get_topics(post.id)
             }
         )
 

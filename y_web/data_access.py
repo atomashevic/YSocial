@@ -224,6 +224,7 @@ def get_user_recent_posts(user_id, page, per_page=10, mode="rf", current_user=No
                 "comments": cms,
                 "t_comments": len(cms),
                 "emotions": emotions,
+                "topics": get_topics(post.id)
             }
         )
 
@@ -567,13 +568,16 @@ def get_posts_associated_to_hashtags(hashtag_id, page, per_page=10, current_user
 
             emotions = get_elicited_emotions(c.id)
 
+            # get author
+            user = User_mgmt.query.filter_by(id=c.user_id).first()
+
             # is the agent a page?
-            if c.is_page == 1:
-                page = Page.query.filter_by(name=c.username).first()
+            if user.is_page == 1:
+                page = Page.query.filter_by(name=user.username).first()
                 if page is not None:
                     profile_pic = page.logo
             else:
-                ag = Agent.query.filter_by(name=c.username).first()
+                ag = Agent.query.filter_by(name=user.username).first()
                 profile_pic = ag.profile_pic if ag is not None and ag.profile_pic is not None else ""
 
 
@@ -680,6 +684,7 @@ def get_posts_associated_to_hashtags(hashtag_id, page, per_page=10, current_user
                 "comments": cms,
                 "t_comments": len(cms),
                 "emotions": emotions,
+                "topics": get_topics(post.id)
             }
         )
 
@@ -834,6 +839,7 @@ def get_posts_associated_to_interest(interest_id, page, per_page=10, current_use
                 "comments": cms,
                 "t_comments": len(cms),
                 "emotions": emotions,
+                "topics": get_topics(post.id)
             }
         )
 
@@ -991,6 +997,7 @@ def get_posts_associated_to_emotion(emotion_id, page, per_page=10, current_user=
                 "comments": cms,
                 "t_comments": len(cms),
                 "emotions": emotions,
+                "topics": get_topics(post.id)
             }
         )
 
@@ -1041,6 +1048,22 @@ def get_elicited_emotions(post_id):
 
     emotions = set([(e.emotion, e.icon, e.id) for e in emotions])
     return emotions
+
+
+def get_topics(post_id):
+
+    # get the topics of the post
+    topics = (
+        Post.query.filter_by(id=post_id)
+        .join(Post_topics, Post.id == Post_topics.post_id)
+        .join(Interests, Post_topics.topic_id == Interests.iid)
+        .add_columns(Interests.interest)
+        .add_columns(Interests.iid)
+        .all()
+    )
+
+    topics = set([(iid, interest) for _, interest, iid in topics])
+    return topics
 
 
 def get_unanswered_mentions(user_id):

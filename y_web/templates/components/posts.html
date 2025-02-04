@@ -117,7 +117,15 @@
                 {% if len(item['emotions']) > 0 %}
                 <p>Emotions</p>
                 {% for em in item['emotions'] %}
-                <a class="mdi {{ em[1] }}" title="{{ em[0] }}" href="/emotion/{{ em[2] }}/1"></a>
+                <a class="mdi {{ em[1] }}" title="{{ em[0] }}" style="font-size: .8rem" href="/emotion/{{ em[2] }}/1"></a>
+                {% endfor %}
+                {% endif %}
+            </div>
+            <div class="likers-text">
+                {% if len(item['topics']) > 0 %}
+                <p>Topics</p>
+                {% for tp in item['topics'] %}
+                <a  href="/interest/{{ tp[0] }}/1" style="font-size: .8rem; border: #00b2ff 1px solid; padding: 2px; border-radius: 10%"> {{ tp[1] }}</a>
                 {% endfor %}
                 {% endif %}
             </div>

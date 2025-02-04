@@ -43,9 +43,18 @@
                     {% for follower in followers %}
                     <div class="card-flex friend-card">
                         <div class="img-container">
-                            <img class="avatar" src="{{ url_for('static', filename='assets/img/demo/unsplash/1.jpg') }}"
-                                 data-demo-src="{{ url_for('static', filename='assets/img/users/'+ str(follower['id']) +'.png') }}"
-                                 alt=""/>
+
+                            <img
+                                    id="user-avatar"
+                                    {% if profile_pic_follower[follower['id']] =="" %}
+                                        data-demo-src="{{ url_for('static', filename='assets/img/users/'+ str(follower['id']) +'.png') }}"
+                                    {% else %}
+                                        data-demo-src="{{ profile_pic_follower[follower['id']] }}"
+                                    {% endif %}
+                                    alt=""
+
+                            />
+
                         </div>
                         <div class="friend-info">
                             <h3><a href="/profile/{{ follower['id'] }}/recent/1">{{ follower['username'] }}</a></h3>
@@ -81,9 +90,17 @@
                     <div class="card-flex friend-card">
 
                         <div class="img-container">
-                            <img class="avatar" src="{{ url_for('static', filename='assets/img/demo/unsplash/1.jpg') }}"
-                                 data-demo-src="{{ url_for('static', filename='assets/img/users/'+ str(followee['id']) +'.png') }}"
-                                 alt=""/>
+                            <img
+                                    id="user-avatar"
+                                    {% if profile_pic_followee[followee['id']] =="" %}
+                                        data-demo-src="{{ url_for('static', filename='assets/img/users/'+ str(followee['id']) +'.png') }}"
+                                    {% else %}
+                                        data-demo-src="{{ profile_pic_followee[followee['id']] }}"
+                                    {% endif %}
+                                    alt=""
+
+                            />
+
                         </div>
                         <div class="friend-info">
                             <h3><a href="/profile/{{ followee['id'] }}/recent/1">{{ followee['username'] }}</a></h3>

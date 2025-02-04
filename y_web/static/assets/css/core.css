@@ -26027,27 +26027,45 @@ position: absolute;
     height: 24px
 }
 
-.card.is-post .content-wrap .card-footer .likers-text,.shop-wrapper .cart-container .cart-content .cart-summary .is-post.summary-card .content-wrap .card-footer .likers-text {
+.card.is-post .content-wrap .card-footer .likers-text,.shop-wrapper .cart-container .cart-content .cart-summary .is-post.summary-card .content-wrap .card-footer .likers-text,  .card.is-post .comments-wrap .comments-body .is-comment .media-content .card-footer .likers-text {
     margin-left: 10px;
     line-height: 1.4
 }
 
-.card.is-post .content-wrap .card-footer .likers-text p,.shop-wrapper .cart-container .cart-content .cart-summary .is-post.summary-card .content-wrap .card-footer .likers-text p {
+.card.is-post .content-wrap .card-footer .likers-text p,.shop-wrapper .cart-container .cart-content .cart-summary .is-post.summary-card .content-wrap .card-footer .likers-text p{
     font-size: .8rem;
     color: #888da8
 }
+
+
+.card.is-post .content-wrap .card-footer{
+    padding-top: 16px !important;
+    padding-left: 0px !important;
+}
+
+
+.card.is-post .comments-wrap .comments-body .is-comment .media-content .card-footer .likers-text p {
+font-size: .8rem !important;
+    color: #888da8
+}
+
+ .card.is-post .comments-wrap .comments-body .is-comment .media-content .card-footer .likers-text p a {
+         color: #393a4f;
+    font-weight: 500
+
+ }
 
 .card-footer .likers-text p{
      font-size: .8rem;
     color: #888da8
 }
 
-.card.is-post .content-wrap .card-footer .likers-text p a,.shop-wrapper .cart-container .cart-content .cart-summary .is-post.summary-card .content-wrap .card-footer .likers-text p a {
+.card.is-post .content-wrap .card-footer .likers-text p a,.shop-wrapper .cart-container .cart-content .cart-summary .is-post.summary-card .content-wrap .card-footer .likers-text p a{
     color: #393a4f;
     font-weight: 500
 }
 
-.card.is-post .content-wrap .card-footer .likers-text p a:hover,.shop-wrapper .cart-container .cart-content .cart-summary .is-post.summary-card .content-wrap .card-footer .likers-text p a:hover {
+.card.is-post .content-wrap .card-footer .likers-text p a:hover,.shop-wrapper .cart-container .cart-content .cart-summary .is-post.summary-card .content-wrap .card-footer .likers-text p a:hover,  .card.is-post .comments-wrap .comments-body .is-comment .media-content .card-footer .likers-text p a :hover {
     color: #5596e6
 }
 
