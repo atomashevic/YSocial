@@ -17,7 +17,10 @@
                     <a class="option-tab" data-tab="starred-friends">
                         <span>Followee</span>
                     </a>
-                    <div class="option-naver"></div>
+                    <!--<a class="option-tab" data-tab="starred-Pages">
+                        <span>Pages</span>
+                    </a>-->
+                    <!--<div class="option-naver"></div>-->
 
                 </div>
                 <div class="end-group">
@@ -126,6 +129,53 @@
 
 
             </div>
+
+           <!-- <div id="starred-pages" class="card-row-wrap">
+                <div class="card-row-placeholder is-hidden">No matching results</div>
+                <div class="card-row">
+
+
+                    {% if len(followees) > 0 %}
+                    {% for followee in followees %}
+                    <div class="card-flex friend-card">
+
+                        <div class="img-container">
+                            <img
+                                    id="user-avatar"
+                                    {% if profile_pic_followee[followee['id']] =="" %}
+                                        data-demo-src="{{ url_for('static', filename='assets/img/users/'+ str(followee['id']) +'.png') }}"
+                                    {% else %}
+                                        data-demo-src="{{ profile_pic_followee[followee['id']] }}"
+                                    {% endif %}
+                                    alt=""
+
+                            />
+
+                        </div>
+                        <div class="friend-info">
+                            <h3><a href="/profile/{{ followee['id'] }}/recent/1">{{ followee['username'] }}</a></h3>
+                        </div>
+                        <div class="friend-stats">
+                            <div class="stat-block">
+                                <label>Followers</label>
+                                <div class="stat-number">{{ followee['number_followers'] }}</div>
+                            </div>
+                            <div class="stat-block">
+                                <label>Followee</label>
+                                <div class="stat-number">{{ followee['number_followees'] }}</div>
+                            </div>
+                            <div class="stat-block">
+                                <label>Reactions</label>
+                                <div class="stat-number">{{ followee['number_reactions'] }}</div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                    {% endif %}
+                </div>
+
+
+            </div> -->
 
         </div>
 

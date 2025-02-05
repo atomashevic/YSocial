@@ -357,6 +357,7 @@ def get_user_friends(user_id, limit=12, page=1):
             .having(func.count(Follow.user_id) % 2 == 1)
         )
     )
+
     followee_list = []
     followers_list = []
 
