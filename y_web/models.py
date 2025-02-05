@@ -199,6 +199,7 @@ class Admin_users(UserMixin, db.Model):
     last_seen = db.Column(db.String(30), nullable=False)
     role = db.Column(db.String(10), nullable=False)
     llm = db.Column(db.String(50), default="")
+    profile_pic = db.Column(db.String(400), default="")
 
 
 class Exps(db.Model):

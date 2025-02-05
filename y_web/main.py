@@ -161,7 +161,7 @@ def profile_logged(user_id, page=1, mode="recent"):
             profile_pic = pg.logo
     else:
         ag = Agent.query.filter_by(name=user.username).first()
-        profile_pic = ag.profile_pic if ag is not None and ag.profile_pic is not None else ""
+        profile_pic = ag.profile_pic if ag is not None and ag.profile_pic is not None else Admin_users.query.filter_by(username=user.username).first().profile_pic
 
     return render_template(
         "profile.html",
@@ -202,7 +202,7 @@ def edit_profile(user_id):
             profile_pic = pg.logo
     else:
         ag = Agent.query.filter_by(name=user.username).first()
-        profile_pic = ag.profile_pic if ag is not None and ag.profile_pic is not None else ""
+        profile_pic = ag.profile_pic if ag is not None and ag.profile_pic is not None else Admin_users.query.filter_by(username=user.username).first().profile_pic
 
     return render_template(
         "edit_profile.html",
@@ -309,7 +309,6 @@ def feed(user_id="all", timeline="timeline", mode="rf", page=1):
     trending_ht = get_trending_hashtags()
     mentions = get_unanswered_mentions(current_user.id)
     sfollow = get_suggested_users(user_id, pages=False)
-
     spages = get_suggested_users(user_id, pages=True)
 
     # get user profile pic
@@ -326,7 +325,7 @@ def feed(user_id="all", timeline="timeline", mode="rf", page=1):
     else:
         try:
             ag = Agent.query.filter_by(name=user.username).first()
-            profile_pic = ag.profile_pic if ag is not None and ag.profile_pic is not None else ""
+            profile_pic = ag.profile_pic if ag is not None and ag.profile_pic is not None else Admin_users.query.filter_by(username=user.username).first().profile_pic
         except:
             profile_pic = ""
 
@@ -378,7 +377,7 @@ def get_post_hashtags(hashtag_id, page=1):
     else:
         try:
             ag = Agent.query.filter_by(name=user.username).first()
-            profile_pic = ag.profile_pic if ag is not None and ag.profile_pic is not None else ""
+            profile_pic = ag.profile_pic if ag is not None and ag.profile_pic is not None else Admin_users.query.filter_by(username=user.username).first().profile_pic
         except:
             profile_pic = ""
 
@@ -427,7 +426,7 @@ def get_post_interest(interest_id, page=1):
     else:
         try:
             ag = Agent.query.filter_by(name=user.username).first()
-            profile_pic = ag.profile_pic if ag is not None and ag.profile_pic is not None else ""
+            profile_pic = ag.profile_pic if ag is not None and ag.profile_pic is not None else Admin_users.query.filter_by(username=user.username).first().profile_pic
         except:
             profile_pic = ""
 
@@ -477,7 +476,7 @@ def get_post_emotion(emotion_id, page=1):
     else:
         try:
             ag = Agent.query.filter_by(name=user.username).first()
-            profile_pic = ag.profile_pic if ag is not None and ag.profile_pic is not None else ""
+            profile_pic = ag.profile_pic if ag is not None and ag.profile_pic is not None else Admin_users.query.filter_by(username=user.username).first().profile_pic
         except:
             profile_pic = ""
 
@@ -681,7 +680,7 @@ def get_thread(post_id):
     else:
         try:
             ag = Agent.query.filter_by(name=user.username).first()
-            profile_pic = ag.profile_pic if ag is not None and ag.profile_pic is not None else ""
+            profile_pic = ag.profile_pic if ag is not None and ag.profile_pic is not None else Admin_users.query.filter_by(username=user.username).first().profile_pic
         except:
             profile_pic = ""
 
@@ -757,7 +756,7 @@ def __get_discussions(posts, username, page):
                     profile_pic = pg.logo
             else:
                 ag = Agent.query.filter_by(name=user.username).first()
-                profile_pic = ag.profile_pic if ag is not None and ag.profile_pic is not None else ""
+                profile_pic = ag.profile_pic if ag is not None and ag.profile_pic is not None else Admin_users.query.filter_by(username=user.username).first().profile_pic
 
             cms.append(
                 {
@@ -814,21 +813,16 @@ def __get_discussions(posts, username, page):
 
         # get elicited emotions names
         emotions = get_elicited_emotions(post.id)
-
         aa = User_mgmt.query.filter_by(id=post.user_id).first()
+
         profile_pic = ""
         if aa.is_page == 1:
             pg = Page.query.filter_by(name=aa.username).first()
             if pg is not None:
                 profile_pic = pg.logo
         else:
-            try:
-                ag = Agent.query.filter_by(name=aa.username).first()
-                profile_pic = ag.profile_pic if ag.profile_pic is not None else ""
-            except:
-                profile_pic = ""
-
-        # get the post.shared_from
+            ag = Agent.query.filter_by(name=aa.username).first()
+            profile_pic =  ag.profile_pic if ag  is not None else Admin_users.query.filter_by(username=aa.username).first().profile_pic
 
         res.append(
             {

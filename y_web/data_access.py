@@ -120,7 +120,7 @@ def get_user_recent_posts(user_id, page, per_page=10, mode="rf", current_user=No
                     profile_pic = page.logo
             else:
                 ag = Agent.query.filter_by(name=user.username).first()
-                profile_pic = ag.profile_pic if ag is not None and ag.profile_pic is not None else ""
+                profile_pic = ag.profile_pic if ag is not None and ag.profile_pic is not None else Admin_users.query.filter_by(username=user.username).first().profile_pic
 
             cms.append(
                 {
@@ -188,7 +188,7 @@ def get_user_recent_posts(user_id, page, per_page=10, mode="rf", current_user=No
                 profile_pic = page.logo
         else:
             ag = Agent.query.filter_by(name=author.username).first()
-            profile_pic = ag.profile_pic if ag is not None and ag.profile_pic is not None else ""
+            profile_pic = ag.profile_pic if ag is not None and ag.profile_pic is not None else Admin_users.query.filter_by(username=author.username).first().profile_pic
 
         res.append(
             {
@@ -578,7 +578,7 @@ def get_posts_associated_to_hashtags(hashtag_id, page, per_page=10, current_user
                     profile_pic = page.logo
             else:
                 ag = Agent.query.filter_by(name=user.username).first()
-                profile_pic = ag.profile_pic if ag is not None and ag.profile_pic is not None else ""
+                profile_pic = ag.profile_pic if ag is not None and ag.profile_pic is not None else Admin_users.query.filter_by(username=user.username).first().profile_pic
 
 
             cms.append(
@@ -648,7 +648,7 @@ def get_posts_associated_to_hashtags(hashtag_id, page, per_page=10, current_user
         else:
             # get agent profile pic
             ag = Agent.query.filter_by(name=author.username).first()
-            profile_pic = ag.profile_pic if ag is not None and ag.profile_pic is not None else ""
+            profile_pic = ag.profile_pic if ag is not None and ag.profile_pic is not None else Admin_users.query.filter_by(username=author.username).first().profile_pic
 
         res.append(
             {
@@ -738,7 +738,7 @@ def get_posts_associated_to_interest(interest_id, page, per_page=10, current_use
                     profile_pic = page.logo
             else:
                 ag = Agent.query.filter_by(name=c.username).first()
-                profile_pic = ag.profile_pic if ag is not None and ag.profile_pic is not None else ""
+                profile_pic = ag.profile_pic if ag is not None and ag.profile_pic is not None else Admin_users.query.filter_by(username=c.username).first().profile_pic
 
             cms.append(
                 {
@@ -803,7 +803,7 @@ def get_posts_associated_to_interest(interest_id, page, per_page=10, current_use
                 profile_pic = page.logo
         else:
             ag = Agent.query.filter_by(name=author.username).first()
-            profile_pic = ag.profile_pic if ag is not None and ag.profile_pic is not None else ""
+            profile_pic = ag.profile_pic if ag is not None and ag.profile_pic is not None else Admin_users.query.filter_by(username=author.username).first().profile_pic
 
         res.append(
             {
@@ -896,7 +896,7 @@ def get_posts_associated_to_emotion(emotion_id, page, per_page=10, current_user=
                     profile_pic = page.logo
             else:
                 ag = Agent.query.filter_by(name=user.username).first()
-                profile_pic = ag.profile_pic if ag is not None and ag.profile_pic is not None else ""
+                profile_pic = ag.profile_pic if ag is not None and ag.profile_pic is not None else Admin_users.query.filter_by(username=user.username).first().profile_pic
 
             cms.append(
                 {
@@ -961,7 +961,7 @@ def get_posts_associated_to_emotion(emotion_id, page, per_page=10, current_user=
                 profile_pic = page.logo
         else:
             ag = Agent.query.filter_by(name=author.username).first()
-            profile_pic = ag.profile_pic if ag is not None and ag.profile_pic is not None else ""
+            profile_pic = ag.profile_pic if ag is not None and ag.profile_pic is not None else Admin_users.query.filter_by(username=author.username).first().profile_pic
 
         res.append(
             {

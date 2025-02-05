@@ -389,7 +389,6 @@ def experiment_details(uid):
 def start_experiment(uid):
     check_privileges(current_user.username)
 
-
     # get experiment
     exp = Exps.query.filter_by(idexp=uid).first()
 

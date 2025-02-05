@@ -148,8 +148,9 @@ def add_user():
     password = request.form.get("password")
     role = request.form.get("role")
     llm = request.form.get("llm")
+    profile_pic = request.form.get("profile_pic")
 
-    user = Admin_users(username=username, email=email, password=password, role=role, llm=llm)
+    user = Admin_users(username=username, email=email, password=password, role=role, llm=llm, profile_pic=profile_pic)
 
     db.session.add(user)
     db.session.commit()
