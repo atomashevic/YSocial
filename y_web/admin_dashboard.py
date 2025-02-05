@@ -1,17 +1,11 @@
-import os
-
 from flask import (
     Blueprint,
     render_template,
-    redirect,
-    url_for
 )
-from flask_login import login_user, login_required, current_user
+from flask_login import login_required, current_user
 
 from .models import (
     Exps,
-    Admin_users,
-    User_mgmt,
     Client,
     Client_Execution, Ollama_Pull
 )
@@ -73,3 +67,9 @@ def dashboard():
 
     return render_template("admin/dashboard.html", experiments=res, ollamas=ollamas, models=models, active_pulls=ollama_pulls, len=len)
 
+
+@admin.route("/admin/about")
+@login_required
+def about():
+    check_privileges(current_user.username)
+    return render_template("admin/about.html")
