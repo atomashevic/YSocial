@@ -16,15 +16,17 @@ from .models import (
     Post_topics,
     Reactions,
     Admin_users,
-    Images
+    Images,
+    Post_Sentiment
 )
 from flask import request
 from .llm_annotations import ContentAnnotator, Annotator
+from .utils.text_utils import vader_sentiment
 
 user = Blueprint("user_actions", __name__)
 
 
-@user.route("/follow/<int:user_id>/<int:follower_id>")
+@user.route("/follow/<int:user_id>/<int:follower_id>", methods=["GET", "POST"])
 @login_required
 def follow(user_id, follower_id):
     # get the last round id from Rounds
@@ -32,7 +34,7 @@ def follow(user_id, follower_id):
 
     # check
     followed = (
-        Follow.query.filter_by(user_id=user_id, follower_id=follower_id)
+        Follow.query.filter_by(user_id=user_id, follower_id=int(follower_id))
         .order_by(Follow.id.desc())
         .first()
     )
@@ -40,19 +42,19 @@ def follow(user_id, follower_id):
     if followed:
         if followed.action == "follow":
             new_follow = Follow(
-                follower_id=user_id,
-                user_id=current_user.id,
+                follower_id=follower_id,
+                user_id=user_id,
                 action="unfollow",
                 round=current_round.id,
             )
             db.session.add(new_follow)
             db.session.commit()
-            return {"message": "User unfollowed successfully", "status": 200}
+            return redirect(request.referrer)
 
     # add the user to the Follow table
     new_follow = Follow(
-        follower_id=user_id,
-        user_id=current_user.id,
+        follower_id=follower_id,
+        user_id=user_id,
         action="follow",
         round=current_round.id,
     )
@@ -60,7 +62,6 @@ def follow(user_id, follower_id):
     db.session.commit()
 
     return redirect(request.referrer)
-#    return {"message": "User followed successfully", "status": 200}
 
 
 @user.route("/share_content")
@@ -171,6 +172,19 @@ def publish_post():
     post.thread_id = post.id
     db.session.commit()
 
+    sentiment = vader_sentiment(text)
+    post_sentiment = Post_Sentiment(
+        post_id=post.id,
+        user_id=current_user.id,
+        pos=sentiment["pos"],
+        neg=sentiment["neg"],
+        neu=sentiment["neu"],
+        compound=sentiment["compound"],
+        round=current_round.id
+    )
+    db.session.add(post_sentiment)
+    db.session.commit()
+
     user = Admin_users.query.filter_by(username=current_user.username).first()
     llm = user.llm if user.llm != "" else "llama3.2:latest"
 
@@ -268,6 +282,26 @@ def publish_comment():
     db.session.add(post)
     db.session.commit()
 
+    # get sentiment of the post is responding to
+    sentiment_root = Post_Sentiment.query.filter_by(post_id=pid).first()
+    values = {"pos": sentiment_root.pos, "neg": sentiment_root.neg, "neu": sentiment_root.neu}
+    # get the key with the max value
+    sentiment_parent = max(values, key=values.get)
+
+    sentiment = vader_sentiment(text)
+    post_sentiment = Post_Sentiment(
+        post_id=post.id,
+        user_id=current_user.id,
+        pos=sentiment["pos"],
+        neg=sentiment["neg"],
+        neu=sentiment["neu"],
+        compound=sentiment["compound"],
+        sentiment_parent=sentiment_parent,
+        round=current_round.id
+    )
+    db.session.add(post_sentiment)
+    db.session.commit()
+
     # check if the comment is to answer a mention
     mention = Mentions.query.filter_by(post_id=pid, user_id=current_user.id).first()
     if mention:
@@ -277,7 +311,6 @@ def publish_comment():
     user = Admin_users.query.filter_by(username=current_user.username).first()
     llm = user.llm if user.llm != "" else "llama3.1"
 
-    # @todo: add image support, link support and topic annotation
     annotator = ContentAnnotator(llm=llm)
     emotions = annotator.annotate_emotions(text)
     hashtags = annotator.extract_components(text, c_type="hashtags")
@@ -328,6 +361,7 @@ def publish_comment():
         us = User_mgmt.query.filter_by(username=mention.strip("@")).first()
 
         # existing user and not self
+        #@todo: check gosth mentions to the current user...
         if us is not None and us.id != current_user.id:
             mn = Mentions(user_id=us.id, post_id=post.id, round=current_round.id)
             db.session.add(mn)

@@ -369,12 +369,22 @@ def run_simulation(cl, cli_id, agent_file):
             for g in sagents:
                 daily_active[g.name] = None
 
+                # max 1 post per round
+                posted = False
+
                 for _ in range(int(g.round_actions)):
                     # sample two elements from a list with replacement
+
+                    if posted and g.is_page == 0:
+                        # if already posted in this round (and is not a page): only reply, read or other actions
+                        available_acts = [a for a in acts if a != "POST"]
+                    else:
+                        available_acts = acts
+
                     candidates = random.choices(
-                        acts,
+                        available_acts,
                         k=2,
-                        weights=[cl.actions_likelihood[a] for a in acts],
+                        weights=[cl.actions_likelihood[a] for a in available_acts],
                     )
                     candidates.append("NONE")
 

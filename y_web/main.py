@@ -235,7 +235,9 @@ def update_profile_data(user_id):
     user.recsys_type = request.form.get("recsys_type")
     user.frecsys_type = request.form.get("frecsys_type")
     user.age = int(request.form.get("age"))
-    # profile_pic = request.form.get("profile_pic")
+    profile_pic = request.form.get("profile_pic")
+
+    Admin_users.query.filter_by(username=user.username).first().profile_pic = profile_pic
 
     db.session.commit()
 
@@ -317,23 +319,31 @@ def feed(user_id="all", timeline="timeline", mode="rf", page=1):
     else:
         user = User_mgmt.query.filter_by(id=current_user.id).first()
 
-    profile_pic = ""
+    try:
+        ag = Agent.query.filter_by(name=current_user.username).first()
+        profile_pic = ag.profile_pic if ag is not None and ag.profile_pic is not None else Admin_users.query.filter_by(username=current_user.username).first().profile_pic
+    except:
+        profile_pic = ""
+
+    profile_pic_feed = ""
     if user.is_page == 1:
         pg = Page.query.filter_by(name=user.username).first()
         if pg is not None:
-            profile_pic = pg.logo
+            profile_pic_feed = pg.logo
     else:
         try:
             ag = Agent.query.filter_by(name=user.username).first()
-            profile_pic = ag.profile_pic if ag is not None and ag.profile_pic is not None else Admin_users.query.filter_by(username=user.username).first().profile_pic
+            profile_pic_feed = ag.profile_pic if ag is not None and ag.profile_pic is not None else Admin_users.query.filter_by(
+                username=user.username).first().profile_pic
         except:
-            profile_pic = ""
+            profile_pic_feed = ""
 
     return render_template(
         "feed.html",
         items=res,
         page=page,
         profile_pic=profile_pic,
+        profile_pic_feed=profile_pic_feed,
         user_id=user_id,
         timeline=timeline,
         username=username,
@@ -508,6 +518,8 @@ def get_friends(user_id, page=1):
     )
     mentions = get_unanswered_mentions(current_user.id)
 
+    cu = User_mgmt.query.filter_by(id=current_user.id).first()
+
     profile_pic_follower = {}
 
     for f in followers:
@@ -541,18 +553,22 @@ def get_friends(user_id, page=1):
             except:
                 profile_pic_followee[f['id']] = ""
 
+    us = Admin_users.query.filter_by(username=cu.username).first()
+    profile_pic = us.profile_pic if us is not None and us.profile_pic is not None else ""
+
     return render_template(
         "friends.html",
         followers=followers,
+        profile_pic=profile_pic,
         profile_pic_follower=profile_pic_follower,
         followees=followees,
         profile_pic_followee=profile_pic_followee,
         page=page,
-        username=current_user.username,
+        username=cu.username,
         enumerate=enumerate,
         len=len,
-        logged_username=current_user.username,
-        logged_id=int(current_user.id),
+        logged_username=cu.username,
+        logged_id=int(cu.id),
         user_id=user_id,
         number_followers=number_followers,
         number_followees=number_followees,
@@ -584,13 +600,28 @@ def get_thread(post_id):
 
     image = Images.query.filter_by(id=posts[0].image_id).first()
 
+    user = User_mgmt.query.filter_by(id=posts[0].user_id).first()
+    profile_pic = ""
+    if user.is_page == 1:
+        pg = Page.query.filter_by(name=user.username).first()
+        if pg is not None:
+            profile_pic = pg.logo
+    else:
+        try:
+            ag = Agent.query.filter_by(name=user.username).first()
+            profile_pic = ag.profile_pic if ag is not None and ag.profile_pic is not None else Admin_users.query.filter_by(
+                username=user.username).first().profile_pic
+        except:
+            profile_pic = ""
+
     discussion_tree = {
         "post": augment_text(posts[0].tweet),
+        "profile_pic": profile_pic,
         "image": image,
         "shared_from": -1 if posts[0].shared_from == -1 else (posts[0].shared_from, db.session.query(User_mgmt).join(Post, User_mgmt.id == Post.user_id).filter(Post.id == posts[0].shared_from).first().username),
 
         "post_id": posts[0].id,
-        "author": User_mgmt.query.filter_by(id=posts[0].user_id).first().username,
+        "author": user.username,
         "author_id": posts[0].user_id,
         "day": day,
         "hour": hour,
@@ -612,12 +643,13 @@ def get_thread(post_id):
         is None,
         "is_shared": len(Post.query.filter_by(shared_from=posts[0].id).all()),
         "emotions": get_elicited_emotions(posts[0].id),
-        "topics": get_topics(posts[0].id)
+        "topics": get_topics(posts[0].id, posts[0].user_id)
     }
 
     reverse_map = {posts[0].id: None}
     post_to_child = {posts[0].id: []}
     post_to_data = {posts[0].id: discussion_tree}
+    parent_id = posts[0].id
 
     for post in posts[1:]:
         c = Rounds.query.filter_by(id=post.round).first()
@@ -628,12 +660,26 @@ def get_thread(post_id):
             day = c.day
             hour = c.hour
 
+        user = User_mgmt.query.filter_by(id=post.user_id).first()
+        profile_pic = ""
+        if user.is_page == 1:
+            pg = Page.query.filter_by(name=user.username).first()
+            if pg is not None:
+                profile_pic = pg.logo
+        else:
+            try:
+                ag = Agent.query.filter_by(name=user.username).first()
+                profile_pic = ag.profile_pic if ag is not None and ag.profile_pic is not None else Admin_users.query.filter_by(
+                    username=user.username).first().profile_pic
+            except:
+                profile_pic = ""
+
         data = {
             "post": augment_text(post.tweet),
             "post_id": post.id,
-            "author": User_mgmt.query.filter_by(id=post.user_id).first().username,
+            "author": user.username,
             "author_id": post.user_id,
-            post.id: None,
+            "profile_pic": profile_pic,
             "day": day,
             "hour": hour,
             "children": [],
@@ -653,7 +699,7 @@ def get_thread(post_id):
             is None,
             "is_shared": len(Post.query.filter_by(shared_from=post.id).all()),
             "emotions": get_elicited_emotions(post.id),
-            "topics": get_topics(post.id)
+            "topics": get_topics(post.id, post.user_id)
         }
 
         parent = post.comment_to
@@ -758,6 +804,10 @@ def __get_discussions(posts, username, page):
                 ag = Agent.query.filter_by(name=user.username).first()
                 profile_pic = ag.profile_pic if ag is not None and ag.profile_pic is not None else Admin_users.query.filter_by(username=user.username).first().profile_pic
 
+            topics = get_topics(c.id, c.user_id)
+            if len(topics) == 0:
+                topics = []
+
             cms.append(
                 {
                     "post_id": c.id,
@@ -785,6 +835,7 @@ def __get_discussions(posts, username, page):
                     is None,
                     "is_shared": len(Post.query.filter_by(shared_from=c.id).all()),
                     "emotions": emotions,
+                    "topics": topics
                 }
             )
 
@@ -822,7 +873,11 @@ def __get_discussions(posts, username, page):
                 profile_pic = pg.logo
         else:
             ag = Agent.query.filter_by(name=aa.username).first()
-            profile_pic =  ag.profile_pic if ag  is not None else Admin_users.query.filter_by(username=aa.username).first().profile_pic
+            profile_pic = ag.profile_pic if ag  is not None else Admin_users.query.filter_by(username=aa.username).first().profile_pic
+
+        topics = get_topics(post.id, post.user_id)
+        if len(topics) == 0:
+            topics = []
 
         res.append(
             {
@@ -856,7 +911,7 @@ def __get_discussions(posts, username, page):
                 "comments": cms,
                 "t_comments": len(cms),
                 "emotions": emotions,
-                "topics": get_topics(post.id)
+                "topics": topics
             }
         )
 

@@ -92,7 +92,6 @@
             </a>
         </div>
         <div class="navbar-menu">
-
             <div class="navbar-end">
 
                 <div class="navbar-item is-account drop-trigger has-caret"
@@ -114,7 +113,11 @@
             <div class="icon-wrap">
               <img
                       src="https://via.placeholder.com/300x300"
-                      data-demo-src="{{ url_for('static', filename='assets/img/users/'+ str(mention[2]) +'.png') }}"
+                       {% if profile_pic =="" %}
+                                        data-demo-src="{{ url_for('static', filename='assets/img/users/'+ str(mention[2]) +'.png') }}"
+                                    {% else %}
+                                        data-demo-src="{{ profile_pic }}"
+                                    {% endif %}
                       data-user-popover="1"
                       alt=""
               />
@@ -145,7 +148,11 @@
                     <div class="user-image">
                         <img
                                 src="https://via.placeholder.com/400x400"
-                                data-demo-src="{{ url_for('static', filename='assets/img/users/'+ str(logged_id)+'.png') }}"
+                                {% if profile_pic =="" %}
+                                        data-demo-src="{{ url_for('static', filename='assets/img/users/'+ str(logged_id) +'.png') }}"
+                                    {% else %}
+                                        data-demo-src="{{ profile_pic }}"
+                                    {% endif %}
                                 alt=""
                         />
                         <span class="indicator"></span>
@@ -174,7 +181,11 @@
                                             <div class="image">
                                                 <img
                                                         src="https://via.placeholder.com/400x400"
-                                                        data-demo-src="{{ url_for('static', filename='assets/img/users/'+ str(logged_id) + '.png') }}"
+                                                         {% if profile_pic =="" %}
+                                                        data-demo-src="{{ url_for('static', filename='assets/img/users/'+ str(logged_id) +'.png') }}"
+                                                    {% else %}
+                                                        data-demo-src="{{ profile_pic }}"
+                                                    {% endif %}
                                                         alt=""
                                                 />
                                             </div>
@@ -278,7 +289,11 @@
             <a href="{{ url_for('main.profile') }}" class="navbar-link">
                 <img
                         src="https://via.placeholder.com/150x150"
-                        data-demo-src="{{ url_for('static', filename='assets/img/users/'+ str(logged_id)+'.png') }}"
+                         {% if profile_pic =="" %}
+                                        data-demo-src="{{ url_for('static', filename='assets/img/users/'+ str(logged_id) +'.png') }}"
+                                    {% else %}
+                                        data-demo-src="{{ profile_pic }}"
+                                    {% endif %}
                         alt=""
                 />
                 <span class="is-heading">{{ logged_username }}</span>

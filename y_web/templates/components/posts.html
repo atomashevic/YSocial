@@ -109,11 +109,11 @@
         <!-- /Post body -->
 
         <!-- Post footer -->
-        <div class="card-footer">
+        <div class="card-footer" style="display: flex;">
             <!-- Followers avatars -->
 
             <!-- Followers text -->
-            <div class="likers-text">
+            <div class="likers-text" style="display: inline">
                 {% if len(item['emotions']) > 0 %}
                 <p>Emotions</p>
                 {% for em in item['emotions'] %}
@@ -121,11 +121,17 @@
                 {% endfor %}
                 {% endif %}
             </div>
-            <div class="likers-text">
+            <div class="likers-text" style="display: inline">
                 {% if len(item['topics']) > 0 %}
                 <p>Topics</p>
                 {% for tp in item['topics'] %}
-                <a  href="/interest/{{ tp[0] }}/1" style="font-size: .8rem; border: #00b2ff 1px solid; padding: 2px; border-radius: 10%"> {{ tp[1] }}</a>
+                    {% if tp[2] == 'positive' %}
+                        <a  href="/interest/{{ tp[0] }}/1" style="color: #0bc350; font-size: .8rem; border: #0bc350 1px solid; padding: 2px; border-radius: 10%"> {{ tp[1] }}</a>
+                    {% elif tp[2] == 'negative' %}
+                        <a  href="/interest/{{ tp[0] }}/1" style="color: #e60000; font-size: .8rem; border: #e60000 1px solid; padding: 2px; border-radius: 10%"> {{ tp[1] }}</a>
+                    {% else %}
+                        <a  href="/interest/{{ tp[0] }}/1" style="color: #00b2ff; font-size: .8rem; border: #00b2ff 1px solid; padding: 2px; border-radius: 10%"> {{ tp[1] }}</a>
+                    {% endif %}
                 {% endfor %}
                 {% endif %}
             </div>
@@ -197,13 +203,29 @@
                     <div class="post-text">
                         <p> {{ item["post"]|safe }}</p>
                     </div>
-                    <div class="likers-text">
-                        {% if len(item['emotions']) > 0 %}
-                        <p>Emotions</p>
-                        {% for em in item['emotions'] %}
-                        <a class="mdi {{ em[1] }}" title="{{ em[0] }}" href="/emotion/{{ em[2] }}/1"></a>
-                        {% endfor %}
-                        {% endif %}
+                    <div class="card-footer" style="display: flex;">
+                        <div class="likers-text" style="display: inline">
+                            {% if len(item['emotions']) > 0 %}
+                            <p>Emotions</p>
+                            {% for em in item['emotions'] %}
+                            <a class="mdi {{ em[1] }}" title="{{ em[0] }}" href="/emotion/{{ em[2] }}/1"></a>
+                            {% endfor %}
+                            {% endif %}
+                        </div>
+                        <div class="likers-text" style="display: inline">
+                            {% if len(item['topics']) > 0 %}
+                            <p>Topics</p>
+                            {% for tp in item['topics'] %}
+                                {% if tp[2] == 'positive' %}
+                                    <a  href="/interest/{{ tp[0] }}/1" style="color: #0bc350; font-size: .8rem; border: #0bc350 1px solid; padding: 2px; border-radius: 10%"> {{ tp[1] }}</a>
+                                {% elif tp[2] == 'negative' %}
+                                    <a  href="/interest/{{ tp[0] }}/1" style="color: #e60000; font-size: .8rem; border: #e60000 1px solid; padding: 2px; border-radius: 10%"> {{ tp[1] }}</a>
+                                {% else %}
+                                    <a  href="/interest/{{ tp[0] }}/1" style="color: #00b2ff; font-size: .8rem; border: #00b2ff 1px solid; padding: 2px; border-radius: 10%"> {{ tp[1] }}</a>
+                                {% endif %}
+                            {% endfor %}
+                            {% endif %}
+                        </div>
                     </div>
 
                     <div class="reply" style="text-align: right">
@@ -250,12 +272,26 @@
                         {{ cm["post"]|safe }}
                     </p>
                     <!-- Actions -->
-                    <div class="card-footer_inner">
-                        <div class="likers-text">
+                    <div class="card-footer" style="display: flex;">
+                        <div class="likers-text" style="display: inline">
                             {% if len(cm['emotions']) > 0 %}
                             <p>Emotions</p>
                             {% for em in cm['emotions'] %}
                             <a class="mdi {{ em[1] }}" title="{{ em[0] }}" href="/emotion/{{ em[2] }}/1"></a>
+                            {% endfor %}
+                            {% endif %}
+                        </div>
+                        <div class="likers-text" style="display: inline">
+                            {% if len(cm['topics']) > 0 %}
+                            <p>Topics</p>
+                            {% for tp in cm['topics'] %}
+                                {% if tp[2] == 'positive' %}
+                                    <a  href="/interest/{{ tp[0] }}/1" style="color: #0bc350; font-size: .8rem; border: #0bc350 1px solid; padding: 2px; border-radius: 10%"> {{ tp[1] }}</a>
+                                {% elif tp[2] == 'negative' %}
+                                    <a  href="/interest/{{ tp[0] }}/1" style="color: #e60000; font-size: .8rem; border: #e60000 1px solid; padding: 2px; border-radius: 10%"> {{ tp[1] }}</a>
+                                {% else %}
+                                    <a  href="/interest/{{ tp[0] }}/1" style="color: #00b2ff; font-size: .8rem; border: #00b2ff 1px solid; padding: 2px; border-radius: 10%"> {{ tp[1] }}</a>
+                                {% endif %}
                             {% endfor %}
                             {% endif %}
                         </div>

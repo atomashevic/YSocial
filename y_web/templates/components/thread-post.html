@@ -8,7 +8,11 @@
                     <div class="image">
                         <img
                                 src="https://via.placeholder.com/300x300"
+                                {% if thread['profile_pic'] == "" %}
                                 data-demo-src="{{ url_for('static', filename='assets/img/users/'+ str(thread['author_id']) +'.png') }}"
+                            {% else %}
+                                data-demo-src="{{ thread['profile_pic'] }}"
+                            {% endif %}
                                 data-user-popover="1"
                                 alt=""
                         />
@@ -22,21 +26,27 @@
                         {{ thread["post"]|safe }}
                     </p>
 
-                    <div class="card-footer">
-                        <sèam class="likers-text" style="display: inline">
+                    <div class="card-footer" style="display: flex;">
+                        <div class="likers-text" style="display: inline">
                             {% if len(thread['emotions']) > 0 %}
                             <p style="font-size: .8rem">Emotions</p>
                             {% for em in thread['emotions'] %}
                             <a class="mdi {{ em[1] }}" title="{{ em[0] }}" href="/emotion/{{ em[2] }}/1"></a>
                             {% endfor %}
                             {% endif %}
-                        </sèam>
+                        </div>
                          <div class="likers-text" style="display: inline">
                             {% if len(thread['topics']) > 0 %}
                             <p style="font-size: .8rem">Topics</p>
                             {% for tp in thread['topics'] %}
-                            <a  href="/interest/{{ tp[0] }}/1" style="font-size: .8rem; border: #00b2ff 1px solid; padding: 2px; border-radius: 10%"> {{ tp[1] }}</a>
-                            {% endfor %}
+                                {% if tp[2] == 'positive' %}
+                                    <a  href="/interest/{{ tp[0] }}/1" style="color: #0bc350; font-size: .8rem; border: #0bc350 1px solid; padding: 2px; border-radius: 10%"> {{ tp[1] }}</a>
+                                {% elif tp[2] == 'negative' %}
+                                    <a  href="/interest/{{ tp[0] }}/1" style="color: #e60000; font-size: .8rem; border: #e60000 1px solid; padding: 2px; border-radius: 10%"> {{ tp[1] }}</a>
+                                {% else %}
+                                    <a  href="/interest/{{ tp[0] }}/1" style="color: #00b2ff; font-size: .8rem; border: #00b2ff 1px solid; padding: 2px; border-radius: 10%"> {{ tp[1] }}</a>
+                                {% endif %}
+                             {% endfor %}
                             {% endif %}
                         </div>
                     </div>

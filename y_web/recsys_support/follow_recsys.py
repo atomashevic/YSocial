@@ -3,7 +3,7 @@ from y_web.models import (
     User_mgmt,
     Page,
     Agent,
-    Follow,
+    Follow, Admin_users,
 )
 from y_web import db
 import numpy as np
@@ -27,9 +27,9 @@ def get_suggested_users(user_id, pages=False):
         users = __follow_suggestions("", user.id, 5, 1.5)
 
     if not pages:
-        res = [{"username": user.username, "id": user.id, "profile_pic": ""} for user in users if user.is_page != 1]
+        res = [{"username": user.username, "id": user.id, "profile_pic": ""} for user in users if user.is_page != 1 and int(user_id) != user.id]
     else:
-        res = [{"username": user.username, "id": user.id, "profile_pic": ""} for user in users if user.is_page == 1]
+        res = [{"username": user.username, "id": user.id, "profile_pic": ""} for user in users if user.is_page == 1 and int(user_id) != user.id]
         if len(res) == 0:
             # get random Users with is_page = 1 that user_id is not following
             pages = User_mgmt.query.filter_by(is_page=1).order_by(func.random()).limit(5)
@@ -47,7 +47,7 @@ def get_suggested_users(user_id, pages=False):
         else:
             try:
                 ag = Agent.query.filter_by(name=user["username"]).first()
-                user["profile_pic"] = ag.profile_pic if ag is not None and ag.profile_pic is not None else ""
+                user["profile_pic"] = ag.profile_pic if ag is not None and ag.profile_pic is not None else Admin_users.query.filter_by(username=user["username"]).first().profile_pic
             except:
                 user["profile_pic"] = ""
 

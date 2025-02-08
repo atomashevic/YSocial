@@ -284,10 +284,10 @@
                                         <img
                                                 id="user-avatar"
                                                 class="avatar-image"
-                                                {% if profile_pic =="" %}
+                                                {% if profile_pic_feed =="" %}
                                                     data-demo-src="{{ url_for('static', filename='assets/img/users/'+ str(user_id) +'.png') }}"
                                                 {% else %}
-                                                    data-demo-src="{{ profile_pic }}"
+                                                    data-demo-src="{{ profile_pic_feed }}"
                                                 {% endif %}
                                                 alt=""
                                                 width="50%"
@@ -436,7 +436,11 @@
                                     <div class="compose-form">
                                         <img
                                                 src="https://via.placeholder.com/300x300"
-                                                data-demo-src="{{ url_for('static', filename='assets/img/users/'+ str(logged_id) +'.png') }}"
+                                                {% if profile_pic =="" %}
+                                        data-demo-src="{{ url_for('static', filename='assets/img/users/'+ str(logged_id) +'.png') }}"
+                                    {% else %}
+                                        data-demo-src="{{ profile_pic }}"
+                                    {% endif %}
                                                 alt=""
                                         />
                                         <div class="control">

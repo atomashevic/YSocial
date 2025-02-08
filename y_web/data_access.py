@@ -14,7 +14,8 @@ from .models import (
     Post_topics,
     Images,
     Page,
-    Agent, Admin_users
+    Agent, Admin_users,
+    Post_Sentiment
 )
 from sqlalchemy.sql.expression import func
 from sqlalchemy import desc
@@ -149,6 +150,7 @@ def get_user_recent_posts(user_id, page, per_page=10, mode="rf", current_user=No
                     is None,
                     "is_shared": len(Post.query.filter_by(shared_from=c.id).all()),
                     "emotions": emotions,
+                    "topics": get_topics(post.thread_id, int(post.user_id))
                 }
             )
 
@@ -224,7 +226,7 @@ def get_user_recent_posts(user_id, page, per_page=10, mode="rf", current_user=No
                 "comments": cms,
                 "t_comments": len(cms),
                 "emotions": emotions,
-                "topics": get_topics(post.id)
+                "topics": get_topics(post.id, int(post.user_id))
             }
         )
 
@@ -424,9 +426,10 @@ def get_user_friends(user_id, limit=12, page=1):
     return followers_list, followee_list, number_followers, number_followees
 
 
-def get_trending_emotions(limit=10, window=24):
+def get_trending_emotions(limit=10, window=120):
     """
     Get the trending emotions.
+    :param window:
     :param limit:
     :return:
     """
@@ -457,7 +460,7 @@ def get_trending_emotions(limit=10, window=24):
     return em
 
 
-def get_trending_hashtags(limit=10, window=24):
+def get_trending_hashtags(limit=10, window=120):
     """
     Get the trending hashtags.
     :param limit:
@@ -495,7 +498,7 @@ def get_trending_hashtags(limit=10, window=24):
     return ht
 
 
-def get_trending_topics(limit=10, window=24):
+def get_trending_topics(limit=10, window=120):
     # get current round
     last_round = Rounds.query.order_by(desc(Rounds.id)).first()
     if last_round is not None:
@@ -684,7 +687,7 @@ def get_posts_associated_to_hashtags(hashtag_id, page, per_page=10, current_user
                 "comments": cms,
                 "t_comments": len(cms),
                 "emotions": emotions,
-                "topics": get_topics(post.id)
+                "topics": get_topics(post.id, int(post.user_id))
             }
         )
 
@@ -731,14 +734,16 @@ def get_posts_associated_to_interest(interest_id, page, per_page=10, current_use
             # get elicited emotions names
             emotions = get_elicited_emotions(c.id)
 
+            c_user = User_mgmt.query.filter_by(id=c.user_id).first()
+
             # is the agent a page?
-            if c.is_page == 1:
-                page = Page.query.filter_by(name=c.username).first()
+            if c_user.is_page == 1:
+                page = Page.query.filter_by(name=c_user.username).first()
                 if page is not None:
                     profile_pic = page.logo
             else:
-                ag = Agent.query.filter_by(name=c.username).first()
-                profile_pic = ag.profile_pic if ag is not None and ag.profile_pic is not None else Admin_users.query.filter_by(username=c.username).first().profile_pic
+                ag = Agent.query.filter_by(name=c_user.username).first()
+                profile_pic = ag.profile_pic if ag is not None and ag.profile_pic is not None else Admin_users.query.filter_by(username=c_user.username).first().profile_pic
 
             cms.append(
                 {
@@ -839,7 +844,7 @@ def get_posts_associated_to_interest(interest_id, page, per_page=10, current_use
                 "comments": cms,
                 "t_comments": len(cms),
                 "emotions": emotions,
-                "topics": get_topics(post.id)
+                "topics": get_topics(post.id, int(post.user_id))
             }
         )
 
@@ -997,7 +1002,7 @@ def get_posts_associated_to_emotion(emotion_id, page, per_page=10, current_user=
                 "comments": cms,
                 "t_comments": len(cms),
                 "emotions": emotions,
-                "topics": get_topics(post.id)
+                "topics": get_topics(post.id, int(post.user_id))
             }
         )
 
@@ -1050,20 +1055,41 @@ def get_elicited_emotions(post_id):
     return emotions
 
 
-def get_topics(post_id):
+def get_topics(post_id, user_id):
 
     # get the topics of the post
-    topics = (
-        Post.query.filter_by(id=post_id)
-        .join(Post_topics, Post.id == Post_topics.post_id)
-        .join(Interests, Post_topics.topic_id == Interests.iid)
-        .add_columns(Interests.interest)
-        .add_columns(Interests.iid)
-        .all()
-    )
+    #topics = (
+    #    Post.query.filter_by(id=post_id)
+    #    .join(Post_topics, Post.id == Post_topics.post_id)
+    #    .join(Post_Sentiment, Post.id == Post_Sentiment.post_id)
+    #    .join(Interests, Post_topics.topic_id == Interests.iid)
+    #    .add_columns(Interests.interest)
+    #    .add_columns(Interests.iid)
+    #    .add_columns(Post_Sentiment.compound)
+    #    .add_columns(Post_Sentiment.is_reaction)
+    #    .add_columns(Post_Sentiment.user_id)
+    #    .all()
+    #)
+    post = Post.query.filter_by(id=post_id).first()
+    if post.image_id is not None:
+        return []
 
-    topics = set([(iid, interest) for _, interest, iid in topics])
-    return topics
+    sentiment = Post_Sentiment.query.filter_by(post_id=post_id, user_id=user_id).all()
+
+    cleaned = {}
+    for topic in sentiment:
+        if topic.topic_id != -1:
+            name = Interests.query.filter_by(iid=topic.topic_id).first().interest
+            if topic.topic_id not in cleaned and topic.is_reaction == 0:
+                # threshold the sentiment
+                if topic.compound > 0.05:
+                    cleaned[topic.topic_id] = (topic.topic_id, name, "positive", topic.round)
+                elif topic.compound < -0.05:
+                    cleaned[topic.topic_id] = (topic.topic_id, name, "negative", topic.round)
+                else:
+                    cleaned[topic.topic_id] = (topic.topic_id, name, "neutral", topic.round)
+
+    return list(cleaned.values())
 
 
 def get_unanswered_mentions(user_id):
