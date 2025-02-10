@@ -10,6 +10,9 @@ def start_app(debug=False, host="localhost", port=8080):
     :param host: the host to run the app on
     """
 
+    import nltk
+    nltk.download('vader_lexicon')
+
     # unload all experiments
     from y_web.models import Exps
     # select all loaded experiments
