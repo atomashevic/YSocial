@@ -294,9 +294,22 @@ def get_mutual_friends(user_a, user_b, limit=10):
                 mutual_friends.append(f_a.follower_id)
 
     res = []
+    added = {}
     for uid in mutual_friends[:limit]:
         user = User_mgmt.query.filter_by(id=uid).first()
-        res.append({"id": user.id, "username": user.username})
+        profile_pic = ""
+        if user.is_page == 1:
+            page = Page.query.filter_by(name=user.username).first()
+            if page is not None:
+                profile_pic = page.logo
+
+        else:
+            ag = Agent.query.filter_by(name=user.username).first()
+            profile_pic = ag.profile_pic if ag is not None and ag.profile_pic is not None else Admin_users.query.filter_by(username=user.username).first().profile_pic
+
+        if user.id not in added:
+            res.append({"id": user.id, "username": user.username, "profile_pic": profile_pic})
+            added[user.id] = None
 
     return res
 

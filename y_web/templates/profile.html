@@ -81,7 +81,7 @@
                                             </div>
                                         </div>
                                     </a>
-                                    <a href="/profile-friends.html" class="dropdown-item">
+                                    <!--<a href="/profile-friends.html" class="dropdown-item">
                                         <div class="media">
                                             <i data-feather="heart"></i>
                                             <div class="media-content">
@@ -89,7 +89,7 @@
                                                 <small>See friends.</small>
                                             </div>
                                         </div>
-                                    </a>
+                                    </a>-->
                                     <a href="/profile-photos.html" class="dropdown-item">
                                         <div class="media">
                                             <i data-feather="image"></i>
@@ -241,8 +241,12 @@
                             {% for suser in mutual %}
                             <div class="friend-item">
                                 <img
-                                        data-demo-src="{{ url_for('static', filename='assets/img/users/'+ str(suser['author_id']) +'.png') }}"
-                                        alt=""
+                                        {% if profile_pic =="" %}
+                                            data-demo-src="{{ url_for('static', filename='assets/img/users/'+ str(user_id) +'.png') }}"
+                                        {% else %}
+                                            data-demo-src="{{ profile_pic }}"
+                                        {% endif %}
+                                         alt=""
                                         data-user-popover="1"
                                 />
                                 <div class="text-content">
