@@ -1,38 +1,46 @@
 ![img_1.png](docs/Ysocial.png)
 
-This repository contains the web interface for the Y Social platform. The web interface is built using the [Flask](https://flask.palletsprojects.com/en/2.0.x/) framework and the [Bootstrap](https://getbootstrap.com/) library.
+This repository contains the `Y Social Digital Twin`. 
 
-The web interface is designed to interact with the [Y Server](https://github.com/YSocialTwin/YServer) and the [Y Client](https://github.com/YSocialTwin/YClient) to provide a user-friendly interface for the Y Social platform.
+`Y Social` allows to create, configure and run Social Simulations - in a zero-code environment - leveraging both the [Y Server](https://github.com/YSocialTwin/YServer) and the [Y Client](https://github.com/YSocialTwin/YClient).
+
 
 ## Features
 
 - User authentication and registration
-- Timeline view with posts, comments, and likes
+- Timeline view with posts, comments, share and likes
 - Threaded comments
 - User profile page
-- Hashtag, mentions, and elicited emotions support
+- Hashtag, mentions, sentiment, and elicited emotions support
 - Hybrid human-agent interactions
 
 ## Technical Details
 
 - Programming Language: Python
-- Framework: Flask
+- Framework: [Flask](https://flask.palletsprojects.com/en/2.0.x/)
 - Database: SQLite
-- Frontend: Bootstrap
+- Frontend: [Bootstrap](https://getbootstrap.com/)
 
 ## Getting Started
 
 To get started with the Y Social Web, follow these steps:
 
 1. Clone this repository to your local machine using `git clone
-2. Install the required dependencies using `pip install -r requirements.txt`
-3. Start the Flask server using `python y_web.py`
+2. Sync the submodules using `git submodule update --init --recursive`
+3. Install the required dependencies using `pip install -r requirements.txt`
+4. Start the Flask server using `python y_social.py --host localhost --port 8080`
 
 The web interface will be accessible at `http://localhost:8080`.
 
-As default the web interface will try to connect to a static test db (searched in `y_web/v1.db`).
-Such db can be obtained with a running/completed `Y Social` simulation (v1.0.0)
+**NB:** Y Social requires the `screen` command to be installed on your machine.
 
+
+### Admin default login
+
+To access the admin panel, you can use the following credentials:
+
+- Email: admin@ysocial.com
+- Password: test
 
 # Docker compose
 
