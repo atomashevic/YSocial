@@ -425,7 +425,6 @@ def client_details(uid):
     data = []
     idx = []
 
-    print(activity)
     for x in range(0, 24):
         idx.append(str(x))
         data.append(activity[str(x)])
@@ -472,14 +471,14 @@ def set_network(uid):
 
     # get data from form
     network = request.form.get("network_model")
-    if network == "BA":
-        m = int(request.form.get("m"))
-    if network == "ER":
-        p = float(request.form.get("p"))
-    else:
-        return redirect(request.referrer)
 
-    g = nx.erdos_renyi_graph(len(agent_ids), p=p) if network == "ER" else nx.barabasi_albert_graph(len(agent_ids), m=m)
+    m = int(request.form.get("m"))
+    p = float(request.form.get("p"))
+
+    if network == "BA":
+        g = nx.barabasi_albert_graph(len(agent_ids), m=m)
+    else:
+        g = nx.erdos_renyi_graph(len(agent_ids), p=p)
 
     # get the client experiment
     exp = Exps.query.filter_by(idexp=client.id_exp).first()

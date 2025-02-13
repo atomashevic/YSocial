@@ -338,8 +338,13 @@ def start_client_process(exp, cli, population, resume=False):
 
     if resume:
         cl.days = ce.expected_duration_rounds - ce.elapsed_time
+
     cl.read_agents()
     cl.add_feeds()
+
+    if first_run and cli.network_type is not None and cli.network_type != "":
+        cl.add_network()
+
     run_simulation(cl, cli.id, filename)
 
 

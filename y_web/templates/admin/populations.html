@@ -230,9 +230,19 @@
                                         <span class="left">Education Levels</span>
                                         <span class="right" style="width: 70%;"><input type="text" name="education_levels" class="input" value="high school, bachelor, master, phd"></span>
                                     </div>
-                                    <div class="box-line">
+                                    <div class="box-line" style="height: 100px; margin-bottom: 20px;">
                                         <span class="left">Political Leanings</span>
-                                        <span class="right" style="width: 70%;"><input type="text" name="political_leanings" class="input" value="democrat, republican"></span>
+                                        <span class="right" style="width: 70%;">
+                                            <div class="select">
+                                            <select multiple size="2" name="political_leanings">
+                                                <option value="democrat">Democrat</option>
+                                                <option value="republican">Republican</option>
+                                                <option value="neutral">Neutral</option>
+                                            </select>
+                                            </div>
+                                         <!--   <input type="text" name="political_leanings" class="input" value="democrat, republican"> -->
+
+                                        </span>
                                     </div>
                                     <div class="box-line">
                                         <span class="left">Nationalities</span>
