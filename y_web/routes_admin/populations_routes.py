@@ -53,7 +53,10 @@ def create_population():
     age_min = int(request.form.get("age_min"))
     age_max = int(request.form.get("age_max"))
     education_levels = request.form.get("education_levels")
-    political_leanings = request.form.get("political_leanings")
+    political_leanings = request.form.getlist('political_leanings') #request.form.get("political_leanings")
+    political_leanings = ",".join(political_leanings)
+
+
     nationalities = request.form.get("nationalities")
     languages = request.form.get("languages")
     interests = request.form.get("interests")

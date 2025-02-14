@@ -19,7 +19,7 @@ def augment_text(text):
     :param text: the text to augment
     :return: the augmented text
     """
-    text = text.split("(")[0]
+    # text = text.split("(")[0]
 
     # Extract the mentions and hashtags
     mentions = extract_components(text, c_type="mentions")
@@ -49,6 +49,13 @@ def augment_text(text):
 
     for h, hid in used_hastag.items():
         text = text.replace(h, f'<a href="/hashtag_posts/{hid}/1"> {h} </a>')
+
+    # remove first character it is a space
+    if text[0] == " ":
+        text = text[1:]
+
+    # capitalize the first letter of the text
+    text = text[0].upper() + text[1:]
 
     return text
 
