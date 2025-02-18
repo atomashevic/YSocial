@@ -1,7 +1,11 @@
+import json
+import os
+
 from flask import (
     Blueprint,
     render_template,
     request,
+    send_file
 )
 from flask_login import login_required, current_user
 
@@ -10,7 +14,8 @@ from y_web.models import (
     Population,
     Agent,
     Agent_Population,
-    Population_Experiment,
+    Population_Experiment, Page_Population,
+    Page, Agent_Profile,
 )
 from y_web.utils import (
     generate_population,
@@ -352,4 +357,81 @@ def delete_population(uid):
         db.session.commit()
 
     return populations()
+
+
+@population.route("/admin/download_population/<int:uid>")
+@login_required
+def download_population(uid):
+    check_privileges(current_user.username)
+
+    # get all agents in the population
+    agents = (
+        db.session.query(Agent, Agent_Population)
+        .join(Agent_Population)
+        .filter(Agent_Population.population_id == uid)
+        .all()
+    )
+
+    pages = (
+        db.session.query(Page, Page_Population)
+        .join(Page_Population)
+        .filter(Page_Population.population_id == uid)
+        .all()
+    )
+
+    # get population details
+    population = Population.query.filter_by(id=uid).first()
+
+    res = {
+        "population_data": {
+            "name": population.name,
+            "descr": population.descr,
+        },
+        "agents": [],
+        "pages": [],
+    }
+
+    for a in agents:
+        res["agents"].append({
+            "id": a[0].id,
+            "name": a[0].name,
+            "ag_type": a[0].ag_type,
+            "leaning": a[0].leaning,
+            "interests": a[0].interests,
+            "oe": a[0].oe,
+            "co": a[0].co,
+            "ex": a[0].ex,
+            "ag": a[0].ag,
+            "ne": a[0].ne,
+            "language": a[0].language,
+            "education": a[0].education_level,
+            "round_actions": a[0].round_actions,
+            "nationality": a[0].nationality,
+            "toxicity": a[0].toxicity,
+            "age": a[0].age,
+            "gender": a[0].gender,
+            "crecsys": a[0].crecsys,
+            "frecsys": a[0].frecsys,
+            "profile_pic": a[0].profile_pic,
+            "profile": Agent_Profile.query.filter_by(agent_id=a[0].id).first().profile if Agent_Profile.query.filter_by(agent_id=a[0].id).first() is not None else None,
+        })
+
+    for p in pages:
+        res["pages"].append({
+            "id": p[0].id,
+            "name": p[0].name,
+            "descr": p[0].descr,
+            "page_type": p[0].page_type,
+            "feed": p[0].feed,
+            "keywords": p[0].keywords,
+            "logo": p[0].logo,
+            "pg_type": p[0].pg_type,
+            "leaning": p[0].leaning,
+        })
+
+    BASE_DIR = os.path.dirname(os.path.abspath(__file__)).split("routes_admin")[0]
+    filename = f"{BASE_DIR}{os.sep}experiments{os.sep}temp_data{os.sep}population_{population.name}.json"
+    json.dump(res, open(filename, "w"), indent=4)
+
+    return send_file(filename, as_attachment=True)
 
