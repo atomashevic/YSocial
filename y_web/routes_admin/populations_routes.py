@@ -5,7 +5,9 @@ from flask import (
     Blueprint,
     render_template,
     request,
-    send_file
+    send_file,
+    redirect,
+    flash,
 )
 from flask_login import login_required, current_user
 
@@ -434,4 +436,92 @@ def download_population(uid):
     json.dump(res, open(filename, "w"), indent=4)
 
     return send_file(filename, as_attachment=True)
+
+
+@population.route("/admin/upload_population", methods=["POST"])
+@login_required
+def upload_population():
+    check_privileges(current_user.username)
+
+    population_file = request.files["population_file"]
+
+    BASE_DIR = os.path.dirname(os.path.abspath(__file__)).split("routes_admin")[0]
+    filename = f"{BASE_DIR}{os.sep}experiments{os.sep}temp_data{os.sep}{population_file.filename}"
+    population_file.save(filename)
+
+    data = json.load(open(filename, "r"))
+
+    # check if the population already exists
+    population = Population.query.filter_by(name=data["population_data"]["name"]).first()
+    if population:
+        flash("Population already exists.")
+        return redirect(request.referrer)
+
+    # add the population to the database
+    population = Population(name=data["population_data"]["name"], descr=data["population_data"]["descr"])
+    db.session.add(population)
+    db.session.commit()
+
+    # add the agents to the database
+    for a in data["agents"]:
+        # check if the agent already exists
+        agent = Agent.query.filter_by(name=a["name"]).first()
+        if not agent:
+            agent = Agent(
+                name=a["name"],
+                ag_type=a["ag_type"],
+                leaning=a["leaning"],
+                interests=a["interests"],
+                oe=a["oe"],
+                co=a["co"],
+                ex=a["ex"],
+                ag=a["ag"],
+                ne=a["ne"],
+                language=a["language"],
+                education_level=a["education"],
+                round_actions=a["round_actions"],
+                nationality=a["nationality"],
+                toxicity=a["toxicity"],
+                age=a["age"],
+                gender=a["gender"],
+                crecsys=a["crecsys"],
+                frecsys=a["frecsys"],
+                profile_pic=a["profile_pic"],
+            )
+            db.session.add(agent)
+            db.session.commit()
+
+            if a["profile"]:
+                agent_profile = Agent_Profile(agent_id=agent.id, profile=a["profile"])
+                db.session.add(agent_profile)
+                db.session.commit()
+
+        agent_population = Agent_Population(agent_id=agent.id, population_id=population.id)
+        db.session.add(agent_population)
+        db.session.commit()
+
+    # add the pages to the database
+    for p in data["pages"]:
+
+        # check if the page already exists
+        page = Page.query.filter_by(name=p["name"]).first()
+        if not page:
+            page = Page(
+                name=p["name"],
+                descr=p["descr"],
+                page_type=p["page_type"],
+                feed=p["feed"],
+                keywords=p["keywords"],
+                logo=p["logo"],
+                pg_type=p["pg_type"],
+                leaning=p["leaning"],
+            )
+            db.session.add(page)
+            db.session.commit()
+
+        page_population = Page_Population(page_id=page.id, population_id=population.id)
+        db.session.add(page_population)
+        db.session.commit()
+
+    return redirect(request.referrer)
 
