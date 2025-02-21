@@ -364,7 +364,12 @@ def run_simulation(cl, cli_id, agent_file):
             expected_active_users = max(
                 int(len(cl.agents.agents) * cl.hourly_activity[str(h)]), 1
             )
+
+            page_agents = [p for p in cl.agents.agents if p.is_page]
             sagents = random.sample(cl.agents.agents, expected_active_users)
+
+            # add page agents
+            sagents.extend(page_agents)
 
             # available actions
             acts = [a for a, v in cl.actions_likelihood.items() if v > 0]
@@ -377,7 +382,13 @@ def run_simulation(cl, cli_id, agent_file):
                 # max 1 post per round
                 posted = False
 
-                for _ in range(int(g.round_actions)):
+                # get a random integer within g.round_actions. If g.is_page == 1, then rounds = 1
+                if g.is_page == 1:
+                    rounds = 1
+                else:
+                    rounds = random.randint(1, int(g.round_actions))
+
+                for _ in range(rounds):
                     # sample two elements from a list with replacement
 
                     if posted and g.is_page == 0:

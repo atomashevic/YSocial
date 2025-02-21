@@ -6,10 +6,9 @@
         <div class="settings-wrapper" style="justify-content: center; align-items: center; display: grid; margin-left: 0px;">
             <!-- /partials/settings/sections/general-settings.html -->
             <div id="general-settings" class="settings-section is-active" style="max-width: 1000px;">
-                <div class="settings-panel">
+                <div class="settings-panel" style="background: #fff; padding: 30px; border: 1px solid #e0e0e0; border-radius: 6px;">
                     <div class="title-wrap">
-                        <h2>General Settings</h2>
-
+                        <h2 style="font-family: 'Montserrat', sans-serif; font-size: 1.2rem; font-weight: 500; color: #999;">General Settings</h2>
                     </div>
                     <div class="settings-form-wrapper">
                         <div class="settings-form">
@@ -234,21 +233,17 @@
                             </div>
                           </form>
                         </div>
-                       <div class="illustration">
-                            <img src="{{ url_for('static', filename='assets/img/robots/robot_v.png') }}" style="border-radius: 10px; filter: saturate(1); opacity: 0.6;">
-                        </div>
-
-                </div>
+                    </div>
                 </div>
             </div>
 
             <!-- /partials/settings/sections/security-settings.html -->
             <div id="security-settings" class="settings-section is-active" style="margin-top: 50px; max-width: 1000px;">
 
-              <div class="settings-panel">
+              <div class="settings-panel" style="background: #fff; padding: 30px; border: 1px solid #e0e0e0; border-radius: 6px;">
 
                     <div class="title-wrap">
-                        <h2>Security</h2>
+                        <h2 style="font-family: 'Montserrat', sans-serif; font-size: 1.2rem; font-weight: 500; color: #999;">Security</h2>
                     </div>
                     <form action="/update_password/{{ user.id }}" enctype="multipart/form-data" method="POST">
 
@@ -309,10 +304,6 @@
                                     </div>
                                 </div>
                             </div>
-                        </div>
-
-                        <div class="illustration">
-                            <img src="{{ url_for('static', filename='assets/img/robots/security.png') }}" style="border-radius: 10px; filter: saturate(1); opacity: 0.6;">
                         </div>
                     </div>
                       </form>
