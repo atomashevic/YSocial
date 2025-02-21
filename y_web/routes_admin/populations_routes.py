@@ -52,17 +52,17 @@ def create_population_empty():
 @login_required
 def create_population():
     check_privileges(current_user.username)
-
     name = request.form.get("pop_name")
     descr = request.form.get("pop_descr")
     n_agents = request.form.get("n_agents")
     user_type = request.form.get("user_type")
     age_min = int(request.form.get("age_min"))
     age_max = int(request.form.get("age_max"))
-    education_levels = request.form.get("education_levels")
-    political_leanings = request.form.getlist('political_leanings') #request.form.get("political_leanings")
-    political_leanings = ",".join(political_leanings)
 
+    education_levels = request.form.getlist("education_levels")
+    education_levels = ",".join(education_levels)
+    political_leanings = request.form.getlist('political_leanings')
+    political_leanings = ",".join(political_leanings)
 
     nationalities = request.form.get("nationalities")
     languages = request.form.get("languages")

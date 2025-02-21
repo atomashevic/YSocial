@@ -249,13 +249,23 @@
                                     <h4><b>Categorical Attributes</b></h4><small>Lists as comma separated values</small>
                                     <div class="box-line">
                                         <span class="left">Education Levels</span>
-                                        <span class="right" style="width: 70%;"><input type="text" name="education_levels" class="input" value="high school, bachelor, master, phd"></span>
+                                            <span class="right" style="width: 70%;">
+                                                <div class="select">
+                                                    <select multiple size="2" name="education_levels">
+                                                        <option value="high school">High school</option>
+                                                        <option value="bachelor">Bachelor</option>
+                                                        <option value="master">Master</option>
+                                                        <option value="phd">Ph.D.</option>
+                                                    </select>
+                                                </div>
+                                            </span>
+                                        </span>
                                     </div>
                                     <div class="box-line" style="height: 100px; margin-bottom: 20px;">
                                         <span class="left">Political Leanings</span>
                                         <span class="right" style="width: 70%;">
                                             <div class="select">
-                                            <select multiple size="2" name="political_leanings[]">
+                                            <select multiple size="2" name="political_leanings">
                                                 <option value="democrat">Democrat</option>
                                                 <option value="republican">Republican</option>
                                                 <option value="neutral">Neutral</option>
@@ -270,7 +280,7 @@
                                         <span class="right" style="width: 70%;"><input type="text" name="nationalities" class="input" value="American, Italian"></span>
                                     </div>
                                      <div class="box-line">
-                                        <span class="left">Languages</span>
+                                        <span class="left">Spoken Languages</span>
                                         <span class="right" style="width: 70%;"><input type="text" name="languages" class="input" value="English, Italian"></span>
                                     </div>
                                     <div class="box-line">
