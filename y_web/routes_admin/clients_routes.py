@@ -20,11 +20,12 @@ from y_web.models import (
     Population_Experiment,
     Page_Population,
     Client,
-    Client_Execution
+    Client_Execution, User_mgmt
 )
 from y_web.utils import (
     start_client,
     terminate_client,
+    get_ollama_models
 )
 import json
 import shutil
@@ -429,6 +430,9 @@ def client_details(uid):
         idx.append(str(x))
         data.append(activity[str(x)])
 
+
+    models = get_ollama_models()
+
     return render_template(
         "admin/client_details.html",
         data=data,
@@ -438,6 +442,7 @@ def client_details(uid):
         experiment=experiment,
         population=population,
         pages=pages,
+        models=models,
 
     )
 
@@ -663,3 +668,66 @@ def reset_agents_activity(uid):
 
     return redirect(request.referrer)
 
+
+@clientsr.route("/admin/update_recsys/<int:uid>", methods=["POST"])
+@login_required
+def update_recsys(uid):
+    check_privileges(current_user.username)
+
+    recsys_type = request.form.get("recsys_type")
+    frecsys_type = request.form.get("frecsys_type")
+
+    client = Client.query.filter_by(id=uid).first()
+
+    # get populations for client uid
+    population = Population.query.filter_by(id=client.population_id).first()
+    # get agents for the populations
+    agents = Agent_Population.query.filter_by(population_id=population.id).all()
+
+    # updating the recommenders of the agents in the specific simulation instance (not in the population)
+    for agent in agents:
+        try:
+            a = Agent.query.filter_by(id=agent.agent_id).first()
+            user = (User_mgmt.query.filter_by(username=a.name)).first()
+            user.frecsys_type = frecsys_type
+            user.recsys_type = recsys_type
+            db.session.commit()
+        except:
+            flash("The experiment needs to be activated first.", "error")
+            return redirect(request.referrer)
+
+    population.crecsys = recsys_type
+    population.frecsys = frecsys_type
+
+    db.session.commit()
+    return redirect(request.referrer)
+
+
+@clientsr.route("/admin/update_client_llm/<int:uid>", methods=["POST"])
+@login_required
+def update_llm(uid):
+    check_privileges(current_user.username)
+
+    user_type = request.form.get("user_type")
+
+    client = Client.query.filter_by(id=uid).first()
+
+    # get populations for client uid
+    population = Population.query.filter_by(id=client.population_id).first()
+    # get agents for the populations
+    agents = Agent_Population.query.filter_by(population_id=population.id).all()
+
+    for agent in agents:
+        try:
+            a = Agent.query.filter_by(id=agent.agent_id).first()
+            user = (User_mgmt.query.filter_by(username=a.name)).first()
+            user.user_type = user_type
+            db.session.commit()
+        except:
+            flash("The experiment needs to be activated first.", "error")
+            return redirect(request.referrer)
+
+    population.llm = user_type
+
+    db.session.commit()
+    return redirect(request.referrer)
