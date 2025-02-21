@@ -207,10 +207,10 @@
                     <div class="dashboard-box">
                         <div class="box-content">
                             <div class="box-lines">
-                                <h3 class="title is-5 is-thin">Population Recommender</h3>
+                                <h3 class="title is-5 is-thin">Client Recommenders & Large Language Models</h3>
                                 <div class="box-line">
                                     <span class="left">
-                                        Here, you can bulk update the recommender systems used by all agents in the population.
+                                        Here, you can bulk update the recommender systems/LLM used by all agents in the population.
                                         Any changes made will apply to all agents within the specific experimental instance associated with the client.
                                         <br><br>
                                         <strong>Note:</strong> Ensure that the experiment is loaded before applying changes to avoid overwriting configurations from other simulations, especially if the same population is deployed across multiple experiments.</span>
@@ -268,27 +268,13 @@
                                         </button>
                                     </div>
                             </form>
-                        </div>
-                    </div>
-
-                    <div class="dashboard-box">
-                        <div class="box-content">
-                            <div class="box-lines">
-                                <h3 class="title is-5 is-thin">Population LLM</h3>
-                                <div class="box-line">
-                                    <span class="left">
-                                        Here, you can bulk update the Large Language Models used by all agents in the population.
-                                        Any changes made will apply to all agents within the specific experimental instance associated with the client.
-                                        <br><br>
-                                        <strong>Note:</strong> Ensure that the experiment is loaded before applying changes to avoid overwriting configurations from other simulations, especially if the same population is deployed across multiple experiments.</span>
-                                </div>
-                                <hr>
-                                <div class="box-line">
+                        <hr>
+                        <div class="box-line">
                                     <span class="left">Current LLM</span>
                                     <span class="right">{{ population.llm }}</span>
                                 </div>
-                            </div>
-                            <hr>
+
+                        <hr>
                             <form action="/admin/update_client_llm/{{ client.id }}" enctype="multipart/form-data" method="POST">
                                 <div class="box-lines">
                                     <h4 class="title is-5 is-thin">Set LLM</h4>
@@ -314,7 +300,9 @@
                                         </button>
                                     </div>
                             </form>
-                        </div>
+
+</div>
+
                     </div>
 
 
@@ -407,13 +395,17 @@
                             }
                         });
                     </script>
+                </div>
+            </div>
 
+            <div class="columns">
+                 <div class="column is-12">
                     <div class="dashboard-box">
-                        <h3 class="title is-5 is-thin">Percentage Active Agents per Hour</h3>
+                        <h3 class="title is-12 is-thin">Percentage Active Agents per Hour</h3>
                         <small>Default values fitted on longitudinal <a href="https://zenodo.org/records/14669616">Bluesy Data</a></small>
                             <div class="box-content">
 
-                            <canvas id="activity_rates" style="width:100%;max-width:700px"></canvas>
+                            <canvas id="activity_rates" style="width:100%;"></canvas>
                             <script>
                                 new Chart("activity_rates", {
                                     type: 'bar',
