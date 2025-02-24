@@ -12,3 +12,4 @@ pygments
 networkx
 flaml[automl]
 nltk
+perspective

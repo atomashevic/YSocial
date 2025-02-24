@@ -203,6 +203,21 @@ class Post_Sentiment(db.Model):
     compound = db.Column(db.REAL)
     sentiment_parent = db.Column(db.String(5), default="")
 
+
+class Post_Toxicity(db.Model):
+    __bind_key__ = "db_exp"
+    __tablename__ = "post_toxicity"
+    id = db.Column(db.Integer, primary_key=True)
+    post_id = db.Column(db.Integer, db.ForeignKey("post.id"), nullable=False)
+    toxicity = db.Column(db.REAL, default=0)
+    severe_toxicity = db.Column(db.REAL, default=0)
+    identity_attack = db.Column(db.REAL, default=0)
+    insult = db.Column(db.REAL, default=0)
+    profanity = db.Column(db.REAL, default=0)
+    threat = db.Column(db.REAL, default=0)
+    sexually_explicit = db.Column(db.REAL, default=0)
+    flirtation = db.Column(db.REAL, default=0)
+
 ############################################################################################################
 
 
@@ -217,6 +232,7 @@ class Admin_users(UserMixin, db.Model):
     role = db.Column(db.String(10), nullable=False)
     llm = db.Column(db.String(50), default="")
     profile_pic = db.Column(db.String(400), default="")
+    perspective_api = db.Column(db.String(300), default=None)
 
 
 class Exps(db.Model):

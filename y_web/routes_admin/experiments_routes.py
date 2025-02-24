@@ -193,6 +193,7 @@ def create_experiment():
     owner = request.form.get("owner")
     host = request.form.get("host")
     port = int(request.form.get("port"))
+    perspective_api = request.form.get("perspective_api")
 
     uid = uuid.uuid4()
     pathlib.Path(f"y_web{os.sep}experiments{os.sep}{uid}").mkdir(
@@ -209,9 +210,10 @@ def create_experiment():
         "name": exp_name,
         "host": host,
         "port": port,
-        "debug": "True",
+        "debug": "False",
         "reset_db": "False",
         "modules": ["news", "voting", "image"],
+        "perspective_api": perspective_api if len(perspective_api) > 0 else None,
     }
 
     with open(

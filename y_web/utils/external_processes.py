@@ -11,6 +11,7 @@ from y_web.models import Client_Execution, Agent_Population, Agent, Page, Page_P
 from y_web import db, client_processes
 import requests
 from ollama import Client as oclient
+import concurrent
 
 
 def terminate_process_on_port(port):
@@ -376,7 +377,9 @@ def run_simulation(cl, cli_id, agent_file):
 
             # shuffle agents
             random.shuffle(sagents)
-            for g in sagents:
+
+            ################# PARALLELIZED SECTION #################
+            def agent_task(g):
                 daily_active[g.name] = None
 
                 # max 1 post per round
@@ -414,6 +417,12 @@ def run_simulation(cl, cli_id, agent_file):
                         actions=candidates,
                         max_length_thread_reading=cl.max_length_thread_reading,
                     )
+
+            # Run agent tasks in parallel
+            with concurrent.futures.ThreadPoolExecutor() as executor:
+                executor.map(agent_task, sagents)
+            ################# END OF PARALLELIZATION #################
+
             # increment slot
             cl.sim_clock.increment_slot()
 

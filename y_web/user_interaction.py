@@ -21,7 +21,7 @@ from .models import (
 )
 from flask import request
 from .llm_annotations import ContentAnnotator, Annotator
-from .utils.text_utils import vader_sentiment
+from .utils.text_utils import vader_sentiment, toxicity
 
 user = Blueprint("user_actions", __name__)
 
@@ -172,18 +172,8 @@ def publish_post():
     post.thread_id = post.id
     db.session.commit()
 
+    toxicity(text, current_user.username, post.id, db)
     sentiment = vader_sentiment(text)
-    post_sentiment = Post_Sentiment(
-        post_id=post.id,
-        user_id=current_user.id,
-        pos=sentiment["pos"],
-        neg=sentiment["neg"],
-        neu=sentiment["neu"],
-        compound=sentiment["compound"],
-        round=current_round.id
-    )
-    db.session.add(post_sentiment)
-    db.session.commit()
 
     user = Admin_users.query.filter_by(username=current_user.username).first()
     llm = user.llm if user.llm != "" else "llama3.2:latest"
@@ -210,6 +200,20 @@ def publish_post():
         db.session.add(ui)
         ti = Post_topics(post_id=post.id, topic_id=topic_id)
         db.session.add(ti)
+        db.session.commit()
+
+        post_sentiment = Post_Sentiment(
+            post_id=post.id,
+            user_id=current_user.id,
+            topic_id=topic_id,
+            pos=sentiment["pos"],
+            neg=sentiment["neg"],
+            neu=sentiment["neu"],
+            compound=sentiment["compound"],
+            round=current_round.id
+
+        )
+        db.session.add(post_sentiment)
         db.session.commit()
 
     for emotion in emotions:
@@ -287,20 +291,9 @@ def publish_comment():
     values = {"pos": sentiment_root.pos, "neg": sentiment_root.neg, "neu": sentiment_root.neu}
     # get the key with the max value
     sentiment_parent = max(values, key=values.get)
-
     sentiment = vader_sentiment(text)
-    post_sentiment = Post_Sentiment(
-        post_id=post.id,
-        user_id=current_user.id,
-        pos=sentiment["pos"],
-        neg=sentiment["neg"],
-        neu=sentiment["neu"],
-        compound=sentiment["compound"],
-        sentiment_parent=sentiment_parent,
-        round=current_round.id
-    )
-    db.session.add(post_sentiment)
-    db.session.commit()
+
+    toxicity(text, current_user.username, post.id, db)
 
     # check if the comment is to answer a mention
     mention = Mentions.query.filter_by(post_id=pid, user_id=current_user.id).first()
@@ -327,6 +320,20 @@ def publish_comment():
             db.session.add(ui)
             ti = Post_topics(post_id=post.id, topic_id=t)
             db.session.add(ti)
+            db.session.commit()
+
+            post_sentiment = Post_Sentiment(
+                post_id=post.id,
+                user_id=current_user.id,
+                topic_id=t,
+                pos=sentiment["pos"],
+                neg=sentiment["neg"],
+                neu=sentiment["neu"],
+                compound=sentiment["compound"],
+                sentiment_parent=sentiment_parent,
+                round=current_round.id
+            )
+            db.session.add(post_sentiment)
             db.session.commit()
 
     for emotion in emotions:

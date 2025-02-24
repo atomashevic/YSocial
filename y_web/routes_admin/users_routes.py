@@ -135,6 +135,7 @@ def user_details(uid):
         user_experiments=experiments,
         all_experiments=all_experiments,
         user_experiments_joined=joined_exp,
+        none=None
     )
 
 
@@ -220,6 +221,21 @@ def add_user_to_experiment():
 
     db.session.query(Exps).filter_by(status=1).update({Exps.status: 0})
     db.session.query(Exps).filter_by(db_name=exp.db_name).update({Exps.status: 1})
+    db.session.commit()
+
+    return user_details(user_id)
+
+
+@users.route("/admin/set_perspective_api_user", methods=["POST"])
+@login_required
+def set_perspective_api_user():
+    check_privileges(current_user.username)
+
+    user_id = request.form.get("user_id")
+    perspective_api = request.form.get("perspective_api")
+
+    user = Admin_users.query.filter_by(id=user_id).first()
+    user.perspective_api = perspective_api
     db.session.commit()
 
     return user_details(user_id)
