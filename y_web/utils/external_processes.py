@@ -369,14 +369,19 @@ def run_simulation(cl, cli_id, agent_file):
             page_agents = [p for p in cl.agents.agents if p.is_page]
             sagents = random.sample(cl.agents.agents, expected_active_users)
 
-            # add page agents
-            sagents.extend(page_agents)
-
             # available actions
             acts = [a for a, v in cl.actions_likelihood.items() if v > 0]
 
             # shuffle agents
             random.shuffle(sagents)
+
+            # pages post at least a news each slot, more if they were selected randomly
+            for page in page_agents:
+                page.select_action(
+                    tid=tid,
+                    actions=[],
+                    max_length_thread_reading=cl.max_length_thread_reading,
+                )
 
             ################# PARALLELIZED SECTION #################
             def agent_task(g):
