@@ -375,8 +375,10 @@ def run_simulation(cl, cli_id, agent_file):
             # shuffle agents
             random.shuffle(sagents)
 
-            # pages post at least a news each slot, more if they were selected randomly
+            # pages post at least a news each slot of the day (7-22), more if they were selected randomly
             for page in page_agents:
+                if h < 7 or h > 22:
+                    continue
                 page.select_action(
                     tid=tid,
                     actions=[],
