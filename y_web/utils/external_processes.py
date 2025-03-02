@@ -338,7 +338,7 @@ def start_client_process(exp, cli, population, resume=False):
         cl = YClientWeb(config_file, data_base_path, first_run=first_run)
 
     if resume:
-        cl.days = ce.expected_duration_rounds - ce.elapsed_time
+        cl.days = int((ce.expected_duration_rounds - ce.elapsed_time)/24)
 
     cl.read_agents()
     cl.add_feeds()
@@ -354,7 +354,8 @@ def run_simulation(cl, cli_id, agent_file):
     Run the simulation
     """
 
-    for _ in range(int(cl.days)):
+    for d1 in range(int(cl.days)):
+        print(d1, (int(cl.days)))
         daily_active = {}
         tid, _, _ = cl.sim_clock.get_current_slot()
 

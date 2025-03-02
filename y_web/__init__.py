@@ -56,6 +56,12 @@ app.config["SQLALCHEMY_BINDS"] = {
     "db_exp": f"sqlite:///{BASE_DIR}/db/dummy.db",
 }
 
+# Manually add check_same_thread=False
+app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
+    "connect_args": {"check_same_thread": False}
+}
+
+
 db = SQLAlchemy(app)
 
 login_manager = LoginManager()

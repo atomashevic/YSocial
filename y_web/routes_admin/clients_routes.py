@@ -1,5 +1,6 @@
 import os
 import networkx as nx
+import random
 
 from flask import (
     Blueprint,
@@ -29,7 +30,7 @@ from y_web.utils import (
 )
 import json
 import shutil
-from . import db, experiment_details
+from . import db, experiment_details, population
 from y_web.utils.miscellanea import check_privileges
 
 clientsr = Blueprint("clientsr", __name__)
@@ -343,12 +344,61 @@ def create_client():
             },
         },
         "agents": {
+            "llm_v_agent": "minicpm-v",
             "reading_from_follower_ratio": float(reading_from_follower_ratio),
             "max_length_thread_reading": int(max_length_thread_reading),
             "attention_window": int(attention_window),
             "probability_of_daily_follow": float(probability_of_daily_follow),
+            "age": {"min": 18, "max": 65},
+            "political_leaning": [],
+            "toxicity_levels": [],
+            "languages": [],
+            "llm_agents": [],
+            "education_levels": [],
+            "round_actions": {"min": 1, "max": 3},
+            "n_interests": {"min": 1, "max": 5},
+            "interests": [],
+            "big_five": {
+                "oe": ["inventive/curious", "consistent/cautious"],
+                "co": ["extravagant/careless", "efficient/organized"],
+                "ex": ["outgoing/energetic", "solitary/reserved"],
+                "ag": ["critical/judgmental", "friendly/compassionate"],
+                "ne": ["resilient/confident", "sensitive/nervous"],
+            },
+
         },
     }
+
+    #get population agents
+    agents = Agent_Population.query.filter_by(population_id=population_id).all()
+    # get agents political leaning
+    political_leaning = set([Agent.query.filter_by(id=a.agent_id).first().leaning for a in agents])
+    # get agents age
+    age = set([Agent.query.filter_by(id=a.agent_id).first().age for a in agents])
+    # get agents toxicity levels
+    toxicity = set([Agent.query.filter_by(id=a.agent_id).first().toxicity for a in agents])
+    # get agents language
+    language = set([Agent.query.filter_by(id=a.agent_id).first().language for a in agents])
+    # get agents type
+    ag_type = ([Agent.query.filter_by(id=a.agent_id).first().ag_type for a in agents])
+    # get agents education level
+    education_level = ([Agent.query.filter_by(id=a.agent_id).first().education_level for a in agents])
+
+    config["agents"]["political_leanings"] = list(political_leaning)
+    config["agents"]["age"]['min'] = min(age)
+    config["agents"]["age"]['max'] = max(age)
+    config["agents"]["toxicity_levels"] = list(toxicity)
+    config["agents"]["languages"] = list(language)
+    config["agents"]["llm_agents"] = list(ag_type)
+    config["agents"]["education_levels"] = list(education_level)
+    config["agents"]["round_actions"] = {"min": 1, "max": 3}
+    config["agents"]["n_interests"] = {"min": 1, "max": 5}
+
+    # get a random element of a list
+    ag = random.choice(agents)
+    # get agent interests
+    interests = Agent.query.filter_by(id=ag.agent_id).first().interests
+    config["agents"]["interests"] = interests.split(",")
 
     uid = exp.db_name.split(os.sep)[1]
 
@@ -517,22 +567,52 @@ def upload_network(uid):
     # get the client experiment
     exp = Exps.query.filter_by(idexp=client.id_exp).first()
     # get the experiment folder
-    BASE = os.path.dirname(os.path.abspath(__file__))
+    BASE = os.path.dirname(os.path.abspath(__file__)).split("routes_admin")[0][:-1]
     exp_folder = exp.db_name.split(os.sep)[1]
 
-    network = request.files["network_filename"]
-
+    network = request.files["network_file"]
     network.save(f"{BASE}{os.sep}experiments{os.sep}{exp_folder}{os.sep}{client.name}_network_temp.csv")
 
     path = f"{BASE}{os.sep}experiments{os.sep}{exp_folder}{os.sep}{client.name}".replace(
         f"routes_admin{os.sep}", "")
 
     try:
-        with open(f"{path}_network.csv", "r") as o:
+        with open(f"{path}_network.csv", "w") as o:
+            error, error2 = False, False
             with open(f"{path}_network_temp.csv", "r") as f:
                 for l in f:
-                    l.rstrip().split(",")
-                    if Agent.query.filter_by(name=l[0]).first() and Agent.query.filter_by(name=l[1]).first():
+                    l = l.rstrip().split(",")
+
+                    agent_1 = Agent.query.filter_by(name=l[0]).first()
+                    if agent_1 is not None:
+                        # check if in population
+                        test = Agent_Population.query.filter_by(agent_id=agent_1.id, population_id=client.population_id).all()
+                        error = len(test) == 0
+                    else:
+                        agent_1 = Page.query.filter_by(name=l[0]).first()
+                        if agent_1 is not None:
+                            # check if in population
+                            test = Page_Population.query.filter_by(page_id=agent_1.id, population_id=client.population_id).all()
+                            error = len(test) == 0
+                        if agent_1 is None:
+                            error = True
+
+                    agent_2 = Agent.query.filter_by(name=l[1]).first()
+                    if agent_2 is not None:
+                        # check if in population
+                        test = Agent_Population.query.filter_by(agent_id=agent_2.id, population_id=client.population_id).all()
+                        error2 = len(test) == 0
+                    else:
+                        agent_2 = Page.query.filter_by(name=l[1]).first()
+                        if agent_2 is not None:
+                            # check if in population
+                            test = Page_Population.query.filter_by(page_id=agent_2.id, population_id=client.population_id).all()
+                            error2 = len(test) == 0
+
+                        if agent_2 is None:
+                            error2 = True
+
+                    if not error and not error2:
                         o.write(f"{l[0]},{l[1]}\n")
                     else:
                         flash(f"Agent {l[0]} or {l[1]} not found.", "error")
@@ -548,7 +628,7 @@ def upload_network(uid):
     # delete the temp file
     os.remove(f"{path}_network_temp.csv")
 
-    client.network_type = network
+    client.network_type = "Custom Network"
     db.session.commit()
     return redirect(request.referrer)
 
