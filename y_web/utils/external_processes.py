@@ -355,7 +355,6 @@ def run_simulation(cl, cli_id, agent_file):
     """
 
     for d1 in range(int(cl.days)):
-        print(d1, (int(cl.days)))
         daily_active = {}
         tid, _, _ = cl.sim_clock.get_current_slot()
 
@@ -368,13 +367,6 @@ def run_simulation(cl, cli_id, agent_file):
             )
 
             page_agents = [p for p in cl.agents.agents if p.is_page]
-            sagents = random.sample(cl.agents.agents, expected_active_users)
-
-            # available actions
-            acts = [a for a, v in cl.actions_likelihood.items() if v > 0]
-
-            # shuffle agents
-            random.shuffle(sagents)
 
             # pages post at least a news each slot of the day (7-22), more if they were selected randomly
             for page in page_agents:
@@ -386,8 +378,21 @@ def run_simulation(cl, cli_id, agent_file):
                     max_length_thread_reading=cl.max_length_thread_reading,
                 )
 
+                # check whether there are agents left
+                if len(cl.agents.agents) == 0:
+                    break
+                sagents = random.sample(cl.agents.agents, expected_active_users)
+
+                # available actions
+
+                # shuffle agents
+                random.shuffle(sagents)
+
             ################# PARALLELIZED SECTION #################
             def agent_task(g):
+
+                acts = [a for a, v in cl.actions_likelihood.items() if v > 0]
+
                 daily_active[g.name] = None
 
                 # max 1 post per round
@@ -415,16 +420,20 @@ def run_simulation(cl, cli_id, agent_file):
                     )
                     candidates.append("NONE")
 
-                    # reply to received mentions
-                    if g not in cl.pages:
-                        g.reply(tid=tid)
+                    try:
+                        # reply to received mentions
+                        if g not in cl.pages:
+                            g.reply(tid=tid)
 
-                    # select action to be performed
-                    g.select_action(
-                        tid=tid,
-                        actions=candidates,
-                        max_length_thread_reading=cl.max_length_thread_reading,
-                    )
+                        # select action to be performed
+                        g.select_action(
+                            tid=tid,
+                            actions=candidates,
+                            max_length_thread_reading=cl.max_length_thread_reading,
+                        )
+                    except Exception as e:
+                        print(f"Error ({g.name}): {e}")
+                        pass
 
             # Run agent tasks in parallel
             with concurrent.futures.ThreadPoolExecutor() as executor:
@@ -456,18 +465,20 @@ def run_simulation(cl, cli_id, agent_file):
             if agent not in cl.pages:
                 agent.select_action(tid=tid, actions=["FOLLOW", "NONE"])
 
-        # daily churn
-        cl.churn(tid)
+        # daily churn and new agents
+        if len(daily_active) > 0:
+            # daily churn
+            cl.churn(tid)
 
-        # daily new agents
-        if cl.percentage_new_agents_iteration > 0:
-            for _ in range(
-                max(
-                    1,
-                    int(len(daily_active) * cl.percentage_new_agents_iteration),
-                )
-            ):
-                cl.add_agent()
+            # daily new agents
+            if cl.percentage_new_agents_iteration > 0:
+                for _ in range(
+                    max(
+                        1,
+                        int(len(daily_active) * cl.percentage_new_agents_iteration),
+                    )
+                ):
+                    cl.add_agent()
 
         # saving "living" agents at the end of the day
         if (
