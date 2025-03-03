@@ -379,18 +379,16 @@ def run_simulation(cl, cli_id, agent_file):
                 )
 
                 # check whether there are agents left
-                if len(cl.agents.agents) == 0:
-                    break
-                sagents = random.sample(cl.agents.agents, expected_active_users)
+            if len(cl.agents.agents) == 0:
+                break
+            sagents = random.sample(cl.agents.agents, expected_active_users)
 
-                # available actions
-
-                # shuffle agents
-                random.shuffle(sagents)
+            # available actions
+            # shuffle agents
+            random.shuffle(sagents)
 
             ################# PARALLELIZED SECTION #################
-            def agent_task(g):
-
+            def agent_task(g, cl):
                 acts = [a for a, v in cl.actions_likelihood.items() if v > 0]
 
                 daily_active[g.name] = None
@@ -437,7 +435,7 @@ def run_simulation(cl, cli_id, agent_file):
 
             # Run agent tasks in parallel
             with concurrent.futures.ThreadPoolExecutor() as executor:
-                executor.map(agent_task, sagents)
+                executor.map(agent_task, (sagents, cl))
             ################# END OF PARALLELIZATION #################
 
             # increment slot
