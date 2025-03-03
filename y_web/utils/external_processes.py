@@ -388,7 +388,7 @@ def run_simulation(cl, cli_id, agent_file):
             random.shuffle(sagents)
 
             ################# PARALLELIZED SECTION #################
-            def agent_task(g, cl):
+            def agent_task(g):
                 acts = [a for a, v in cl.actions_likelihood.items() if v > 0]
 
                 daily_active[g.name] = None
@@ -435,7 +435,7 @@ def run_simulation(cl, cli_id, agent_file):
 
             # Run agent tasks in parallel
             with concurrent.futures.ThreadPoolExecutor() as executor:
-                executor.map(agent_task, (sagents, cl))
+                executor.map(agent_task, sagents)
             ################# END OF PARALLELIZATION #################
 
             # increment slot
