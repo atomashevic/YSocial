@@ -302,6 +302,8 @@ def population_details(uid):
     except:
         pass
 
+    models = get_ollama_models()
+
     return render_template(
         "admin/population_details.html",
         population=population,
@@ -309,6 +311,7 @@ def population_details(uid):
         population_experiments=exps,
         agents=agents,
         data=dd,
+        models=models,
     )
 
 
@@ -523,5 +526,54 @@ def upload_population():
         db.session.add(page_population)
         db.session.commit()
 
+    return redirect(request.referrer)
+
+@population.route("/admin/update_population_recsys/<int:uid>", methods=["POST"])
+@login_required
+def update_recsys(uid):
+    check_privileges(current_user.username)
+
+    recsys_type = request.form.get("recsys_type")
+    frecsys_type = request.form.get("frecsys_type")
+
+    # get populations for client uid
+    population = Population.query.filter_by(id=uid).first()
+    # get agents for the populations
+    agents = Agent_Population.query.filter_by(population_id=uid).all()
+
+    # updating the recommenders of the agents in the specific simulation instance (not in the population)
+    for agent in agents:
+        ag = Agent.query.filter_by(id=agent.agent_id).first()
+        ag.frecsys = frecsys_type
+        ag.crecsys = recsys_type
+        db.session.commit()
+
+    population.crecsys = recsys_type
+    population.frecsys = frecsys_type
+
+    db.session.commit()
+    return redirect(request.referrer)
+
+
+@population.route("/admin/update_population_llm/<int:uid>", methods=["POST"])
+@login_required
+def update_llm(uid):
+    check_privileges(current_user.username)
+
+    user_type = request.form.get("user_type")
+
+    # get populations for client uid
+    population = Population.query.filter_by(id=uid).first()
+    # get agents for the populations
+    agents = Agent_Population.query.filter_by(population_id=population.id).all()
+
+    for agent in agents:
+        ag = Agent.query.filter_by(id=agent.agent_id).first()
+        ag.ag_type = user_type
+        db.session.commit()
+
+    population.llm = user_type
+
+    db.session.commit()
     return redirect(request.referrer)
 

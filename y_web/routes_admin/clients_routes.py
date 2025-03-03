@@ -480,7 +480,6 @@ def client_details(uid):
         idx.append(str(x))
         data.append(activity[str(x)])
 
-
     models = get_ollama_models()
 
     return render_template(
