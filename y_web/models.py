@@ -30,6 +30,7 @@ class User_mgmt(UserMixin, db.Model):
     toxicity = db.Column(db.String(10), default="no")
     is_page = db.Column(db.Integer, default=0)
     left_on = db.Column(db.Integer, default=None)
+    daily_activity_level = db.Column(db.Integer(), default=1)
 
     posts = db.relationship("Post", backref="author", lazy=True)
     liked = db.relationship("Reactions", backref="liked_by", lazy=True)
@@ -304,6 +305,7 @@ class Agent(db.Model):
     crecsys = db.Column(db.String(50))
     frecsys = db.Column(db.String(50))
     profile_pic = db.Column(db.String(400), default="")
+    daily_activity_level = db.Column(db.Integer, default=1)
 
 
 class Agent_Population(db.Model):

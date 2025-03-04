@@ -111,6 +111,7 @@ def create_agent():
     toxicity = request.form.get("toxicity")
     alt_profile = request.form.get("alt_profile")
     profile_pic = request.form.get("profile_pic")
+    daily_activity_level = request.form.get("daily_user_activity")
 
     agent = Agent(
         name=name,
@@ -132,6 +133,7 @@ def create_agent():
         crecsys=recsys_type,
         frecsys=frecsys_type,
         profile_pic=profile_pic,
+        daily_activity_level=int(daily_activity_level)
     )
 
     db.session.add(agent)

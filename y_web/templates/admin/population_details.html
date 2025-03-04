@@ -485,7 +485,49 @@
                 <div>
             </div>
         </div>
-    </div>
+            </div>
+
+
+            <div class="columns">
+
+                <div class="column is-4">
+
+                    <div class="dashboard-box">
+                        <div class="box-content">
+
+                            <canvas id="activity" style="width:100%;max-width:700px"></canvas>
+                            <script>
+                                new Chart("activity", {
+                                    type: 'bar',
+                                    data: {
+                                        datasets: [{
+                                            label: 'Daily Activity levels',
+                                          data:  {{ data["activity"]["total"] }},
+                                        }],
+                                        labels: {{ data["activity"]["activity"]|tojson  }}
+                                      },
+                                    options: {
+                                        scales: {
+                                            y: {
+                                                beginAtZero: true
+                                            },
+                                            x: {
+                                                min: 0,
+                                                max: 5,
+                                              }
+                                        }
+                                    }
+
+                                });
+                            </script>
+                        </div>
+
+                    </div>
+                <div>
+            </div>
+        </div>
+
+            </div>
 
 </div>
 

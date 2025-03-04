@@ -19,7 +19,7 @@ services:
         volumes:
             - ./:/app/
         environment:
-            - FLASK_APP=/app/y_web.py
+            - FLASK_APP=/app/y_social.py
             - NVIDIA_VISIBLE_DEVICES=all
         networks:
             my-network:
@@ -35,7 +35,7 @@ services:
                         - capabilities: [ gpu ]
         runtime: nvidia
 
-        command: python /app/y_web.py --host 0.0.0.0 --port 5000
+        command: python /app/y_social.py --host 0.0.0.0 --port 5000
 
 networks:
     my-network:

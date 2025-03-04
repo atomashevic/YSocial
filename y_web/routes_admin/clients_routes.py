@@ -21,7 +21,7 @@ from y_web.models import (
     Population_Experiment,
     Page_Population,
     Client,
-    Client_Execution, User_mgmt
+    Client_Execution, User_mgmt, Agent_Profile
 )
 from y_web.utils import (
     start_client,
@@ -380,9 +380,9 @@ def create_client():
     # get agents language
     language = set([Agent.query.filter_by(id=a.agent_id).first().language for a in agents])
     # get agents type
-    ag_type = ([Agent.query.filter_by(id=a.agent_id).first().ag_type for a in agents])
+    ag_type = set([Agent.query.filter_by(id=a.agent_id).first().ag_type for a in agents])
     # get agents education level
-    education_level = ([Agent.query.filter_by(id=a.agent_id).first().education_level for a in agents])
+    education_level = set([Agent.query.filter_by(id=a.agent_id).first().education_level for a in agents])
 
     config["agents"]["political_leanings"] = list(political_leaning)
     config["agents"]["age"]['min'] = min(age)
@@ -414,6 +414,89 @@ def create_client():
     data_base_path = f"{BASE_DIR}y_web{os.sep}experiments{os.sep}{uid}{os.sep}"
     shutil.copyfile(f"{BASE_DIR}data_schema{os.sep}prompts.json".replace("/y_web/utils", ""),
                         f"{data_base_path}prompts.json")
+
+    # Create agent population file
+    BASE_DIR = os.path.dirname(os.path.abspath(__file__)).split("routes_admin")[0]
+    filename = f"{BASE_DIR}{os.sep}{exp.db_name.split('database_server.db')[0]}{population.name.replace(' ', '')}.json"
+
+    agents = Agent_Population.query.filter_by(population_id=population.id).all()
+    # get the agent details
+    agents = [Agent.query.filter_by(id=a.agent_id).first() for a in agents]
+
+    res = {"agents": []}
+    for a in agents:
+
+        custom_prompt = Agent_Profile.query.filter_by(agent_id=a.id).first()
+
+        if custom_prompt:
+            custom_prompt = custom_prompt.profile
+
+        res["agents"].append(
+            {
+                "name": a.name,
+                "email": f"{a.name}@ysocial.it",
+                "password": f"{a.name}",
+                "age": a.age,
+                "type": a.ag_type,
+                "leaning": a.leaning,
+                "interests": [
+                    [x.strip() for x in a.interests.split(",")],
+                    [len([x for x in a.interests.split(",")])],
+                ] if a.interests else [[], 0],
+                "oe": a.oe,
+                "co": a.co,
+                "ex": a.ex,
+                "ag": a.ag,
+                "ne": a.ne,
+                "rec_sys": a.crecsys,
+                "frec_sys": a.frecsys,
+                "language": a.language,
+                "owner": exp.owner,
+                "education_level": a.education_level,
+                "round_actions": int(a.round_actions),
+                "gender": a.gender,
+                "nationality": a.nationality,
+                "toxicity": a.toxicity,
+                "is_page": 0,
+                "prompts": custom_prompt if custom_prompt else None,
+                "daily_activity_level": a.daily_activity_level
+            }
+        )
+
+    # get the pages associated with the population
+    pages = Page_Population.query.filter_by(population_id=population.id).all()
+    pages = [Page.query.filter_by(id=p.page_id).first() for p in pages]
+
+    for p in pages:
+        res["agents"].append(
+            {
+                "name": p.name,
+                "email": f"{p.name}@ysocial.it",
+                "password": f"{p.name}",
+                "age": 0,
+                "type": p.pg_type,
+                "leaning": p.leaning,
+                "interests": [[], 0],
+                "oe": "",
+                "co": "",
+                "ex": "",
+                "ag": "",
+                "ne": "",
+                "rec_sys": "",
+                "frec_sys": "",
+                "language": "english",
+                "owner": exp.owner,
+                "education_level": "",
+                "round_actions": 3,
+                "gender": "",
+                "nationality": "",
+                "toxicity": "none",
+                "is_page": 1,
+                "feed_url": p.feed,
+            }
+        )
+
+    json.dump(res, open(filename, "w"), indent=4)
 
     # load experiment_details page
     return experiment_details(int(exp_id))

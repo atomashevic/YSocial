@@ -1,7 +1,25 @@
 import random
 import faker
+import numpy as np
 from y_web import db
 from y_web.models import Population, Agent, Agent_Population
+
+
+def __sample_age(mean, std_dev, min_age, max_age):
+    """Sample an age from a Gaussian distribution while ensuring it falls within [min_age, max_age]."""
+    while True:
+        age = np.random.normal(mean, std_dev)  # Sample from Gaussian
+        if min_age <= age <= max_age:  # Ensure it's within the range
+            return int(round(age))
+
+
+def __sample_pareto(values, alpha=2.0):
+    """Sample a value from the given set following a Pareto distribution."""
+    pareto_sample = (np.random.pareto(alpha))  # Shifted Pareto sample
+    normalized_sample = pareto_sample / (pareto_sample + 1)  # Normalize to (0,1)
+
+    # Map the continuous value to the discrete set
+    return values[int(np.floor(normalized_sample * len(values)))]
 
 
 def generate_population(population_name):
@@ -33,7 +51,12 @@ def generate_population(population_name):
         political_leaning = fake.random_element(
             elements=(population.leanings.split(","))
         ).strip()
-        age = fake.random_int(min=population.age_min, max=population.age_max)
+
+        # Gaussian distribution for age
+        age = __sample_age(np.mean([population.age_min, population.age_max]),
+                           int((population.age_max - population.age_min)/2),
+                           population.age_min, population.age_max)
+
         interests = fake.random_elements(
             elements=set(population.interests.split(",")),
             length=fake.random_int(
@@ -67,10 +90,12 @@ def generate_population(population_name):
         try:
             round_actions = fake.random_int(
                 min=1,
-                max=3,
+                max=4,
             )
         except:
             round_actions = 3
+
+        daily_activity_level = __sample_pareto([1, 2, 3, 4, 5])
 
         agent = Agent(
             name=name.replace(" ", ""),
@@ -91,6 +116,7 @@ def generate_population(population_name):
             toxicity=toxicity,
             frecsys=population.frecsys,
             crecsys=population.crecsys,
+            daily_activity_level=daily_activity_level,
         )
 
         db.session.add(agent)

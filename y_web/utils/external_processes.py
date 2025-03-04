@@ -12,6 +12,7 @@ from y_web import db, client_processes
 import requests
 from ollama import Client as oclient
 import concurrent
+import numpy as np
 
 
 def terminate_process_on_port(port):
@@ -240,84 +241,6 @@ def start_client_process(exp, cli, population, resume=False):
 
     else:
         first_run = True
-        # writing the agent file
-        agents = Agent_Population.query.filter_by(population_id=population.id).all()
-        # get the agent details
-        agents = [Agent.query.filter_by(id=a.agent_id).first() for a in agents]
-
-        res = {"agents": []}
-        for a in agents:
-
-            custom_prompt = Agent_Profile.query.filter_by(agent_id=a.id).first()
-
-            if custom_prompt:
-                custom_prompt = custom_prompt.profile
-
-            res["agents"].append(
-                {
-                    "name": a.name,
-                    "email": f"{a.name}@ysocial.it",
-                    "password": f"{a.name}",
-                    "age": a.age,
-                    "type": a.ag_type,
-                    "leaning": a.leaning,
-                    "interests": [
-                        [x.strip() for x in a.interests.split(",")],
-                        [len([x for x in a.interests.split(",")])],
-                    ] if a.interests else [[], 0],
-                    "oe": a.oe,
-                    "co": a.co,
-                    "ex": a.ex,
-                    "ag": a.ag,
-                    "ne": a.ne,
-                    "rec_sys": a.crecsys,
-                    "frec_sys": a.frecsys,
-                    "language": a.language,
-                    "owner": exp.owner,
-                    "education_level": a.education_level,
-                    "round_actions": int(a.round_actions),
-                    "gender": a.gender,
-                    "nationality": a.nationality,
-                    "toxicity": a.toxicity,
-                    "is_page": 0,
-                    "prompts": custom_prompt if custom_prompt else None,
-                }
-            )
-
-        # get the pages associated with the population
-        pages = Page_Population.query.filter_by(population_id=population.id).all()
-        pages = [Page.query.filter_by(id=p.page_id).first() for p in pages]
-
-        for p in pages:
-            res["agents"].append(
-                {
-                    "name": p.name,
-                    "email": f"{p.name}@ysocial.it",
-                    "password": f"{p.name}",
-                    "age": 0,
-                    "type": p.pg_type,
-                    "leaning": p.leaning,
-                    "interests": [[], 0],
-                    "oe": "",
-                    "co": "",
-                    "ex": "",
-                    "ag": "",
-                    "ne": "",
-                    "rec_sys": "",
-                    "frec_sys": "",
-                    "language": "english",
-                    "owner": exp.owner,
-                    "education_level": "",
-                    "round_actions": 3,
-                    "gender": "",
-                    "nationality": "",
-                    "toxicity": "none",
-                    "is_page": 1,
-                    "feed_url": p.feed,
-                }
-            )
-
-        json.dump(res, open(filename, "w"), indent=4)
 
         # create a client execution object
         ce = Client_Execution(
@@ -381,7 +304,13 @@ def run_simulation(cl, cli_id, agent_file):
                 # check whether there are agents left
             if len(cl.agents.agents) == 0:
                 break
-            sagents = random.sample(cl.agents.agents, expected_active_users)
+
+            # get the daily activities of each agent
+            weights = [a.daily_activity_level for a in cl.agents.agents]
+            # normalize weights to sum to 1
+            weights = [w / sum(weights) for w in weights]
+            # sample agents
+            sagents = np.random.choice(cl.agents.agents, size=expected_active_users, p=weights, replace=False)
 
             # available actions
             # shuffle agents

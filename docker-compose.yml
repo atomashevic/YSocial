@@ -19,7 +19,7 @@ services:
         volumes:
             - ./:/app/
         environment:
-            - FLASK_APP=/app/y_web.py
+            - FLASK_APP=/app/y_social.py
         networks:
             my-network:
                 aliases:
@@ -27,7 +27,7 @@ services:
         ports:
             - 5001:5000  # Host port 5001 -> Container port 5000
 
-        command: python /app/y_web.py --host 0.0.0.0 --port 5000
+        command: python /app/y_social.py --host 0.0.0.0 --port 5000
 
 networks:
     my-network:

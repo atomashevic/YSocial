@@ -200,6 +200,14 @@ def population_details(uid):
             age["age"].append(a[0].age)
             age["total"].append(1)
 
+    sorted_age = dict(sorted(zip(age['age'], age['total'])))
+
+    # Convert back to dictionary format with separate lists
+    age = {
+        'age': list(sorted_age.keys()),
+        'total': list(sorted_age.values())
+    }
+
     edu = {"education": [], "total": []}
 
     for a in agents:
@@ -234,6 +242,23 @@ def population_details(uid):
                 tox["toxicity"].append(a[0].toxicity)
                 tox["total"].append(1)
 
+    activity = {"activity": [], "total": []}
+    for a in agents:
+        if a[0].daily_activity_level in activity["activity"]:
+            activity["total"][activity["activity"].index(a[0].daily_activity_level)] += 1
+        else:
+            if a[0].daily_activity_level is not None:
+                activity["activity"].append(a[0].daily_activity_level)
+                activity["total"].append(1)
+
+    sorted_activity = dict(sorted(zip(activity['activity'], activity['total'])))
+
+    # Convert back to dictionary format with separate lists
+    activity = {
+        'activity': list(sorted_activity.keys()),
+        'total': list(sorted_activity.values())
+    }
+
     dd = {
         "age": age,
         "leaning": ln,
@@ -241,6 +266,7 @@ def population_details(uid):
         "nationalities": nat,
         "languages": lang,
         "toxicity": tox,
+        "activity": activity,
     }
 
     topics = {}
@@ -418,6 +444,7 @@ def download_population(uid):
             "crecsys": a[0].crecsys,
             "frecsys": a[0].frecsys,
             "profile_pic": a[0].profile_pic,
+            "daily_activity_level": a[0].daily_activity_level,
             "profile": Agent_Profile.query.filter_by(agent_id=a[0].id).first().profile if Agent_Profile.query.filter_by(agent_id=a[0].id).first() is not None else None,
         })
 
@@ -490,6 +517,7 @@ def upload_population():
                 crecsys=a["crecsys"],
                 frecsys=a["frecsys"],
                 profile_pic=a["profile_pic"],
+                daily_activity_level=a["daily_activity_level"] if "daily_activity_level" in a else 1,
             )
             db.session.add(agent)
             db.session.commit()
@@ -527,6 +555,7 @@ def upload_population():
         db.session.commit()
 
     return redirect(request.referrer)
+
 
 @population.route("/admin/update_population_recsys/<int:uid>", methods=["POST"])
 @login_required
