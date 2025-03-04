@@ -5,16 +5,14 @@ from flask import (
 )
 from flask_login import login_required, current_user
 
-from y_web.models import (
-    Ollama_Pull
-)
+from y_web.models import Ollama_Pull
 from y_web.utils import (
     start_ollama_server,
     is_ollama_running,
     is_ollama_installed,
     pull_ollama_model,
     delete_ollama_model,
-    delete_model_pull
+    delete_model_pull,
 )
 import json
 from y_web import db
@@ -82,7 +80,7 @@ def delete_model(model_name):
     return redirect(request.referrer)
 
 
-@ollama.route('/admin/pull_progress/<string:model_name>')
+@ollama.route("/admin/pull_progress/<string:model_name>")
 def get_pull_progress(model_name):
     """Return the current progress as JSON."""
     # get client_execution

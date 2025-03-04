@@ -4,11 +4,7 @@ from flask import (
 )
 from flask_login import login_required, current_user
 
-from .models import (
-    Exps,
-    Client,
-    Client_Execution, Ollama_Pull
-)
+from .models import Exps, Client, Client_Execution, Ollama_Pull
 from y_web.utils import (
     is_ollama_running,
     is_ollama_installed,
@@ -42,7 +38,6 @@ def dashboard():
         exps[e.idexp] = {
             "experiment": e,
             "clients": Client.query.filter_by(id_exp=e.idexp).all(),
-
         }
 
     res = {}
@@ -65,7 +60,14 @@ def dashboard():
     ollama_pulls = Ollama_Pull.query.all()
     ollama_pulls = [(pull.model_name, float(pull.status)) for pull in ollama_pulls]
 
-    return render_template("admin/dashboard.html", experiments=res, ollamas=ollamas, models=models, active_pulls=ollama_pulls, len=len)
+    return render_template(
+        "admin/dashboard.html",
+        experiments=res,
+        ollamas=ollamas,
+        models=models,
+        active_pulls=ollama_pulls,
+        len=len,
+    )
 
 
 @admin.route("/admin/about")

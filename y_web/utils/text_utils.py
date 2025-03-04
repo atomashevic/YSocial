@@ -37,10 +37,19 @@ def toxicity(text, username, post_id, db):
         if api_key is not None:
             try:
                 p = PerspectiveAPI(api_key)
-                toxicity_score = p.score(text,
-                                 tests=["TOXICITY", "SEVERE_TOXICITY", "IDENTITY_ATTACK",
-                                        "INSULT", "PROFANITY", "THREAT",
-                                        "SEXUALLY_EXPLICIT", "FLIRTATION"])
+                toxicity_score = p.score(
+                    text,
+                    tests=[
+                        "TOXICITY",
+                        "SEVERE_TOXICITY",
+                        "IDENTITY_ATTACK",
+                        "INSULT",
+                        "PROFANITY",
+                        "THREAT",
+                        "SEXUALLY_EXPLICIT",
+                        "FLIRTATION",
+                    ],
+                )
                 post_toxicity = Post_Toxicity(
                     post_id=post_id,
                     toxicity=toxicity_score["TOXICITY"],
@@ -50,8 +59,8 @@ def toxicity(text, username, post_id, db):
                     profanity=toxicity_score["PROFANITY"],
                     threat=toxicity_score["THREAT"],
                     sexually_explicit=toxicity_score["SEXUALLY_EXPLICIT"],
-                    flirtation=toxicity_score["FLIRTATION"]
-                   )
+                    flirtation=toxicity_score["FLIRTATION"],
+                )
 
                 db.session.add(post_toxicity)
                 db.session.commit()

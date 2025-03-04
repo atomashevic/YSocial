@@ -1,23 +1,11 @@
 import os
 
-from flask import (
-    Blueprint,
-    render_template,
-    request,
-    abort
-)
+from flask import Blueprint, render_template, request, abort
 from flask_login import login_required, current_user
 
-from y_web.models import (
-    Exps,
-    Admin_users,
-    User_mgmt,
-    User_Experiment
-)
+from y_web.models import Exps, Admin_users, User_mgmt, User_Experiment
 
-from y_web.utils import (
-    get_ollama_models
-)
+from y_web.utils import get_ollama_models
 
 from y_web import db, app
 from y_web.utils.miscellanea import check_privileges
@@ -135,7 +123,7 @@ def user_details(uid):
         user_experiments=experiments,
         all_experiments=all_experiments,
         user_experiments_joined=joined_exp,
-        none=None
+        none=None,
     )
 
 
@@ -151,7 +139,14 @@ def add_user():
     llm = request.form.get("llm")
     profile_pic = request.form.get("profile_pic")
 
-    user = Admin_users(username=username, email=email, password=password, role=role, llm=llm, profile_pic=profile_pic)
+    user = Admin_users(
+        username=username,
+        email=email,
+        password=password,
+        role=role,
+        llm=llm,
+        profile_pic=profile_pic,
+    )
 
     db.session.add(user)
     db.session.commit()

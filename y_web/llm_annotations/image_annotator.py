@@ -34,7 +34,6 @@ class Annotator(object):
         )
 
     def annotate(self, image):
-
         self.user_proxy.initiate_chat(
             self.image_agent,
             silent=True,

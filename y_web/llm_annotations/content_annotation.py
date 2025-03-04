@@ -11,7 +11,6 @@ class ContentAnnotator(object):
         """
 
         if llm is not None:
-
             self.config_list = [
                 {
                     "model": llm,
@@ -55,7 +54,8 @@ class ContentAnnotator(object):
         :param text: the text to annotate
         :return:
         """
-        if self.annotator is None: return []
+        if self.annotator is None:
+            return []
 
         self.handler.initiate_chat(
             self.annotator,
@@ -77,7 +77,8 @@ class ContentAnnotator(object):
         :param text: the text to annotate
         :return:
         """
-        if self.annotator is None: return []
+        if self.annotator is None:
+            return []
 
         self.handler.initiate_chat(
             self.annotator,

@@ -20,12 +20,9 @@ from y_web.models import (
     Population_Experiment,
     User_Experiment,
     Client,
-    Client_Execution
+    Client_Execution,
 )
-from y_web.utils import (
-    terminate_process_on_port,
-    start_server
-)
+from y_web.utils import terminate_process_on_port, start_server
 import json
 import pathlib, shutil
 import uuid
@@ -404,7 +401,7 @@ def start_experiment(uid):
     # start the yserver
     start_server(exp)
 
-    return redirect(request.referrer) #experiment_details(uid)
+    return redirect(request.referrer)  # experiment_details(uid)
 
 
 @experiments.route("/admin/stop_experiment/<int:uid>")

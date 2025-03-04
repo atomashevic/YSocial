@@ -7,7 +7,15 @@ import json
 import time
 import random
 from multiprocessing import Process
-from y_web.models import Client_Execution, Agent_Population, Agent, Page, Page_Population, Ollama_Pull, Agent_Profile
+from y_web.models import (
+    Client_Execution,
+    Agent_Population,
+    Agent,
+    Page,
+    Page_Population,
+    Ollama_Pull,
+    Agent_Profile,
+)
 from y_web import db, client_processes
 import requests
 from ollama import Client as oclient
@@ -47,9 +55,7 @@ def start_server(exp):
     yserver_path = os.path.dirname(os.path.abspath(__file__)).split("y_web")[0]
     sys.path.append(f"{yserver_path}{os.sep}external{os.sep}YServer{os.sep}")
     BASE_DIR = os.path.dirname(os.path.abspath(__file__)).split("utils")[0]
-    config = (
-        f"{yserver_path}y_web{os.sep}{exp.db_name.split('database_server.db')[0]}config_server.json"
-    )
+    config = f"{yserver_path}y_web{os.sep}{exp.db_name.split('database_server.db')[0]}config_server.json"
     exp_uid = exp.db_name.split(os.sep)[1]
     flask_command = f"python {yserver_path}external{os.sep}YServer{os.sep}y_server_run.py -c {config}"
 
@@ -69,7 +75,9 @@ def start_server(exp):
 def is_ollama_installed():
     # Step 1: Check if Ollama is installed
     try:
-        subprocess.run(["ollama", "--version"], capture_output=True, text=True, check=True)
+        subprocess.run(
+            ["ollama", "--version"], capture_output=True, text=True, check=True
+        )
         print("Ollama is installed.")
         return True
     except FileNotFoundError:
@@ -88,7 +96,9 @@ def is_ollama_running():
             print("Ollama is running.")
             return True
         else:
-            print(f"Ollama responded but not running correctly. Status: {response.status_code}")
+            print(
+                f"Ollama responded but not running correctly. Status: {response.status_code}"
+            )
             return False
     except requests.ConnectionError:
         print("Ollama is not running or cannot be reached.")
@@ -96,8 +106,7 @@ def is_ollama_running():
 
 
 def start_ollama_server():
-
-    if is_ollama_installed() :
+    if is_ollama_installed():
         if not is_ollama_running():
             screen_command = f"screen -dmS ollama ollama serve"
 
@@ -121,20 +130,18 @@ def pull_ollama_model(model_name):
 
 def start_ollama_pull(model_name):
     ol_client = oclient(
-        host='http://127.0.0.1:11434',
-        headers={'x-some-header': 'some-value'}
+        host="http://127.0.0.1:11434", headers={"x-some-header": "some-value"}
     )
 
     for progress in ol_client.pull(model_name, stream=True):
-
         model = Ollama_Pull.query.filter_by(model_name=model_name).first()
         if not model:
             model = Ollama_Pull(model_name=model_name, status=0)
             db.session.add(model)
             db.session.commit()
 
-        total = progress.get('total')
-        completed = progress.get('completed')
+        total = progress.get("total")
+        completed = progress.get("completed")
         if completed is not None:
             current = float(completed) / float(total)
             # update the model status
@@ -148,8 +155,7 @@ def get_ollama_models():
     models = []
 
     ol_client = oclient(
-        host='http://0.0.0.0:11434',
-        headers={'x-some-header': 'some-value'}
+        host="http://0.0.0.0:11434", headers={"x-some-header": "some-value"}
     )
 
     # Extract all model values
@@ -162,8 +168,7 @@ def get_ollama_models():
 
 def delete_ollama_model(model_name):
     ol_client = oclient(
-        host='http://0.0.0.0:11434',
-        headers={'x-some-header': 'some-value'}
+        host="http://0.0.0.0:11434", headers={"x-some-header": "some-value"}
     )
 
     ol_client.delete(model_name)
@@ -199,7 +204,15 @@ def terminate_client(cli, pause=False):
 
 
 def start_client(exp, cli, population, resume=False):
-    process = Process(target=start_client_process, args=(exp, cli, population, resume, ))
+    process = Process(
+        target=start_client_process,
+        args=(
+            exp,
+            cli,
+            population,
+            resume,
+        ),
+    )
     process.start()
     client_processes[cli.name] = process
 
@@ -229,7 +242,8 @@ def start_client_process(exp, cli, population, resume=False):
 
     BASE_DIR = os.path.dirname(os.path.abspath(__file__))
     filename = f"{BASE_DIR}{os.sep}{exp.db_name.split('database_server.db')[0]}{population.name.replace(' ', '')}.json".replace(
-        "utils/", "")
+        "utils/", ""
+    )
 
     # check if a Client_Execution object exists for client_id
     ce = Client_Execution.query.filter_by(client_id=cli.id).first()
@@ -246,9 +260,9 @@ def start_client_process(exp, cli, population, resume=False):
         ce = Client_Execution(
             client_id=cli.id,
             elapsed_time=0,
-            expected_duration_rounds=cli.days*24,
+            expected_duration_rounds=cli.days * 24,
             last_active_hour=-1,
-            last_active_day=-1
+            last_active_day=-1,
         )
         db.session.add(ce)
         db.session.commit()
@@ -261,7 +275,7 @@ def start_client_process(exp, cli, population, resume=False):
         cl = YClientWeb(config_file, data_base_path, first_run=first_run)
 
     if resume:
-        cl.days = int((ce.expected_duration_rounds - ce.elapsed_time)/24)
+        cl.days = int((ce.expected_duration_rounds - ce.elapsed_time) / 24)
 
     cl.read_agents()
     cl.add_feeds()
@@ -310,7 +324,9 @@ def run_simulation(cl, cli_id, agent_file):
             # normalize weights to sum to 1
             weights = [w / sum(weights) for w in weights]
             # sample agents
-            sagents = np.random.choice(cl.agents.agents, size=expected_active_users, p=weights, replace=False)
+            sagents = np.random.choice(
+                cl.agents.agents, size=expected_active_users, p=weights, replace=False
+            )
 
             # available actions
             # shuffle agents

@@ -15,7 +15,7 @@ def __sample_age(mean, std_dev, min_age, max_age):
 
 def __sample_pareto(values, alpha=2.0):
     """Sample a value from the given set following a Pareto distribution."""
-    pareto_sample = (np.random.pareto(alpha))  # Shifted Pareto sample
+    pareto_sample = np.random.pareto(alpha)  # Shifted Pareto sample
     normalized_sample = pareto_sample / (pareto_sample + 1)  # Normalize to (0,1)
 
     # Map the continuous value to the discrete set
@@ -53,9 +53,12 @@ def generate_population(population_name):
         ).strip()
 
         # Gaussian distribution for age
-        age = __sample_age(np.mean([population.age_min, population.age_max]),
-                           int((population.age_max - population.age_min)/2),
-                           population.age_min, population.age_max)
+        age = __sample_age(
+            np.mean([population.age_min, population.age_max]),
+            int((population.age_max - population.age_min) / 2),
+            population.age_min,
+            population.age_max,
+        )
 
         interests = fake.random_elements(
             elements=set(population.interests.split(",")),

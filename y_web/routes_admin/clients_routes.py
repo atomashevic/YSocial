@@ -21,13 +21,11 @@ from y_web.models import (
     Population_Experiment,
     Page_Population,
     Client,
-    Client_Execution, User_mgmt, Agent_Profile
+    Client_Execution,
+    User_mgmt,
+    Agent_Profile,
 )
-from y_web.utils import (
-    start_client,
-    terminate_client,
-    get_ollama_models
-)
+from y_web.utils import start_client, terminate_client, get_ollama_models
 import json
 import shutil
 from . import db, experiment_details, population
@@ -146,7 +144,7 @@ def stop_client(uid, idexp):
     client = Client.query.filter_by(id=uid).first()
     terminate_client(client, pause=False)
 
-    return redirect(request.referrer) #experiment_details(idexp)
+    return redirect(request.referrer)  # experiment_details(idexp)
 
 
 @clientsr.route("/admin/clients/<idexp>")
@@ -272,7 +270,9 @@ def create_client():
             "days": int(days),
             "slots": 24,
             "percentage_new_agents_iteration": float(percentage_new_agents_iteration),
-            "percentage_removed_agents_iteration": float(percentage_removed_agents_iteration),
+            "percentage_removed_agents_iteration": float(
+                percentage_removed_agents_iteration
+            ),
             "hourly_activity": {
                 "10": 0.021,
                 "16": 0.032,
@@ -365,28 +365,37 @@ def create_client():
                 "ag": ["critical/judgmental", "friendly/compassionate"],
                 "ne": ["resilient/confident", "sensitive/nervous"],
             },
-
         },
     }
 
-    #get population agents
+    # get population agents
     agents = Agent_Population.query.filter_by(population_id=population_id).all()
     # get agents political leaning
-    political_leaning = set([Agent.query.filter_by(id=a.agent_id).first().leaning for a in agents])
+    political_leaning = set(
+        [Agent.query.filter_by(id=a.agent_id).first().leaning for a in agents]
+    )
     # get agents age
     age = set([Agent.query.filter_by(id=a.agent_id).first().age for a in agents])
     # get agents toxicity levels
-    toxicity = set([Agent.query.filter_by(id=a.agent_id).first().toxicity for a in agents])
+    toxicity = set(
+        [Agent.query.filter_by(id=a.agent_id).first().toxicity for a in agents]
+    )
     # get agents language
-    language = set([Agent.query.filter_by(id=a.agent_id).first().language for a in agents])
+    language = set(
+        [Agent.query.filter_by(id=a.agent_id).first().language for a in agents]
+    )
     # get agents type
-    ag_type = set([Agent.query.filter_by(id=a.agent_id).first().ag_type for a in agents])
+    ag_type = set(
+        [Agent.query.filter_by(id=a.agent_id).first().ag_type for a in agents]
+    )
     # get agents education level
-    education_level = set([Agent.query.filter_by(id=a.agent_id).first().education_level for a in agents])
+    education_level = set(
+        [Agent.query.filter_by(id=a.agent_id).first().education_level for a in agents]
+    )
 
     config["agents"]["political_leanings"] = list(political_leaning)
-    config["agents"]["age"]['min'] = min(age)
-    config["agents"]["age"]['max'] = max(age)
+    config["agents"]["age"]["min"] = min(age)
+    config["agents"]["age"]["max"] = max(age)
     config["agents"]["toxicity_levels"] = list(toxicity)
     config["agents"]["languages"] = list(language)
     config["agents"]["llm_agents"] = list(ag_type)
@@ -412,8 +421,10 @@ def create_client():
 
     # copy prompts.json into the experiment folder
     data_base_path = f"{BASE_DIR}y_web{os.sep}experiments{os.sep}{uid}{os.sep}"
-    shutil.copyfile(f"{BASE_DIR}data_schema{os.sep}prompts.json".replace("/y_web/utils", ""),
-                        f"{data_base_path}prompts.json")
+    shutil.copyfile(
+        f"{BASE_DIR}data_schema{os.sep}prompts.json".replace("/y_web/utils", ""),
+        f"{data_base_path}prompts.json",
+    )
 
     # Create agent population file
     BASE_DIR = os.path.dirname(os.path.abspath(__file__)).split("routes_admin")[0]
@@ -425,7 +436,6 @@ def create_client():
 
     res = {"agents": []}
     for a in agents:
-
         custom_prompt = Agent_Profile.query.filter_by(agent_id=a.id).first()
 
         if custom_prompt:
@@ -442,7 +452,9 @@ def create_client():
                 "interests": [
                     [x.strip() for x in a.interests.split(",")],
                     [len([x for x in a.interests.split(",")])],
-                ] if a.interests else [[], 0],
+                ]
+                if a.interests
+                else [[], 0],
                 "oe": a.oe,
                 "co": a.co,
                 "ex": a.ex,
@@ -459,7 +471,7 @@ def create_client():
                 "toxicity": a.toxicity,
                 "is_page": 0,
                 "prompts": custom_prompt if custom_prompt else None,
-                "daily_activity_level": a.daily_activity_level
+                "daily_activity_level": a.daily_activity_level,
             }
         )
 
@@ -513,7 +525,9 @@ def delete_client(uid):
 
     # remove the db file on the client
     BASE_PATH = os.path.dirname(os.path.abspath(__file__)).split("y_web")[0]
-    path = f"{BASE_PATH}external{os.sep}YClient{os.sep}experiments{os.sep}{client.name}.db"
+    path = (
+        f"{BASE_PATH}external{os.sep}YClient{os.sep}experiments{os.sep}{client.name}.db"
+    )
     if os.path.exists(path):
         os.remove(path)
     else:
@@ -546,7 +560,8 @@ def client_details(uid):
     exp_folder = experiment.db_name.split(os.sep)[1]
 
     path = f"{BASE}{os.sep}experiments{os.sep}{exp_folder}{os.sep}client_{client.name}-{population.name}.json".replace(
-        f"routes_admin{os.sep}", "")
+        f"routes_admin{os.sep}", ""
+    )
 
     if os.path.exists(path):
         with open(path, "r") as f:
@@ -575,11 +590,10 @@ def client_details(uid):
         population=population,
         pages=pages,
         models=models,
-
     )
 
 
-@clientsr.route('/admin/progress/<int:client_id>')
+@clientsr.route("/admin/progress/<int:client_id>")
 def get_progress(client_id):
     """Return the current progress as JSON."""
     # get client_execution
@@ -587,7 +601,15 @@ def get_progress(client_id):
 
     if client_execution is None:
         return json.dumps({"progress": 0})
-    progress = int(100 * float(client_execution.elapsed_time)/float(client_execution.expected_duration_rounds)) if client_execution.expected_duration_rounds > 0 else 0
+    progress = (
+        int(
+            100
+            * float(client_execution.elapsed_time)
+            / float(client_execution.expected_duration_rounds)
+        )
+        if client_execution.expected_duration_rounds > 0
+        else 0
+    )
     return json.dumps({"progress": progress})
 
 
@@ -602,7 +624,9 @@ def set_network(uid):
     # get populations for client uid
     populations = Population.query.filter_by(id=client.population_id).all()
     # get agents for the populations
-    agents = Agent_Population.query.filter(Agent_Population.population_id.in_([p.id for p in populations])).all()
+    agents = Agent_Population.query.filter(
+        Agent_Population.population_id.in_([p.id for p in populations])
+    ).all()
     # get agent ids for all agents in populations
     agent_ids = [Agent.query.filter_by(id=a.agent_id).first().name for a in agents]
 
@@ -623,7 +647,9 @@ def set_network(uid):
     BASE = os.path.dirname(os.path.abspath(__file__))
     exp_folder = exp.db_name.split(os.sep)[1]
 
-    path = f"{BASE}{os.sep}experiments{os.sep}{exp_folder}{os.sep}{client.name}_network.csv".replace(f"routes_admin{os.sep}", "")
+    path = f"{BASE}{os.sep}experiments{os.sep}{exp_folder}{os.sep}{client.name}_network.csv".replace(
+        f"routes_admin{os.sep}", ""
+    )
 
     # since the network is undirected and Y assume directed relations we need to write the edges in both directions
     with open(path, "w") as f:
@@ -653,10 +679,15 @@ def upload_network(uid):
     exp_folder = exp.db_name.split(os.sep)[1]
 
     network = request.files["network_file"]
-    network.save(f"{BASE}{os.sep}experiments{os.sep}{exp_folder}{os.sep}{client.name}_network_temp.csv")
+    network.save(
+        f"{BASE}{os.sep}experiments{os.sep}{exp_folder}{os.sep}{client.name}_network_temp.csv"
+    )
 
-    path = f"{BASE}{os.sep}experiments{os.sep}{exp_folder}{os.sep}{client.name}".replace(
-        f"routes_admin{os.sep}", "")
+    path = (
+        f"{BASE}{os.sep}experiments{os.sep}{exp_folder}{os.sep}{client.name}".replace(
+            f"routes_admin{os.sep}", ""
+        )
+    )
 
     try:
         with open(f"{path}_network.csv", "w") as o:
@@ -668,13 +699,17 @@ def upload_network(uid):
                     agent_1 = Agent.query.filter_by(name=l[0]).first()
                     if agent_1 is not None:
                         # check if in population
-                        test = Agent_Population.query.filter_by(agent_id=agent_1.id, population_id=client.population_id).all()
+                        test = Agent_Population.query.filter_by(
+                            agent_id=agent_1.id, population_id=client.population_id
+                        ).all()
                         error = len(test) == 0
                     else:
                         agent_1 = Page.query.filter_by(name=l[0]).first()
                         if agent_1 is not None:
                             # check if in population
-                            test = Page_Population.query.filter_by(page_id=agent_1.id, population_id=client.population_id).all()
+                            test = Page_Population.query.filter_by(
+                                page_id=agent_1.id, population_id=client.population_id
+                            ).all()
                             error = len(test) == 0
                         if agent_1 is None:
                             error = True
@@ -682,13 +717,17 @@ def upload_network(uid):
                     agent_2 = Agent.query.filter_by(name=l[1]).first()
                     if agent_2 is not None:
                         # check if in population
-                        test = Agent_Population.query.filter_by(agent_id=agent_2.id, population_id=client.population_id).all()
+                        test = Agent_Population.query.filter_by(
+                            agent_id=agent_2.id, population_id=client.population_id
+                        ).all()
                         error2 = len(test) == 0
                     else:
                         agent_2 = Page.query.filter_by(name=l[1]).first()
                         if agent_2 is not None:
                             # check if in population
-                            test = Page_Population.query.filter_by(page_id=agent_2.id, population_id=client.population_id).all()
+                            test = Page_Population.query.filter_by(
+                                page_id=agent_2.id, population_id=client.population_id
+                            ).all()
                             error2 = len(test) == 0
 
                         if agent_2 is None:
@@ -702,7 +741,10 @@ def upload_network(uid):
                         os.remove(f"{path}_network.csv")
                         return redirect(request.referrer)
     except:
-        flash("File format error: provide a csv file containing two columns with agent names. No header required.", "error")
+        flash(
+            "File format error: provide a csv file containing two columns with agent names. No header required.",
+            "error",
+        )
         os.remove(f"{path}_network_temp.csv")
         os.remove(f"{path}_network.csv")
         return redirect(request.referrer)
@@ -728,7 +770,8 @@ def download_agent_list(uid):
 
     # get agents in the populations
     agents = Agent_Population.query.filter(
-        Agent_Population.population_id.in_([p.id_population for p in populations])).all()
+        Agent_Population.population_id.in_([p.id_population for p in populations])
+    ).all()
 
     # get the experiment
     exp = Exps.query.filter_by(idexp=client.id_exp).first()
@@ -736,13 +779,19 @@ def download_agent_list(uid):
     BASE = os.path.dirname(os.path.abspath(__file__))
     exp_folder = exp.db_name.split(os.sep)[1]
 
-    with open(f"{BASE}{os.sep}experiments{os.sep}{exp_folder}{os.sep}{client.name}_agent_list.csv", "w") as f:
+    with open(
+        f"{BASE}{os.sep}experiments{os.sep}{exp_folder}{os.sep}{client.name}_agent_list.csv",
+        "w",
+    ) as f:
         for a in agents:
             agent = Agent.query.filter_by(id=a.agent_id).first()
             f.write(f"{agent.name}\n")
         f.flush()
 
-    return send_file(f"{BASE}{os.sep}experiments{os.sep}{exp_folder}{os.sep}{client.name}_agent_list.csv", as_attachment=True)
+    return send_file(
+        f"{BASE}{os.sep}experiments{os.sep}{exp_folder}{os.sep}{client.name}_agent_list.csv",
+        as_attachment=True,
+    )
 
 
 @clientsr.route("/admin/update_agents_activity/<int:uid>", methods=["POST"])
@@ -764,7 +813,8 @@ def update_agents_activity(uid):
     exp_folder = experiment.db_name.split(os.sep)[1]
 
     path = f"{BASE}{os.sep}experiments{os.sep}{exp_folder}{os.sep}client_{client.name}-{population.name}.json".replace(
-        f"routes_admin{os.sep}", "")
+        f"routes_admin{os.sep}", ""
+    )
 
     if os.path.exists(path):
         with open(path, "r") as f:
@@ -792,7 +842,8 @@ def reset_agents_activity(uid):
     exp_folder = experiment.db_name.split(os.sep)[1]
 
     path = f"{BASE}{os.sep}experiments{os.sep}{exp_folder}{os.sep}client_{client.name}-{population.name}.json".replace(
-        f"routes_admin{os.path.sep}", "")
+        f"routes_admin{os.path.sep}", ""
+    )
 
     if os.path.exists(path):
         with open(path, "r") as f:

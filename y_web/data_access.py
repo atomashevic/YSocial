@@ -14,8 +14,9 @@ from .models import (
     Post_topics,
     Images,
     Page,
-    Agent, Admin_users,
-    Post_Sentiment
+    Agent,
+    Admin_users,
+    Post_Sentiment,
 )
 from sqlalchemy.sql.expression import func
 from sqlalchemy import desc
@@ -67,11 +68,11 @@ def get_user_recent_posts(user_id, page, per_page=10, mode="rf", current_user=No
         ).paginate(page=page, per_page=per_page, error_out=False)
 
     elif mode == "shares":
-
         # get all posts of user_id having shared_from is not -1
         posts = (
-            Post.query.filter(Post.user_id == int(user_id), Post.shared_from != -1)
-            .order_by(desc(Post.id))
+            Post.query.filter(
+                Post.user_id == int(user_id), Post.shared_from != -1
+            ).order_by(desc(Post.id))
         ).paginate(page=page, per_page=per_page, error_out=False)
 
     else:
@@ -121,14 +122,29 @@ def get_user_recent_posts(user_id, page, per_page=10, mode="rf", current_user=No
                     profile_pic = page.logo
             else:
                 ag = Agent.query.filter_by(name=user.username).first()
-                profile_pic = ag.profile_pic if ag is not None and ag.profile_pic is not None else Admin_users.query.filter_by(username=user.username).first().profile_pic
+                profile_pic = (
+                    ag.profile_pic
+                    if ag is not None and ag.profile_pic is not None
+                    else Admin_users.query.filter_by(username=user.username)
+                    .first()
+                    .profile_pic
+                )
 
             cms.append(
                 {
                     "post_id": c.id,
                     "author": author,
                     "profile_pic": profile_pic,
-                    "shared_from": -1 if c.shared_from == -1 else (c.shared_from, db.session.query(User_mgmt).join(Post, User_mgmt.id == Post.user_id).filter(Post.id == c.shared_from).first().username),
+                    "shared_from": -1
+                    if c.shared_from == -1
+                    else (
+                        c.shared_from,
+                        db.session.query(User_mgmt)
+                        .join(Post, User_mgmt.id == Post.user_id)
+                        .filter(Post.id == c.shared_from)
+                        .first()
+                        .username,
+                    ),
                     "author_id": int(c.user_id),
                     "post": augment_text(text),
                     "round": c.round,
@@ -150,7 +166,7 @@ def get_user_recent_posts(user_id, page, per_page=10, mode="rf", current_user=No
                     is None,
                     "is_shared": len(Post.query.filter_by(shared_from=c.id).all()),
                     "emotions": emotions,
-                    "topics": get_topics(post.thread_id, int(post.user_id))
+                    "topics": get_topics(post.thread_id, int(post.user_id)),
                 }
             )
 
@@ -190,14 +206,29 @@ def get_user_recent_posts(user_id, page, per_page=10, mode="rf", current_user=No
                 profile_pic = page.logo
         else:
             ag = Agent.query.filter_by(name=author.username).first()
-            profile_pic = ag.profile_pic if ag is not None and ag.profile_pic is not None else Admin_users.query.filter_by(username=author.username).first().profile_pic
+            profile_pic = (
+                ag.profile_pic
+                if ag is not None and ag.profile_pic is not None
+                else Admin_users.query.filter_by(username=author.username)
+                .first()
+                .profile_pic
+            )
 
         res.append(
             {
                 "article": art,
                 "image": image,
                 "thread_id": post.thread_id,
-                "shared_from": -1 if post.shared_from == -1 else (post.shared_from, db.session.query(User_mgmt).join(Post, User_mgmt.id == Post.user_id).filter(Post.id == post.shared_from).first().username),
+                "shared_from": -1
+                if post.shared_from == -1
+                else (
+                    post.shared_from,
+                    db.session.query(User_mgmt)
+                    .join(Post, User_mgmt.id == Post.user_id)
+                    .filter(Post.id == post.shared_from)
+                    .first()
+                    .username,
+                ),
                 "post_id": post.id,
                 "profile_pic": profile_pic,
                 "author": User_mgmt.query.filter_by(id=post.user_id).first().username,
@@ -226,7 +257,7 @@ def get_user_recent_posts(user_id, page, per_page=10, mode="rf", current_user=No
                 "comments": cms,
                 "t_comments": len(cms),
                 "emotions": emotions,
-                "topics": get_topics(post.id, int(post.user_id))
+                "topics": get_topics(post.id, int(post.user_id)),
             }
         )
 
@@ -312,10 +343,18 @@ def get_mutual_friends(user_a, user_b, limit=10):
 
         else:
             ag = Agent.query.filter_by(name=user.username).first()
-            profile_pic = ag.profile_pic if ag is not None and ag.profile_pic is not None else Admin_users.query.filter_by(username=user.username).first().profile_pic
+            profile_pic = (
+                ag.profile_pic
+                if ag is not None and ag.profile_pic is not None
+                else Admin_users.query.filter_by(username=user.username)
+                .first()
+                .profile_pic
+            )
 
         if user.id not in added:
-            res.append({"id": user.id, "username": user.username, "profile_pic": profile_pic})
+            res.append(
+                {"id": user.id, "username": user.username, "profile_pic": profile_pic}
+            )
             added[user.id] = None
 
     return res
@@ -367,14 +406,18 @@ def get_user_friends(user_id, limit=12, page=1):
     # get number
     number_followees = len(
         list(
-            Follow.query.filter(Follow.user_id==user_id, Follow.follower_id != user_id)
+            Follow.query.filter(
+                Follow.user_id == user_id, Follow.follower_id != user_id
+            )
             .group_by(Follow.follower_id)
             .having(func.count(Follow.follower_id) % 2 == 1)
         )
     )
     number_followers = len(
         list(
-            Follow.query.filter(Follow.follower_id==user_id, Follow.user_id != user_id)
+            Follow.query.filter(
+                Follow.follower_id == user_id, Follow.user_id != user_id
+            )
             .group_by(Follow.user_id)
             .having(func.count(Follow.user_id) % 2 == 1)
         )
@@ -391,7 +434,9 @@ def get_user_friends(user_id, limit=12, page=1):
 
     if page * limit - number_followees < limit:
         followee = (
-            Follow.query.filter(Follow.user_id==user_id, Follow.follower_id != user_id)
+            Follow.query.filter(
+                Follow.user_id == user_id, Follow.follower_id != user_id
+            )
             .group_by(Follow.follower_id)
             .having(func.count(Follow.follower_id) % 2 == 1)
             .join(User_mgmt, Follow.follower_id == User_mgmt.id)
@@ -408,17 +453,31 @@ def get_user_friends(user_id, limit=12, page=1):
                         list(Reactions.query.filter_by(user_id=f.id))
                     ),
                     "number_followers": len(
-                        list(Follow.query.filter(Follow.follower_id == f.id, Follow.user_id != f.id).group_by(Follow.user_id).having(func.count(Follow.user_id) % 2 == 1))
+                        list(
+                            Follow.query.filter(
+                                Follow.follower_id == f.id, Follow.user_id != f.id
+                            )
+                            .group_by(Follow.user_id)
+                            .having(func.count(Follow.user_id) % 2 == 1)
+                        )
                     ),
                     "number_followees": len(
-                        list(Follow.query.filter(Follow.user_id == f.id, Follow.follower_id != f.id).group_by(Follow.follower_id).having(func.count(Follow.follower_id) % 2 == 1))
+                        list(
+                            Follow.query.filter(
+                                Follow.user_id == f.id, Follow.follower_id != f.id
+                            )
+                            .group_by(Follow.follower_id)
+                            .having(func.count(Follow.follower_id) % 2 == 1)
+                        )
                     ),
                 }
             )
 
     if number_followers - page * limit < limit:
         followers = (
-            Follow.query.filter(Follow.follower_id==user_id, Follow.user_id != user_id)
+            Follow.query.filter(
+                Follow.follower_id == user_id, Follow.user_id != user_id
+            )
             .group_by(Follow.user_id)
             .having(func.count(Follow.follower_id) % 2 == 1)
             .join(User_mgmt, Follow.user_id == User_mgmt.id)
@@ -435,10 +494,22 @@ def get_user_friends(user_id, limit=12, page=1):
                         list(Reactions.query.filter_by(user_id=f.id))
                     ),
                     "number_followers": len(
-                        list(Follow.query.filter(Follow.follower_id == f.id, Follow.user_id != f.id).group_by(Follow.user_id).having(func.count(Follow.user_id) % 2 == 1))
+                        list(
+                            Follow.query.filter(
+                                Follow.follower_id == f.id, Follow.user_id != f.id
+                            )
+                            .group_by(Follow.user_id)
+                            .having(func.count(Follow.user_id) % 2 == 1)
+                        )
                     ),
                     "number_followees": len(
-                        list(Follow.query.filter(Follow.user_id == f.id, Follow.follower_id != f.id).group_by(Follow.follower_id).having(func.count(Follow.follower_id) % 2 == 1))
+                        list(
+                            Follow.query.filter(
+                                Follow.user_id == f.id, Follow.follower_id != f.id
+                            )
+                            .group_by(Follow.follower_id)
+                            .having(func.count(Follow.follower_id) % 2 == 1)
+                        )
                     ),
                 }
             )
@@ -601,15 +672,29 @@ def get_posts_associated_to_hashtags(hashtag_id, page, per_page=10, current_user
                     profile_pic = page.logo
             else:
                 ag = Agent.query.filter_by(name=user.username).first()
-                profile_pic = ag.profile_pic if ag is not None and ag.profile_pic is not None else Admin_users.query.filter_by(username=user.username).first().profile_pic
-
+                profile_pic = (
+                    ag.profile_pic
+                    if ag is not None and ag.profile_pic is not None
+                    else Admin_users.query.filter_by(username=user.username)
+                    .first()
+                    .profile_pic
+                )
 
             cms.append(
                 {
                     "post_id": c.id,
                     "author": author,
                     "profile_pic": profile_pic,
-                    "shared_from": -1 if c.shared_from == -1 else (c.shared_from, db.session.query(User_mgmt).join(Post, User_mgmt.id == Post.user_id).filter(Post.id == c.shared_from).first().username),
+                    "shared_from": -1
+                    if c.shared_from == -1
+                    else (
+                        c.shared_from,
+                        db.session.query(User_mgmt)
+                        .join(Post, User_mgmt.id == Post.user_id)
+                        .filter(Post.id == c.shared_from)
+                        .first()
+                        .username,
+                    ),
                     "author_id": int(c.user_id),
                     "post": augment_text(c.tweet.split(":")[-1]),
                     "round": c.round,
@@ -671,7 +756,13 @@ def get_posts_associated_to_hashtags(hashtag_id, page, per_page=10, current_user
         else:
             # get agent profile pic
             ag = Agent.query.filter_by(name=author.username).first()
-            profile_pic = ag.profile_pic if ag is not None and ag.profile_pic is not None else Admin_users.query.filter_by(username=author.username).first().profile_pic
+            profile_pic = (
+                ag.profile_pic
+                if ag is not None and ag.profile_pic is not None
+                else Admin_users.query.filter_by(username=author.username)
+                .first()
+                .profile_pic
+            )
 
         res.append(
             {
@@ -679,7 +770,16 @@ def get_posts_associated_to_hashtags(hashtag_id, page, per_page=10, current_user
                 "image": image,
                 "profile_pic": profile_pic,
                 "thread_id": post.thread_id,
-                "shared_from": -1 if post.shared_from == -1 else (post.shared_from, db.session.query(User_mgmt).join(Post, User_mgmt.id == Post.user_id).filter(Post.id == post.shared_from).first().username),
+                "shared_from": -1
+                if post.shared_from == -1
+                else (
+                    post.shared_from,
+                    db.session.query(User_mgmt)
+                    .join(Post, User_mgmt.id == Post.user_id)
+                    .filter(Post.id == post.shared_from)
+                    .first()
+                    .username,
+                ),
                 "post_id": post.id,
                 "author": User_mgmt.query.filter_by(id=post.user_id).first().username,
                 "author_id": int(post.user_id),
@@ -707,7 +807,7 @@ def get_posts_associated_to_hashtags(hashtag_id, page, per_page=10, current_user
                 "comments": cms,
                 "t_comments": len(cms),
                 "emotions": emotions,
-                "topics": get_topics(post.id, int(post.user_id))
+                "topics": get_topics(post.id, int(post.user_id)),
             }
         )
 
@@ -763,14 +863,29 @@ def get_posts_associated_to_interest(interest_id, page, per_page=10, current_use
                     profile_pic = page.logo
             else:
                 ag = Agent.query.filter_by(name=c_user.username).first()
-                profile_pic = ag.profile_pic if ag is not None and ag.profile_pic is not None else Admin_users.query.filter_by(username=c_user.username).first().profile_pic
+                profile_pic = (
+                    ag.profile_pic
+                    if ag is not None and ag.profile_pic is not None
+                    else Admin_users.query.filter_by(username=c_user.username)
+                    .first()
+                    .profile_pic
+                )
 
             cms.append(
                 {
                     "post_id": c.id,
                     "author": author,
                     "profile_pic": profile_pic,
-                    "shared_from": -1 if c.shared_from == -1 else (c.shared_from, db.session.query(User_mgmt).join(Post, User_mgmt.id == Post.user_id).filter(Post.id == c.shared_from).first().username),
+                    "shared_from": -1
+                    if c.shared_from == -1
+                    else (
+                        c.shared_from,
+                        db.session.query(User_mgmt)
+                        .join(Post, User_mgmt.id == Post.user_id)
+                        .filter(Post.id == c.shared_from)
+                        .first()
+                        .username,
+                    ),
                     "author_id": int(c.user_id),
                     "post": augment_text(c.tweet.split(":")[-1]),
                     "round": c.round,
@@ -828,7 +943,13 @@ def get_posts_associated_to_interest(interest_id, page, per_page=10, current_use
                 profile_pic = page.logo
         else:
             ag = Agent.query.filter_by(name=author.username).first()
-            profile_pic = ag.profile_pic if ag is not None and ag.profile_pic is not None else Admin_users.query.filter_by(username=author.username).first().profile_pic
+            profile_pic = (
+                ag.profile_pic
+                if ag is not None and ag.profile_pic is not None
+                else Admin_users.query.filter_by(username=author.username)
+                .first()
+                .profile_pic
+            )
 
         res.append(
             {
@@ -836,7 +957,16 @@ def get_posts_associated_to_interest(interest_id, page, per_page=10, current_use
                 "image": image,
                 "profile_pic": profile_pic,
                 "thread_id": post.thread_id,
-                "shared_from": -1 if post.shared_from == -1 else (post.shared_from, db.session.query(User_mgmt).join(Post, User_mgmt.id == Post.user_id).filter(Post.id == post.shared_from).first().username),
+                "shared_from": -1
+                if post.shared_from == -1
+                else (
+                    post.shared_from,
+                    db.session.query(User_mgmt)
+                    .join(Post, User_mgmt.id == Post.user_id)
+                    .filter(Post.id == post.shared_from)
+                    .first()
+                    .username,
+                ),
                 "post_id": post.id,
                 "author": User_mgmt.query.filter_by(id=post.user_id).first().username,
                 "author_id": int(post.user_id),
@@ -864,7 +994,7 @@ def get_posts_associated_to_interest(interest_id, page, per_page=10, current_use
                 "comments": cms,
                 "t_comments": len(cms),
                 "emotions": emotions,
-                "topics": get_topics(post.id, int(post.user_id))
+                "topics": get_topics(post.id, int(post.user_id)),
             }
         )
 
@@ -921,14 +1051,29 @@ def get_posts_associated_to_emotion(emotion_id, page, per_page=10, current_user=
                     profile_pic = page.logo
             else:
                 ag = Agent.query.filter_by(name=user.username).first()
-                profile_pic = ag.profile_pic if ag is not None and ag.profile_pic is not None else Admin_users.query.filter_by(username=user.username).first().profile_pic
+                profile_pic = (
+                    ag.profile_pic
+                    if ag is not None and ag.profile_pic is not None
+                    else Admin_users.query.filter_by(username=user.username)
+                    .first()
+                    .profile_pic
+                )
 
             cms.append(
                 {
                     "post_id": c.id,
                     "author": author,
                     "profile_pic": profile_pic,
-                    "shared_from": -1 if c.shared_from == -1 else (c.shared_from, db.session.query(User_mgmt).join(Post, User_mgmt.id == Post.user_id).filter(Post.id == c.shared_from).first().username),
+                    "shared_from": -1
+                    if c.shared_from == -1
+                    else (
+                        c.shared_from,
+                        db.session.query(User_mgmt)
+                        .join(Post, User_mgmt.id == Post.user_id)
+                        .filter(Post.id == c.shared_from)
+                        .first()
+                        .username,
+                    ),
                     "author_id": int(c.user_id),
                     "post": augment_text(c.tweet.split(":")[-1]),
                     "round": c.round,
@@ -986,14 +1131,29 @@ def get_posts_associated_to_emotion(emotion_id, page, per_page=10, current_user=
                 profile_pic = page.logo
         else:
             ag = Agent.query.filter_by(name=author.username).first()
-            profile_pic = ag.profile_pic if ag is not None and ag.profile_pic is not None else Admin_users.query.filter_by(username=author.username).first().profile_pic
+            profile_pic = (
+                ag.profile_pic
+                if ag is not None and ag.profile_pic is not None
+                else Admin_users.query.filter_by(username=author.username)
+                .first()
+                .profile_pic
+            )
 
         res.append(
             {
                 "article": art,
                 "image": image,
                 "thread_id": post.thread_id,
-                "shared_from": -1 if post.shared_from == -1 else (post.shared_from, db.session.query(User_mgmt).join(Post, User_mgmt.id == Post.user_id).filter(Post.id == post.shared_from).first().username),
+                "shared_from": -1
+                if post.shared_from == -1
+                else (
+                    post.shared_from,
+                    db.session.query(User_mgmt)
+                    .join(Post, User_mgmt.id == Post.user_id)
+                    .filter(Post.id == post.shared_from)
+                    .first()
+                    .username,
+                ),
                 "post_id": post.id,
                 "profile_pic": profile_pic,
                 "author": User_mgmt.query.filter_by(id=post.user_id).first().username,
@@ -1022,7 +1182,7 @@ def get_posts_associated_to_emotion(emotion_id, page, per_page=10, current_user=
                 "comments": cms,
                 "t_comments": len(cms),
                 "emotions": emotions,
-                "topics": get_topics(post.id, int(post.user_id))
+                "topics": get_topics(post.id, int(post.user_id)),
             }
         )
 
@@ -1076,9 +1236,8 @@ def get_elicited_emotions(post_id):
 
 
 def get_topics(post_id, user_id):
-
     # get the topics of the post
-    #topics = (
+    # topics = (
     #    Post.query.filter_by(id=post_id)
     #    .join(Post_topics, Post.id == Post_topics.post_id)
     #    .join(Post_Sentiment, Post.id == Post_Sentiment.post_id)
@@ -1089,7 +1248,7 @@ def get_topics(post_id, user_id):
     #    .add_columns(Post_Sentiment.is_reaction)
     #    .add_columns(Post_Sentiment.user_id)
     #    .all()
-    #)
+    # )
     post = Post.query.filter_by(id=post_id).first()
     if post.image_id is not None:
         return []
@@ -1103,11 +1262,26 @@ def get_topics(post_id, user_id):
             if topic.topic_id not in cleaned and topic.is_reaction == 0:
                 # threshold the sentiment
                 if topic.compound > 0.05:
-                    cleaned[topic.topic_id] = (topic.topic_id, name, "positive", topic.round)
+                    cleaned[topic.topic_id] = (
+                        topic.topic_id,
+                        name,
+                        "positive",
+                        topic.round,
+                    )
                 elif topic.compound < -0.05:
-                    cleaned[topic.topic_id] = (topic.topic_id, name, "negative", topic.round)
+                    cleaned[topic.topic_id] = (
+                        topic.topic_id,
+                        name,
+                        "negative",
+                        topic.round,
+                    )
                 else:
-                    cleaned[topic.topic_id] = (topic.topic_id, name, "neutral", topic.round)
+                    cleaned[topic.topic_id] = (
+                        topic.topic_id,
+                        name,
+                        "neutral",
+                        topic.round,
+                    )
 
     return list(cleaned.values())
 

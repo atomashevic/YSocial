@@ -11,10 +11,12 @@ def start_app(debug=False, host="localhost", port=8080):
     """
 
     import nltk
-    nltk.download('vader_lexicon')
+
+    nltk.download("vader_lexicon")
 
     # unload all experiments
     from y_web.models import Exps
+
     # select all loaded experiments
     exps = Exps.query.filter_by(status=1).all()
     # stop all the experiments

@@ -190,4 +190,3 @@ def add_page_to_population():
     db.session.commit()
 
     return page_details(page_id)
-

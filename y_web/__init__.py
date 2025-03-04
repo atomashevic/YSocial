@@ -19,7 +19,7 @@ def cleanup_subprocesses():
     print("Cleaning up subprocesses...")
     for _, proc in client_processes.items():
         print(f"Terminating subprocess {proc.pid}...")
-        proc.terminate() # Wait for the process to terminate
+        proc.terminate()  # Wait for the process to terminate
         proc.join()
     print("All subprocesses terminated.")
 
@@ -43,7 +43,8 @@ if not os.path.exists(f"{BASE_DIR}{os.sep}db{os.sep}dashboard.db"):
         f"{BASE_DIR}{os.sep}db{os.sep}dashboard.db",
     )
     shutil.copyfile(
-        f"{BASE_DIR}{os.sep}..{os.sep}data_schema{os.sep}database_clean_server.db", f"{BASE_DIR}{os.sep}db{os.sep}dummy.db"
+        f"{BASE_DIR}{os.sep}..{os.sep}data_schema{os.sep}database_clean_server.db",
+        f"{BASE_DIR}{os.sep}db{os.sep}dummy.db",
     )
 
 
@@ -57,9 +58,7 @@ app.config["SQLALCHEMY_BINDS"] = {
 }
 
 # Manually add check_same_thread=False
-app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
-    "connect_args": {"check_same_thread": False}
-}
+app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {"connect_args": {"check_same_thread": False}}
 
 
 db = SQLAlchemy(app)
@@ -126,4 +125,3 @@ app.register_blueprint(experiments_blueprint)
 from .routes_admin.clients_routes import clientsr as clients_blueprint
 
 app.register_blueprint(clients_blueprint)
-

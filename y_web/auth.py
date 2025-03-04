@@ -66,7 +66,7 @@ def login_post():
     # login code goes here
     email = request.form.get("email")
     password = request.form.get("password")
-    remember = True if request.form.get('remember') else False
+    remember = True if request.form.get("remember") else False
 
     user = Admin_users.query.filter_by(email=email).first()
 

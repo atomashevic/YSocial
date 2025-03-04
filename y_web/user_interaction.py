@@ -17,7 +17,7 @@ from .models import (
     Reactions,
     Admin_users,
     Images,
-    Post_Sentiment
+    Post_Sentiment,
 )
 from flask import request
 from .llm_annotations import ContentAnnotator, Annotator
@@ -79,9 +79,9 @@ def share_content():
         user_id=current_user.id,
         comment_to=-1,
         shared_from=post_id,
-        image_id = original.image_id,
-        news_id = original.news_id,
-        post_img = original.post_img
+        image_id=original.image_id,
+        news_id=original.news_id,
+        post_img=original.post_img,
     )
 
     db.session.add(post)
@@ -140,7 +140,6 @@ def publish_post():
 
     img_id = None
     if url is not None and url != "":
-
         llm_v = "minicpm-v"
         image_annotator = Annotator(llm_v)
         annotation = image_annotator.annotate(url)
@@ -163,7 +162,7 @@ def publish_post():
         round=current_round.id,
         user_id=current_user.id,
         comment_to=-1,
-        image_id = img_id,
+        image_id=img_id,
     )
 
     db.session.add(post)
@@ -210,8 +209,7 @@ def publish_post():
             neg=sentiment["neg"],
             neu=sentiment["neu"],
             compound=sentiment["compound"],
-            round=current_round.id
-
+            round=current_round.id,
         )
         db.session.add(post_sentiment)
         db.session.commit()
@@ -288,7 +286,11 @@ def publish_comment():
 
     # get sentiment of the post is responding to
     sentiment_root = Post_Sentiment.query.filter_by(post_id=pid).first()
-    values = {"pos": sentiment_root.pos, "neg": sentiment_root.neg, "neu": sentiment_root.neu}
+    values = {
+        "pos": sentiment_root.pos,
+        "neg": sentiment_root.neg,
+        "neu": sentiment_root.neu,
+    }
     # get the key with the max value
     sentiment_parent = max(values, key=values.get)
     sentiment = vader_sentiment(text)
@@ -331,7 +333,7 @@ def publish_comment():
                 neu=sentiment["neu"],
                 compound=sentiment["compound"],
                 sentiment_parent=sentiment_parent,
-                round=current_round.id
+                round=current_round.id,
             )
             db.session.add(post_sentiment)
             db.session.commit()
@@ -368,7 +370,7 @@ def publish_comment():
         us = User_mgmt.query.filter_by(username=mention.strip("@")).first()
 
         # existing user and not self
-        #@todo: check gosth mentions to the current user...
+        # @todo: check ghost mentions to the current user...
         if us is not None and us.id != current_user.id:
             mn = Mentions(user_id=us.id, post_id=post.id, round=current_round.id)
             db.session.add(mn)

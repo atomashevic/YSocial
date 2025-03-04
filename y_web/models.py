@@ -219,6 +219,7 @@ class Post_Toxicity(db.Model):
     sexually_explicit = db.Column(db.REAL, default=0)
     flirtation = db.Column(db.REAL, default=0)
 
+
 ############################################################################################################
 
 
@@ -412,7 +413,7 @@ class Client_Execution(db.Model):
     __tablename__ = "client_execution"
     id = db.Column(db.Integer, primary_key=True)
     client_id = db.Column(db.Integer, db.ForeignKey("client.id"), nullable=False)
-    elapsed_time =db.Column(db.Integer, default=0)
+    elapsed_time = db.Column(db.Integer, default=0)
     expected_duration_rounds = db.Column(db.Integer, default=0)
     last_active_hour = db.Column(db.Integer, default=-1)
     last_active_day = db.Column(db.Integer, default=-1)

@@ -13,9 +13,7 @@ from y_web.models import (
     Agent_Population,
     Agent_Profile,
 )
-from y_web.utils import (
-    get_ollama_models
-)
+from y_web.utils import get_ollama_models
 
 from y_web import db
 from y_web.utils.miscellanea import check_privileges
@@ -133,7 +131,7 @@ def create_agent():
         crecsys=recsys_type,
         frecsys=frecsys_type,
         profile_pic=profile_pic,
-        daily_activity_level=int(daily_activity_level)
+        daily_activity_level=int(daily_activity_level),
     )
 
     db.session.add(agent)
@@ -229,4 +227,3 @@ def delete_agent(uid):
         db.session.commit()
 
     return agent_data()
-

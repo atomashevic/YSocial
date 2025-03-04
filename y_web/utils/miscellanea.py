@@ -6,10 +6,7 @@ from y_web.models import (
 from y_web import db
 from flask_login import login_user
 
-from flask import (
-    redirect,
-    url_for
-)
+from flask import redirect, url_for
 
 
 def check_privileges(username):

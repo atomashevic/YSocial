@@ -16,8 +16,10 @@ from y_web.models import (
     Population,
     Agent,
     Agent_Population,
-    Population_Experiment, Page_Population,
-    Page, Agent_Profile,
+    Population_Experiment,
+    Page_Population,
+    Page,
+    Agent_Profile,
 )
 from y_web.utils import (
     generate_population,
@@ -61,7 +63,7 @@ def create_population():
 
     education_levels = request.form.getlist("education_levels")
     education_levels = ",".join(education_levels)
-    political_leanings = request.form.getlist('political_leanings')
+    political_leanings = request.form.getlist("political_leanings")
     political_leanings = ",".join(political_leanings)
 
     nationalities = request.form.get("nationalities")
@@ -200,13 +202,10 @@ def population_details(uid):
             age["age"].append(a[0].age)
             age["total"].append(1)
 
-    sorted_age = dict(sorted(zip(age['age'], age['total'])))
+    sorted_age = dict(sorted(zip(age["age"], age["total"])))
 
     # Convert back to dictionary format with separate lists
-    age = {
-        'age': list(sorted_age.keys()),
-        'total': list(sorted_age.values())
-    }
+    age = {"age": list(sorted_age.keys()), "total": list(sorted_age.values())}
 
     edu = {"education": [], "total": []}
 
@@ -245,18 +244,20 @@ def population_details(uid):
     activity = {"activity": [], "total": []}
     for a in agents:
         if a[0].daily_activity_level in activity["activity"]:
-            activity["total"][activity["activity"].index(a[0].daily_activity_level)] += 1
+            activity["total"][
+                activity["activity"].index(a[0].daily_activity_level)
+            ] += 1
         else:
             if a[0].daily_activity_level is not None:
                 activity["activity"].append(a[0].daily_activity_level)
                 activity["total"].append(1)
 
-    sorted_activity = dict(sorted(zip(activity['activity'], activity['total'])))
+    sorted_activity = dict(sorted(zip(activity["activity"], activity["total"])))
 
     # Convert back to dictionary format with separate lists
     activity = {
-        'activity': list(sorted_activity.keys()),
-        'total': list(sorted_activity.values())
+        "activity": list(sorted_activity.keys()),
+        "total": list(sorted_activity.values()),
     }
 
     dd = {
@@ -423,43 +424,51 @@ def download_population(uid):
     }
 
     for a in agents:
-        res["agents"].append({
-            "id": a[0].id,
-            "name": a[0].name,
-            "ag_type": a[0].ag_type,
-            "leaning": a[0].leaning,
-            "interests": a[0].interests,
-            "oe": a[0].oe,
-            "co": a[0].co,
-            "ex": a[0].ex,
-            "ag": a[0].ag,
-            "ne": a[0].ne,
-            "language": a[0].language,
-            "education": a[0].education_level,
-            "round_actions": a[0].round_actions,
-            "nationality": a[0].nationality,
-            "toxicity": a[0].toxicity,
-            "age": a[0].age,
-            "gender": a[0].gender,
-            "crecsys": a[0].crecsys,
-            "frecsys": a[0].frecsys,
-            "profile_pic": a[0].profile_pic,
-            "daily_activity_level": a[0].daily_activity_level,
-            "profile": Agent_Profile.query.filter_by(agent_id=a[0].id).first().profile if Agent_Profile.query.filter_by(agent_id=a[0].id).first() is not None else None,
-        })
+        res["agents"].append(
+            {
+                "id": a[0].id,
+                "name": a[0].name,
+                "ag_type": a[0].ag_type,
+                "leaning": a[0].leaning,
+                "interests": a[0].interests,
+                "oe": a[0].oe,
+                "co": a[0].co,
+                "ex": a[0].ex,
+                "ag": a[0].ag,
+                "ne": a[0].ne,
+                "language": a[0].language,
+                "education": a[0].education_level,
+                "round_actions": a[0].round_actions,
+                "nationality": a[0].nationality,
+                "toxicity": a[0].toxicity,
+                "age": a[0].age,
+                "gender": a[0].gender,
+                "crecsys": a[0].crecsys,
+                "frecsys": a[0].frecsys,
+                "profile_pic": a[0].profile_pic,
+                "daily_activity_level": a[0].daily_activity_level,
+                "profile": Agent_Profile.query.filter_by(agent_id=a[0].id)
+                .first()
+                .profile
+                if Agent_Profile.query.filter_by(agent_id=a[0].id).first() is not None
+                else None,
+            }
+        )
 
     for p in pages:
-        res["pages"].append({
-            "id": p[0].id,
-            "name": p[0].name,
-            "descr": p[0].descr,
-            "page_type": p[0].page_type,
-            "feed": p[0].feed,
-            "keywords": p[0].keywords,
-            "logo": p[0].logo,
-            "pg_type": p[0].pg_type,
-            "leaning": p[0].leaning,
-        })
+        res["pages"].append(
+            {
+                "id": p[0].id,
+                "name": p[0].name,
+                "descr": p[0].descr,
+                "page_type": p[0].page_type,
+                "feed": p[0].feed,
+                "keywords": p[0].keywords,
+                "logo": p[0].logo,
+                "pg_type": p[0].pg_type,
+                "leaning": p[0].leaning,
+            }
+        )
 
     BASE_DIR = os.path.dirname(os.path.abspath(__file__)).split("routes_admin")[0]
     filename = f"{BASE_DIR}{os.sep}experiments{os.sep}temp_data{os.sep}population_{population.name}.json"
@@ -482,13 +491,17 @@ def upload_population():
     data = json.load(open(filename, "r"))
 
     # check if the population already exists
-    population = Population.query.filter_by(name=data["population_data"]["name"]).first()
+    population = Population.query.filter_by(
+        name=data["population_data"]["name"]
+    ).first()
     if population:
         flash("Population already exists.")
         return redirect(request.referrer)
 
     # add the population to the database
-    population = Population(name=data["population_data"]["name"], descr=data["population_data"]["descr"])
+    population = Population(
+        name=data["population_data"]["name"], descr=data["population_data"]["descr"]
+    )
     db.session.add(population)
     db.session.commit()
 
@@ -517,7 +530,9 @@ def upload_population():
                 crecsys=a["crecsys"],
                 frecsys=a["frecsys"],
                 profile_pic=a["profile_pic"],
-                daily_activity_level=a["daily_activity_level"] if "daily_activity_level" in a else 1,
+                daily_activity_level=a["daily_activity_level"]
+                if "daily_activity_level" in a
+                else 1,
             )
             db.session.add(agent)
             db.session.commit()
@@ -527,13 +542,14 @@ def upload_population():
                 db.session.add(agent_profile)
                 db.session.commit()
 
-        agent_population = Agent_Population(agent_id=agent.id, population_id=population.id)
+        agent_population = Agent_Population(
+            agent_id=agent.id, population_id=population.id
+        )
         db.session.add(agent_population)
         db.session.commit()
 
     # add the pages to the database
     for p in data["pages"]:
-
         # check if the page already exists
         page = Page.query.filter_by(name=p["name"]).first()
         if not page:
@@ -605,4 +621,3 @@ def update_llm(uid):
 
     db.session.commit()
     return redirect(request.referrer)
-
