@@ -22,22 +22,22 @@ Here's a few screenshots of the web interface:
 
 <details>
   <summary>Login</summary>
-  <img src="images/ysocial1.png" width="600">
+  <img src="images/ysocial1.png" width="100%">
 </details>
 
 <details>
   <summary>Timeline</summary>
-  <img src="images/ysocial_timeline.png" width="600">
+  <img src="images/ysocial_timeline.png" width="100%">
 </details>
 
 <details>
   <summary>Profile</summary>
-  <img src="images/ysocial_profile.png" width="600">
+  <img src="images/ysocial_profile.png" width="100%">
 </details>
 
 <details>
   <summary>Friends & Followers</summary>
-  <img src="images/ysocial_friends.png" width="600">
+  <img src="images/ysocial_friends.png" width="100%">
 </details>
 
 ### 🔧 **Admin Panel**
@@ -51,17 +51,17 @@ Here's a screenshot of the admin panel:
 
 <details>
   <summary>Dashboard</summary>
-  <img src="images/admin_dash.png" width="600">
+  <img src="images/admin_dash.png" width="100%">
 </details>
 
 <details>
   <summary>Experiment Configuration</summary>
-  <img src="images/admin_exp.png" width="600">
+  <img src="images/admin_exp.png" width="100%">
 </details>
 
 <details>
   <summary>News Page</summary>
-  <img src="images/admin_page.png" width="600">
+  <img src="images/admin_page.png" width="100%">
 </details>
 
 ### 🧠 **Simulation Configuration** and **Content Annotation**
