@@ -303,11 +303,12 @@ def augment_text(text):
         text = text.replace(h, f'<a href="/hashtag_posts/{hid}/1"> {h} </a>')
 
     # remove first character it is a space
-    if text[0] == " ":
-        text = text[1:]
+    if len(text) > 0:
+        if text[0] == " ":
+            text = text[1:]
 
-    # capitalize the first letter of the text
-    text = text[0].upper() + text[1:]
+        # capitalize the first letter of the text
+        text = text[0].upper() + text[1:]
 
     return text
 
