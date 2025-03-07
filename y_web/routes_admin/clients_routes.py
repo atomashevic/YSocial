@@ -28,8 +28,8 @@ from y_web.models import (
 from y_web.utils import start_client, terminate_client, get_ollama_models
 import json
 import shutil
-from . import db, experiment_details, population
-from y_web.utils.miscellanea import check_privileges
+from . import db, experiment_details
+from y_web.utils.miscellanea import check_privileges, ollama_status
 
 clientsr = Blueprint("clientsr", __name__)
 
@@ -159,7 +159,9 @@ def clients(idexp):
     # get the populations details
     pops = [Population.query.filter_by(id=p.id_population).first() for p in populations]
 
-    return render_template("admin/clients.html", experiment=exp, populations=pops)
+    ollamas = ollama_status()
+
+    return render_template("admin/clients.html", experiment=exp, populations=pops, ollamas=ollamas)
 
 
 @clientsr.route("/admin/create_client", methods=["POST"])
@@ -580,6 +582,8 @@ def client_details(uid):
 
     models = get_ollama_models()
 
+    ollamas = ollama_status()
+
     return render_template(
         "admin/client_details.html",
         data=data,
@@ -590,6 +594,7 @@ def client_details(uid):
         population=population,
         pages=pages,
         models=models,
+        ollamas=ollamas,
     )
 
 

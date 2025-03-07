@@ -330,6 +330,7 @@ def population_details(uid):
         pass
 
     models = get_ollama_models()
+    ollamas = ollama_status()
 
     return render_template(
         "admin/population_details.html",
@@ -339,6 +340,7 @@ def population_details(uid):
         agents=agents,
         data=dd,
         models=models,
+        ollamas=ollamas,
     )
 
 

@@ -120,6 +120,8 @@ def user_details(uid):
         for j in joined_exp
     ]
 
+    ollamas = ollama_status()
+
     return render_template(
         "admin/user_details.html",
         user=user,
@@ -127,6 +129,7 @@ def user_details(uid):
         all_experiments=all_experiments,
         user_experiments_joined=joined_exp,
         none=None,
+        ollamas=ollamas,
     )
 
 

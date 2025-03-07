@@ -375,12 +375,15 @@ def experiment_details(uid):
     # get experiment clients
     clients = Client.query.filter_by(id_exp=uid).all()
 
+    ollamas = ollama_status()
+
     return render_template(
         "admin/experiment_details.html",
         experiment=experiment,
         clients=clients,
         users=users,
         len=len,
+        ollamas=ollamas,
     )
 
 

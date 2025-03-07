@@ -175,12 +175,15 @@ def agent_details(uid):
     # get all populations
     populations = Population.query.all()
 
+    ollamas = ollama_status()
+
     return render_template(
         "admin/agent_details.html",
         agent=agent,
         agent_populations=pops,
         profile=agent_profiles,
         populations=populations,
+        ollamas=ollamas,
     )
 
 

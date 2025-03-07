@@ -161,12 +161,15 @@ def page_details(uid):
 
     feed = get_feed(page.feed)
 
+    ollamas = ollama_status()
+
     return render_template(
         "admin/page_details.html",
         page=page,
         page_populations=pops,
         populations=populations,
         feeds=feed[:3],
+        ollamas=ollamas,
     )
 
 
