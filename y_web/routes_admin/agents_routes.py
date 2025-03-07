@@ -12,6 +12,7 @@ from y_web.models import (
     Agent,
     Agent_Population,
     Agent_Profile,
+    Profession,
 )
 from y_web.utils import get_ollama_models
 from y_web.utils.miscellanea import ollama_status
@@ -32,7 +33,11 @@ def agent_data():
 
     populations = Population.query.all()
     ollamas = ollama_status()
-    return render_template("admin/agents.html", populations=populations, models=models, ollamas=ollamas)
+
+    # get professions
+    professions = Profession.query.all()
+
+    return render_template("admin/agents.html", populations=populations, models=models, ollamas=ollamas, professions=professions)
 
 
 @agents.route("/admin/agents_data")
@@ -112,6 +117,7 @@ def create_agent():
     alt_profile = request.form.get("alt_profile")
     profile_pic = request.form.get("profile_pic")
     daily_activity_level = request.form.get("daily_user_activity")
+    profession = request.form.get("profession")
 
     agent = Agent(
         name=name,
@@ -134,6 +140,7 @@ def create_agent():
         frecsys=frecsys_type,
         profile_pic=profile_pic,
         daily_activity_level=int(daily_activity_level),
+        profession=profession,
     )
 
     db.session.add(agent)

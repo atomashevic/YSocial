@@ -2,7 +2,8 @@ import random
 import faker
 import numpy as np
 from y_web import db
-from y_web.models import Population, Agent, Agent_Population
+from sqlalchemy.sql import func
+from y_web.models import Population, Agent, Agent_Population, Profession
 
 
 def __sample_age(mean, std_dev, min_age, max_age):
@@ -100,6 +101,9 @@ def generate_population(population_name):
 
         daily_activity_level = __sample_pareto([1, 2, 3, 4, 5])
 
+        # get random profession from db
+        profession = Profession.query.order_by(func.random()).first()
+
         agent = Agent(
             name=name.replace(" ", ""),
             age=age,
@@ -120,6 +124,7 @@ def generate_population(population_name):
             frecsys=population.frecsys,
             crecsys=population.crecsys,
             daily_activity_level=daily_activity_level,
+            profession=profession.profession
         )
 
         db.session.add(agent)

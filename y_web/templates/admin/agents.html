@@ -234,6 +234,19 @@
                                            </span>
                                     </div>
                                     <div class="box-line">
+                                        <span class="left">Profession</span>
+                                        <span class="right">
+                                            <div class="select">
+                                                <select name="profession">
+                                                    <option value=""></option>
+                                                    {% for profession in professions %}
+                                                    <option value="{{ profession.profession }}">{{ profession.profession }}</option>
+                                                    {% endfor %}
+                                                </select>
+                                            </div>
+                                           </span>
+                                    </div>
+                                    <div class="box-line">
                                         <span class="left">Nationality</span>
                                         <div class="select">
                                             <select name="nationality">

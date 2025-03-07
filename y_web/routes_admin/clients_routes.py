@@ -474,6 +474,7 @@ def create_client():
                 "is_page": 0,
                 "prompts": custom_prompt if custom_prompt else None,
                 "daily_activity_level": a.daily_activity_level,
+                "profession": a.profession,
             }
         )
 
