@@ -14,6 +14,7 @@ from y_web.models import (
     Agent_Profile,
 )
 from y_web.utils import get_ollama_models
+from y_web.utils.miscellanea import ollama_status
 
 from y_web import db
 from y_web.utils.miscellanea import check_privileges
@@ -30,7 +31,8 @@ def agent_data():
     models = get_ollama_models()
 
     populations = Population.query.all()
-    return render_template("admin/agents.html", populations=populations, models=models)
+    ollamas = ollama_status()
+    return render_template("admin/agents.html", populations=populations, models=models, ollamas=ollamas)
 
 
 @agents.route("/admin/agents_data")

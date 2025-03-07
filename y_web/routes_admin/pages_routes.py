@@ -17,6 +17,7 @@ from y_web.utils import (
 
 from y_web import db
 from y_web.utils.miscellanea import check_privileges
+from y_web.utils.miscellanea import ollama_status
 
 pages = Blueprint("pages", __name__)
 
@@ -27,8 +28,8 @@ def page_data():
     check_privileges(current_user.username)
 
     models = get_ollama_models()
-
-    return render_template("admin/pages.html", models=models)
+    ollamas = ollama_status()
+    return render_template("admin/pages.html", models=models, ollamas=ollamas)
 
 
 @pages.route("/admin/create_page", methods=["POST"])

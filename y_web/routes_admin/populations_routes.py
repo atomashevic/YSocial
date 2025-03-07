@@ -27,7 +27,7 @@ from y_web.utils import (
 )
 
 from y_web import db
-from y_web.utils.miscellanea import check_privileges
+from y_web.utils.miscellanea import check_privileges, ollama_status
 
 
 population = Blueprint("population", __name__)
@@ -152,8 +152,8 @@ def populations():
     # Regular expression to match model values
 
     models = get_ollama_models()
-
-    return render_template("admin/populations.html", models=models)
+    ollamas = ollama_status()
+    return render_template("admin/populations.html", models=models, ollamas=ollamas)
 
 
 @population.route("/admin/population_details/<int:uid>")

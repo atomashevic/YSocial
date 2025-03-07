@@ -27,7 +27,7 @@ import json
 import pathlib, shutil
 import uuid
 from y_web import db, app
-from y_web.utils.miscellanea import check_privileges, reload_current_user
+from y_web.utils.miscellanea import check_privileges, reload_current_user, ollama_status
 
 experiments = Blueprint("experiments", __name__)
 
@@ -49,7 +49,9 @@ def settings():
             # change the active experiment
             db.session.query(Exps).filter_by(status=1).update({Exps.status: 0})
 
-    return render_template("admin/settings.html", experiments=experiments, users=users)
+    ollamas = ollama_status()
+
+    return render_template("admin/settings.html", experiments=experiments, users=users, ollamas=ollamas)
 
 
 @experiments.route("/admin/join_simulation")

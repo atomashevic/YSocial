@@ -6,22 +6,15 @@ from flask_login import login_required, current_user
 
 from .models import Exps, Client, Client_Execution, Ollama_Pull
 from y_web.utils import (
-    is_ollama_running,
-    is_ollama_installed,
     get_ollama_models,
 )
+
+from y_web.utils.miscellanea import ollama_status
 
 from .utils import check_privileges
 
 
 admin = Blueprint("admin", __name__)
-
-
-def ollama_status():
-    return {
-        "status": is_ollama_running(),
-        "installed": is_ollama_installed(),
-    }
 
 
 @admin.route("/admin/dashboard")
@@ -74,4 +67,5 @@ def dashboard():
 @login_required
 def about():
     check_privileges(current_user.username)
-    return render_template("admin/about.html")
+    ollamas = ollama_status()
+    return render_template("admin/about.html", ollamas=ollamas)

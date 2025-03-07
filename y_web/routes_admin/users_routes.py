@@ -8,7 +8,7 @@ from y_web.models import Exps, Admin_users, User_mgmt, User_Experiment
 from y_web.utils import get_ollama_models
 
 from y_web import db, app
-from y_web.utils.miscellanea import check_privileges
+from y_web.utils.miscellanea import check_privileges, ollama_status
 
 
 users = Blueprint("users", __name__)
@@ -17,10 +17,13 @@ users = Blueprint("users", __name__)
 @users.route("/admin/users")
 @login_required
 def user_data():
-    print("HERE")
     check_privileges(current_user.username)
-    models = get_ollama_models()
-    return render_template("admin/users.html", m=models)
+    ollamas = ollama_status()
+    if ollamas["status"]:
+        models = get_ollama_models()
+    else:
+        models = []
+    return render_template("admin/users.html", m=models, ollamas=ollamas)
 
 
 @users.route("/admin/user_data")

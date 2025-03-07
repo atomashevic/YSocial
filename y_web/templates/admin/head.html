@@ -85,6 +85,7 @@
                 <span>Home</span>
             </div>
         </a>
+
         <a href="/admin/users" class="dashboard-aside-link">
             <div>
                 <i data-feather="users"></i>
@@ -92,6 +93,7 @@
             </div>
         </a>
         <hr>
+           {% if ollamas["status"] and  ollamas["installed"] %}
         <a href="/admin/experiments" class="dashboard-aside-link">
             <div>
                 <i data-feather="server"></i>
@@ -117,7 +119,9 @@
                 <span>Pages</span>
             </div>
         </a>
+
         <hr>
+        {% endif %}
     </div>
     <div class="dashboard-aside-end">
         <a href="/admin/about" class="dashboard-aside-link">
