@@ -477,7 +477,9 @@ def prompts(uid):
     # read the prompts file
     prompts = json.load(open(prompts))
 
-    return render_template("admin/prompts.html", experiment=experiment, prompts=prompts)
+    ollamas = ollama_status()
+
+    return render_template("admin/prompts.html", experiment=experiment, prompts=prompts, ollamas=ollamas)
 
 
 @experiments.route("/admin/update_prompts/<int:uid>", methods=["POST"])
