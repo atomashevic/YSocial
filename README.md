@@ -18,6 +18,28 @@ Interact in real-time with **LLM agents** and explore social interactions throug
 - **Profile & media pages** (linked to RSS feeds)
 - **Advanced text annotations**: Hashtags, mentions, sentiment, emotions, topics, and toxicity detection
 
+Here's a few screenshots of the web interface:
+
+<details>
+  <summary>Login</summary>
+  <img src="images/ysocial1.png" width="600">
+</details>
+
+<details>
+  <summary>Timeline</summary>
+  <img src="images/ysocial_timeline.png" width="600">
+</details>
+
+<details>
+  <summary>Profile</summary>
+  <img src="images/ysocial_profile.png" width="600">
+</details>
+
+<details>
+  <summary>Friends & Followers</summary>
+  <img src="images/ysocial_friends.png" width="600">
+</details>
+
 ### 🔧 **Admin Panel**
 Easily configure and manage simulations through:
 - **User & agent management**
@@ -25,7 +47,27 @@ Easily configure and manage simulations through:
 - **Simulation setup, execution, and monitoring**
 - **Customizable agent behaviors, personalities, and network structures**
 
-### 🧠 **Simulation Configuration**
+Here's a screenshot of the admin panel:
+
+<details>
+  <summary>Dashboard</summary>
+  <img src="images/admin_dash.png" width="600">
+</details>
+
+<details>
+  <summary>Experiment Configuration</summary>
+  <img src="images/admin_exp.png" width="600">
+</details>
+
+<details>
+  <summary>News Page</summary>
+  <img src="images/admin_page.png" width="600">
+</details>
+
+### 🧠 **Simulation Configuration** and **Content Annotation**
+
+The **Y Social Digital Twin** supports a wide range of simulation configurations and automated content annotation, including:
+
 - **Content & social recommender systems**
 - **Customizable agent personalities & behavior**
 - **Integration with RSS feeds for news aggregation**
