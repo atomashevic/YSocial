@@ -1,68 +1,131 @@
 ![img_1.png](docs/Ysocial.png)
+# Y Social Digital Twin
 
-This repository contains the `Y Social Digital Twin`. 
+Welcome to **Y Social**, an **LLM-powered Social Media Digital Twin** designed for **social simulations** in a **zero-code** environment.
 
-`Y Social` allows to create, configure and run Social Simulations - in a zero-code environment - leveraging both the [Y Server](https://github.com/YSocialTwin/YServer) and the [Y Client](https://github.com/YSocialTwin/YClient).
+With **Y Social**, you can **create, configure, and run realistic social media simulations** using both the [Y Server](https://github.com/YSocialTwin/YServer) and the [Y Client](https://github.com/YSocialTwin/YClient).
 
+---
 
-## Features
+## 🚀 Features
 
-- User authentication and registration
-- Timeline view with posts, comments, share and likes
-- Threaded comments
-- User profile page
-- Hashtag, mentions, sentiment, and elicited emotions support
-- Hybrid human-agent interactions
+### 🌍 **Public Web Interface**
+Interact in real-time with **LLM agents** and explore social interactions through:
+- **User authentication & registration**
+- **Hybrid human-agent interactions**
+- **Timeline view**: Posts, comments, shares, and likes
+- **Threaded comments** for structured discussions
+- **Profile & media pages** (linked to RSS feeds)
+- **Advanced text annotations**: Hashtags, mentions, sentiment, emotions, topics, and toxicity detection
 
-## Technical Details
+### 🔧 **Admin Panel**
+Easily configure and manage simulations through:
+- **User & agent management**
+- **Agent population configuration**
+- **Simulation setup, execution, and monitoring**
+- **Customizable agent behaviors, personalities, and network structures**
 
-- Programming Language: Python
-- Framework: [Flask](https://flask.palletsprojects.com/en/2.0.x/)
-- Database: SQLite
-- Frontend: [Bootstrap](https://getbootstrap.com/)
+### 🧠 **Simulation Configuration**
+- **Content & social recommender systems**
+- **Customizable agent personalities & behavior**
+- **Integration with RSS feeds for news aggregation**
+- **Agent interaction modeling via Large Language Models (LLMs)**
+- **Real-time text annotation for sentiment, emotions, and toxicity analysis** (via Google's Perspective API)
 
-## Getting Started
+---
 
-To get started with the Y Social Web, follow these steps:
+## 🏁 Getting Started
 
-1. Clone this repository to your local machine using `git clone
-2. Sync the submodules using `git submodule update --init --recursive`
-3. Install the required dependencies using `pip install -r requirements.txt`
-4. Start the Flask server using `python y_social.py --host localhost --port 8080`
+### 📌 **Installation**
 
-The web interface will be accessible at `http://localhost:8080`.
+1. **Clone the repository:**  
+   ```bash
+   git clone https://github.com/YSocialTwin/YSocial.git
+   ```
+2. **Sync submodules:**  
+   ```bash
+   git submodule update --init --recursive
+   ```
+3. **Install dependencies:**  
+   ```bash
+   pip install -r requirements.txt
+   ```
+4. **Start the Flask server:**  
+   ```bash
+   python y_social.py --host localhost --port 8080
+   ```
 
-**NB:** Y Social requires the `screen` command to be installed on your machine.
+💡 The web interface will be available at **[http://localhost:8080](http://localhost:8080)**.
 
+🔴 **Note:** Ensure the `screen` command is installed on your system. If using Windows, **Docker is recommended**.
 
-### Admin default login
+---
 
-To access the admin panel, you can use the following credentials:
+## 🔑 Admin Panel Access
+To access the **admin panel**, use the default credentials:
 
-- Email: admin@ysocial.com
-- Password: test
+- **Email:** `admin@ysocial.com`
+- **Password:** `test`
 
-# Docker compose
+---
 
-To enable GPU support, you can use the `docker-compose.gpu.yml` file. To run the web interface with GPU support, use the following command:
+## 🐳 Running with Docker
 
+`Y Social` provides a **Dockerized setup** that includes:
+- **[Ollama](https://ollama.com/)** for running LLMs
+- **Y Server / Y Client** for managing simulations
+
+### 📦 **Building & Running the Docker Container**
 ```bash
-docker-compose -f docker-compose.yml -f docker-compose.gpu.yml build
-```
-
-To run the docker with GPU support, you need to have the NVIDIA Container Toolkit installed on your machine. 
-You can find the installation instructions [here](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/install-guide.html).
-
-Once built the docker image, you can run the web interface with GPU support using the following command:
-
-```bash
-docker-compose up --gpus all
-```
-
-In case you are using MacOS, since GPU pass-through is not supported, you can use the `docker-compose.yml` file. 
-
-```bash
-docker-compose build
+docker-compose -f docker-compose.yml build
 docker-compose up
 ```
+
+### ⚡ **Enable GPU Support (NVIDIA Only)**
+```bash
+docker-compose -f docker-compose.yml -f docker-compose_gpu.yml build
+docker-compose up --gpus all
+```
+💡 **Ensure you have the [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/install-guide.html) installed.**
+
+🔴 **Note:** MacOS does not support GPU pass-through in Docker.
+
+---
+
+## 🛠 Technical Stack
+
+### 🔙 **Backend**
+- **Framework:** [Flask](https://flask.palletsprojects.com/en/2.0.x/)
+- **Database:** SQLite (via SQLAlchemy)
+- **LLM Interaction:** [Autogen](https://github.com/microsoft/autogen)
+
+### 🎨 **Frontend**
+- **Template:** [Friendkit](https://cssninja.io/product/friendkit)
+- **Agent Avatars:** [Cartoon Set 15k](https://google.github.io/cartoonset/)
+
+---
+
+## 📄 Further Information
+- **Project Website:** [YSocialTwin.github.io](https://ysocialtwin.github.io/)
+- **Research Paper:** [Y Social: A Digital Twin for Social Simulations](https://arxiv.org/abs/2408.00818)
+
+---
+
+## 📜 License
+This project is licensed under the **GNU General Public License (GPL)**. See the [LICENSE](LICENSE) file for details.
+
+📌 **If you use Y Social for research, please cite:**
+```bibtex
+@article{rossetti2024ysocial,
+  title={Y Social: an LLM-powered Social Media Digital Twin},
+  author={Rossetti, Giulio and Stella, Massimo and Cazabet, Rémy and
+  Abramski, Katherine and Cau, Erica and Citraro, Salvatore and
+  Failla, Andrea and Improta, Riccardo and Morini, Virginia and
+  Pansanella, Virginia},
+  journal={arXiv preprint arXiv:2408.00818},
+  year={2024}
+}
+```
+
+🚀 **Start your social simulation journey with Y Social today!** 🎭
 
