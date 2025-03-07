@@ -696,37 +696,45 @@ def upload_network(uid):
                 for l in f:
                     l = l.rstrip().split(",")
 
-                    agent_1 = Agent.query.filter_by(name=l[0]).first()
+                    agent_1 = Agent.query.filter_by(name=l[0]).all()
+                    aids = [a.id for a in agent_1]
+
                     if agent_1 is not None:
                         # check if in population
-                        test = Agent_Population.query.filter_by(
-                            agent_id=agent_1.id, population_id=client.population_id
+                        test = Agent_Population.query.filter(
+                            Agent_Population.agent_id.in_(aids), Agent_Population.population_id == client.population_id
                         ).all()
                         error = len(test) == 0
                     else:
-                        agent_1 = Page.query.filter_by(name=l[0]).first()
+                        agent_1 = Page.query.filter_by(name=l[0]).all()
+                        aids = [a.id for a in agent_1]
+
                         if agent_1 is not None:
                             # check if in population
-                            test = Page_Population.query.filter_by(
-                                page_id=agent_1.id, population_id=client.population_id
+                            test = Page_Population.query.filter(
+                                Page_Population.page_id.in_(aids), Page_Population.population_id == client.population_id
                             ).all()
                             error = len(test) == 0
                         if agent_1 is None:
                             error = True
 
-                    agent_2 = Agent.query.filter_by(name=l[1]).first()
+                    agent_2 = Agent.query.filter_by(name=l[1]).all()
+                    aids = [a.id for a in agent_2]
+
                     if agent_2 is not None:
                         # check if in population
-                        test = Agent_Population.query.filter_by(
-                            agent_id=agent_2.id, population_id=client.population_id
+                        test = Agent_Population.query.filter(
+                            Agent_Population.agent_id.in_(aids), Agent_Population.population_id == client.population_id
                         ).all()
                         error2 = len(test) == 0
                     else:
-                        agent_2 = Page.query.filter_by(name=l[1]).first()
+                        agent_2 = Page.query.filter_by(name=l[1]).all()
+                        aids = [a.id for a in agent_2]
+
                         if agent_2 is not None:
                             # check if in population
-                            test = Page_Population.query.filter_by(
-                                page_id=agent_2.id, population_id=client.population_id
+                            test = Page_Population.query.filter(
+                                Page_Population.page_id.in_(aids), Page_Population.population_id==client.population_id
                             ).all()
                             error2 = len(test) == 0
 
