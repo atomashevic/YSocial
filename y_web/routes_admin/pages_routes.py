@@ -8,7 +8,7 @@ from flask_login import login_required, current_user
 from y_web.models import (
     Population,
     Page,
-    Page_Population,
+    Page_Population, Leanings,
 )
 from y_web.utils import (
     get_feed,
@@ -29,7 +29,8 @@ def page_data():
 
     models = get_ollama_models()
     ollamas = ollama_status()
-    return render_template("admin/pages.html", models=models, ollamas=ollamas)
+    leanings = Leanings.query.all()
+    return render_template("admin/pages.html", models=models, ollamas=ollamas, leanings=leanings)
 
 
 @pages.route("/admin/create_page", methods=["POST"])

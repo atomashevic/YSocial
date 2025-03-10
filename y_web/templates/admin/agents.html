@@ -227,8 +227,9 @@
                                         <span class="right">
                                             <div class="select">
                                                 <select name="language">
-                                                    <option value="english">English</option>
-                                                    <option value="italian">Italian</option>
+                                                    {% for language in languages %}
+                                                    <option value="{{ language.language }}">{{ language.language }}</option>
+                                                    {% endfor %}
                                                 </select>
                                             </div>
                                            </span>
@@ -251,61 +252,9 @@
                                         <div class="select">
                                             <select name="nationality">
                                                 <option value=""></option>
-                                                <option value="American">American</option>
-                                                <option value="Argentine">Argentine</option>
-                                                <option value="Armenian">Armenian</option>
-                                                <option value="Austrian">Austrian</option>
-                                                <option value="Azerbaijani">Azerbaijani</option>
-                                                <option value="Bangladeshi">Bangladeshi</option>
-                                                <option value="Belgian">Belgian</option>
-                                                <option value="Brazilian">Brazilian</option>
-                                                <option value="British">British</option>
-                                                <option value="Bulgarian">Bulgarian</option>
-                                                <option value="Chilean">Chilean</option>
-                                                <option value="Chinese">Chinese</option>
-                                                <option value="Colombian">Colombian</option>
-                                                <option value="Croatian">Croatian</option>
-                                                <option value="Czech">Czech</option>
-                                                <option value="Danish">Danish</option>
-                                                <option value="Dutch">Dutch</option>
-                                                <option value="Estonian">Estonian</option>
-                                                <option value="Finnish">Finnish</option>
-                                                <option value="French">French</option>
-                                                <option value="Georgian">Georgian</option>
-                                                <option value="German">German</option>
-                                                <option value="Greek">Greek</option>
-                                                <option value="Hungarian">Hungarian</option>
-                                                <option value="Indian">Indian</option>
-                                                <option value="Indonesian">Indonesian</option>
-                                                <option value="Iranian">Iranian</option>
-                                                <option value="Irish">Irish</option>
-                                                <option value="Israeli">Israeli</option>
-                                                <option value="Italian">Italian</option>
-                                                <option value="Japanese">Japanese</option>
-                                                <option value="Latvian">Latvian</option>
-                                                <option value="Lithuanian">Lithuanian</option>
-                                                <option value="Mexican">Mexican</option>
-                                                <option value="Nepalese">Nepalese</option>
-                                                <option value="New Zealander">New Zealander</option>
-                                                <option value="Norwegian">Norwegian</option>
-                                                <option value="Palestinian">Palestinian</option>
-                                                <option value="Polish">Polish</option>
-                                                <option value="Portuguese">Portuguese</option>
-                                                <option value="Romanian">Romanian</option>
-                                                <option value="Russian">Russian</option>
-                                                <option value="Saudi">Saudi</option>
-                                                <option value="Slovak">Slovak</option>
-                                                <option value="Slovenian">Slovenian</option>
-                                                <option value="South African">South African</option>
-                                                <option value="South Korean">South Korean</option>
-                                                <option value="Spanish">Spanish</option>
-                                                <option value="Swedish">Swedish</option>
-                                                <option value="Swiss">Swiss</option>
-                                                <option value="Taiwanese">Taiwanese</option>
-                                                <option value="Thai">Thai</option>
-                                                <option value="Turkish">Turkish</option>
-                                                <option value="Ukrainian">Ukrainian</option>
-
+                                                {% for nationality in nationalities %}
+                                                <option value="{{nationality.nationality}}">{{nationality.nationality}}</option>
+                                                {% endfor %}
                                             </select>
                                         </div>
                                     </div>
@@ -313,10 +262,10 @@
                                         <span class="left">Education Level</span>
                                         <div class="select">
                                             <select name="education_level">
-                                                <option value="high school">High School</option>
-                                                <option value="bachelor">Bachelor</option>
-                                                <option value="master">Master</option>
-                                                <option value="phd">PhD</option>
+                                                <option value=""></option>
+                                                {% for education in education_levels %}
+                                                <option value="{{education.education_level}}">{{education.education_level}}</option>
+                                                {% endfor %}
                                             </select>
                                         </div>
                                     </div>
@@ -328,9 +277,9 @@
                                         <div class="select">
                                             <select name="leaning">
                                                 <option value=""></option>
-                                                <option value="democrat">Democrat</option>
-                                                <option value="republican">Republican</option>
-                                                <option value="centrist">Centrist</option>
+                                                {% for leaning in leanings %}
+                                                <option value="{{ leaning.leaning }}">{{ leaning.leaning }}</option>
+                                                {% endfor %}
                                             </select>
                                         </div>
                                     </div>

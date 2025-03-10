@@ -13,6 +13,7 @@ from y_web.models import (
     Agent_Population,
     Agent_Profile,
     Profession,
+    Nationalities, Education, Leanings, Languages
 )
 from y_web.utils import get_ollama_models
 from y_web.utils.miscellanea import ollama_status
@@ -36,8 +37,21 @@ def agent_data():
 
     # get professions
     professions = Profession.query.all()
+    nationalities = Nationalities.query.all()
+    educations = Education.query.all()
+    leanings = Leanings.query.all()
+    languages = Languages.query.all()
 
-    return render_template("admin/agents.html", populations=populations, models=models, ollamas=ollamas, professions=professions)
+    return render_template("admin/agents.html",
+                           populations=populations,
+                           models=models,
+                           ollamas=ollamas,
+                           professions=professions,
+                           nationalities=nationalities,
+                           education_levels=educations,
+                           leanings=leanings,
+                           languages=languages,
+                           )
 
 
 @agents.route("/admin/agents_data")

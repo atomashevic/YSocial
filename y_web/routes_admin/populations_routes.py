@@ -20,6 +20,8 @@ from y_web.models import (
     Page_Population,
     Page,
     Agent_Profile,
+    Education,
+    Leanings,
 )
 from y_web.utils import (
     generate_population,
@@ -153,7 +155,11 @@ def populations():
 
     models = get_ollama_models()
     ollamas = ollama_status()
-    return render_template("admin/populations.html", models=models, ollamas=ollamas)
+    leanings = Leanings.query.all()
+    education_levels = Education.query.all()
+
+    return render_template("admin/populations.html", models=models,
+                           ollamas=ollamas, leanings=leanings, education_levels=education_levels)
 
 
 @population.route("/admin/population_details/<int:uid>")

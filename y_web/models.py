@@ -435,3 +435,31 @@ class Profession(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     profession = db.Column(db.String(50), nullable=False)
     background = db.Column(db.String(200), nullable=False)
+
+
+class Nationalities(db.Model):
+    __bind__ = "db_admin"
+    __tablename__ = "nationalities"
+    id = db.Column(db.Integer, primary_key=True)
+    nationality = db.Column(db.String(50), nullable=False)
+
+
+class Education(db.Model):
+    __bind__ = "db_admin"
+    __tablename__ = "education"
+    id = db.Column(db.Integer, primary_key=True)
+    education_level = db.Column(db.String(50), nullable=False)
+
+
+class Leanings(db.Model):
+    __bind__ = "db_admin"
+    __tablename__ = "leanings"
+    id = db.Column(db.Integer, primary_key=True)
+    leaning = db.Column(db.String(50), nullable=False)
+
+
+class Languages(db.Model):
+    __bind__ = "db_admin"
+    __tablename__ = "languages"
+    id = db.Column(db.Integer, primary_key=True)
+    language = db.Column(db.String(50), nullable=False)

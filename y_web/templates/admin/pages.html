@@ -177,9 +177,9 @@
                                         <div class="select">
                                             <select name="leaning">
                                                 <option value=""></option>
-                                                <option value="democrat">Democrat</option>
-                                                <option value="republican">Republican</option>
-                                                <option value="centrist">Centrist</option>
+                                                {% for leaning in leanings %}
+                                                <option value="{{ leaning.leaning }}">{{ leaning.leaning }}</option>
+                                                {% endfor %}
                                             </select>
                                         </div>
                                     </div>

@@ -253,10 +253,9 @@
                                             <span class="right" style="width: 70%;">
                                                 <div class="select">
                                                     <select multiple size="2" name="education_levels">
-                                                        <option value="high school">High school</option>
-                                                        <option value="bachelor">Bachelor</option>
-                                                        <option value="master">Master</option>
-                                                        <option value="phd">Ph.D.</option>
+                                                        {% for education_level in education_levels %}
+                                                        <option value="{{ education_level.education_level }}">{{ education_level.education_level }}</option>
+                                                        {% endfor %}
                                                     </select>
                                                 </div>
                                             </span>
@@ -267,9 +266,9 @@
                                         <span class="right" style="width: 70%;">
                                             <div class="select">
                                             <select multiple size="2" name="political_leanings">
-                                                <option value="democrat">Democrat</option>
-                                                <option value="republican">Republican</option>
-                                                <option value="neutral">Neutral</option>
+                                                {% for political_leaning in leanings %}
+                                                <option value="{{ political_leaning.leaning }}">{{ political_leaning.leaning }}</option>
+                                                {% endfor %}
                                             </select>
                                             </div>
                                          <!--   <input type="text" name="political_leanings" class="input" value="democrat, republican"> -->
