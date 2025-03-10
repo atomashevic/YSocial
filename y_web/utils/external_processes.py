@@ -291,11 +291,14 @@ def run_simulation(cl, cli_id, agent_file):
     Run the simulation
     """
 
-    for d1 in range(int(cl.days)):
+    total_days = int(cl.days)
+    daily_slots = int(cl.slots)
+
+    for d1 in range(total_days):
         daily_active = {}
         tid, _, _ = cl.sim_clock.get_current_slot()
 
-        for _ in range(int(cl.slots)):
+        for _ in range(daily_slots):
             tid, d, h = cl.sim_clock.get_current_slot()
 
             # get expected active users for this time slot (at least 1)
