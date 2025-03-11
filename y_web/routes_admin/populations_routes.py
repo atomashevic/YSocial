@@ -158,8 +158,13 @@ def populations():
     leanings = Leanings.query.all()
     education_levels = Education.query.all()
 
-    return render_template("admin/populations.html", models=models,
-                           ollamas=ollamas, leanings=leanings, education_levels=education_levels)
+    return render_template(
+        "admin/populations.html",
+        models=models,
+        ollamas=ollamas,
+        leanings=leanings,
+        education_levels=education_levels,
+    )
 
 
 @population.route("/admin/population_details/<int:uid>")

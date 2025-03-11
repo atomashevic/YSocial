@@ -161,7 +161,9 @@ def clients(idexp):
 
     ollamas = ollama_status()
 
-    return render_template("admin/clients.html", experiment=exp, populations=pops, ollamas=ollamas)
+    return render_template(
+        "admin/clients.html", experiment=exp, populations=pops, ollamas=ollamas
+    )
 
 
 @clientsr.route("/admin/create_client", methods=["POST"])
@@ -708,7 +710,8 @@ def upload_network(uid):
                     if agent_1 is not None:
                         # check if in population
                         test = Agent_Population.query.filter(
-                            Agent_Population.agent_id.in_(aids), Agent_Population.population_id == client.population_id
+                            Agent_Population.agent_id.in_(aids),
+                            Agent_Population.population_id == client.population_id,
                         ).all()
                         error = len(test) == 0
                     else:
@@ -718,7 +721,8 @@ def upload_network(uid):
                         if agent_1 is not None:
                             # check if in population
                             test = Page_Population.query.filter(
-                                Page_Population.page_id.in_(aids), Page_Population.population_id == client.population_id
+                                Page_Population.page_id.in_(aids),
+                                Page_Population.population_id == client.population_id,
                             ).all()
                             error = len(test) == 0
                         if agent_1 is None:
@@ -730,7 +734,8 @@ def upload_network(uid):
                     if agent_2 is not None:
                         # check if in population
                         test = Agent_Population.query.filter(
-                            Agent_Population.agent_id.in_(aids), Agent_Population.population_id == client.population_id
+                            Agent_Population.agent_id.in_(aids),
+                            Agent_Population.population_id == client.population_id,
                         ).all()
                         error2 = len(test) == 0
                     else:
@@ -740,7 +745,8 @@ def upload_network(uid):
                         if agent_2 is not None:
                             # check if in population
                             test = Page_Population.query.filter(
-                                Page_Population.page_id.in_(aids), Page_Population.population_id==client.population_id
+                                Page_Population.page_id.in_(aids),
+                                Page_Population.population_id == client.population_id,
                             ).all()
                             error2 = len(test) == 0
 

@@ -21,6 +21,11 @@ from y_web.models import (
     User_Experiment,
     Client,
     Client_Execution,
+    Agent,
+    Agent_Population,
+    Agent_Profile,
+    Page,
+    Page_Population
 )
 from y_web.utils import terminate_process_on_port, start_server
 import json
@@ -51,7 +56,9 @@ def settings():
 
     ollamas = ollama_status()
 
-    return render_template("admin/settings.html", experiments=experiments, users=users, ollamas=ollamas)
+    return render_template(
+        "admin/settings.html", experiments=experiments, users=users, ollamas=ollamas
+    )
 
 
 @experiments.route("/admin/join_simulation")
@@ -119,6 +126,236 @@ def change_active_experiment(exp_id):
     db.session.commit()
 
     reload_current_user(uname)
+
+    return redirect(request.referrer)
+
+
+@experiments.route("/admin/upload_experiment", methods=["POST"])
+@login_required
+def upload_experiment():
+    check_privileges(current_user.username)
+
+    experiment = request.files["experiment"]
+    uid = uuid.uuid4()
+
+    BASE_DIR = os.path.dirname(os.path.abspath(__file__)).split("routes_admin")[0]
+
+    pathlib.Path(f"{BASE_DIR}experiments{os.sep}{uid}").mkdir()
+
+    experiment.save(f"{BASE_DIR}experiments{os.sep}{uid}{os.sep}exp.zip")
+    # unzip the file
+    shutil.unpack_archive(
+        f"{BASE_DIR}experiments{os.sep}{uid}{os.sep}exp.zip",
+        f"{BASE_DIR}experiments{os.sep}{uid}",
+    )
+    # remove the zip file
+    os.remove(f"{BASE_DIR}experiments{os.sep}{uid}{os.sep}exp.zip")
+
+    # create the experiment in the database from the config_server.json file
+    try:
+        experiment = json.load(
+            open(f"{BASE_DIR}experiments{os.sep}{uid}{os.sep}config_server.json")
+        )
+        print(experiment)
+        name = experiment["name"]
+
+        # check if the experiment already exists
+        exp = Exps.query.filter_by(exp_name=name).first()
+
+        if exp:
+            flash(
+                "The experiment already exists. Please check the experiment name and try again."
+            )
+            shutil.rmtree(f"{BASE_DIR}experiments{os.sep}{uid}", ignore_errors=True)
+            return settings()
+
+        exp = Exps(
+            exp_name=name,
+            db_name=f"experiments{os.sep}{uid}{os.sep}database_server.db",
+            owner=current_user.username,
+            exp_descr="",
+            status=0,
+            port=experiment["port"],
+            server=experiment["host"],
+        )
+
+        db.session.add(exp)
+        db.session.commit()
+
+        exp_stats = Exp_stats(
+            exp_id=exp.idexp, rounds=0, agents=0, posts=0, reactions=0, mentions=0
+        )
+        db.session.add(exp_stats)
+        db.session.commit()
+
+    except:
+        flash(
+            "There was an error loading the experiment files. Please check the files and try again."
+        )
+        # remove the directory containing the files
+        shutil.rmtree(f"{BASE_DIR}experiments{os.sep}{uid}", ignore_errors=True)
+
+    # get the json files that do not start with "client"
+    populations = [
+        f
+        for f in os.listdir(f"{BASE_DIR}experiments{os.sep}{uid}")
+        if f.endswith(".json") and not f.startswith("client") and f != "config_server.json" and f != "prompts.json"
+    ]
+
+    for population in populations:
+        name = population.split(".")[0]
+        pop = json.load(
+            open(f"{BASE_DIR}experiments{os.sep}{uid}{os.sep}{population}")
+        )
+
+        # check if the population already exists
+        population = Population.query.filter_by(name=name).first()
+        if population:
+            flash("The population already exists. Please check the population name and try again.")
+            shutil.rmtree(f"{BASE_DIR}experiments{os.sep}{uid}", ignore_errors=True)
+            return redirect(request.referrer)
+
+        population = Population(name=name, descr="")
+        db.session.add(population)
+        db.session.commit()
+
+        pop_exp = Population_Experiment(id_exp=exp.idexp, id_population=population.id)
+        db.session.add(pop_exp)
+        db.session.commit()
+
+        for agent in pop["agents"]:
+
+            if agent["is_page"] == 1:
+
+                # check if the page already exists
+                page = Page.query.filter_by(name=agent["name"]).first()
+
+                if page:
+                    # add page to the population
+                    ap = Page_Population(page_id=page.id, population_id=population.id)
+                    db.session.add(ap)
+                    db.session.commit()
+
+                else:
+                    # add page to the database
+                    page = Page(
+                        name=agent["name"],
+                        descr="",
+                        page_type="",
+                        feed=agent["feed_url"],
+                        keywords="",
+                        pg_type=agent["type"],
+                        leaning=agent["leaning"],
+                        logo="",
+                    )
+                    db.session.add(page)
+                    db.session.commit()
+
+                    # add page to the population
+                    ap = Page_Population(page_id=page.id, population_id=population.id)
+                    db.session.add(ap)
+                    db.session.commit()
+
+            # add agent to the database
+            ag = Agent(
+                name=agent["name"],
+                age=agent["age"],
+                ag_type=agent["type"],
+                leaning=agent["leaning"],
+                interests=",".join(agent["interests"][0]),
+                oe=agent["oe"],
+                co=agent["co"],
+                ne=agent["ne"],
+                ag=agent["ag"],
+                ex=agent["ex"],
+                language=agent["language"],
+                education_level=agent["education_level"],
+                round_actions=agent["round_actions"],
+                nationality=agent["nationality"],
+                toxicity=agent["toxicity"],
+                gender=agent["gender"],
+                crecsys=agent["rec_sys"],
+                frecsys=agent["frec_sys"],
+                profile_pic="",
+                daily_activity_level=agent["daily_activity_level"],
+                profession=agent["profession"],
+            )
+            db.session.add(ag)
+            db.session.commit()
+
+            if agent["prompts"] is not None:
+                ag_profile = Agent_Profile(agent_id=ag.id, profile=agent["prompts"])
+                db.session.add(ag_profile)
+                db.session.commit()
+
+            # add agent to population
+            ap = Agent_Population(agent_id=ag.id, population_id=population.id)
+            db.session.add(ap)
+            db.session.commit()
+
+        # get the json file that start with "client" and contains "population"
+        client = [
+            f
+            for f in os.listdir(f"{BASE_DIR}experiments{os.sep}{uid}")
+            if f.endswith(".json") and f.startswith("client") and name in f
+        ]
+        if len(client) == 0:
+            flash("No client file found for the population")
+            shutil.rmtree(f"{BASE_DIR}experiments{os.sep}{uid}", ignore_errors=True)
+            return redirect(request.referrer)
+
+        client = json.load(
+            open(f"{BASE_DIR}experiments{os.sep}{uid}{os.sep}{client[0]}")
+        )
+
+        # add client to the database
+        cl = Client(
+            id_exp=exp.idexp,
+            population_id=population.id,
+            status=0,
+            name=client["simulation"]["name"],
+            descr="",
+            days=client["simulation"]["days"],
+            percentage_new_agents_iteration=client["simulation"][
+                "percentage_new_agents_iteration"
+            ],
+            percentage_removed_agents_iteration=client["simulation"][
+                "percentage_removed_agents_iteration"
+            ],
+            max_length_thread_reading=client["agents"]["max_length_thread_reading"],
+            reading_from_follower_ratio=client["agents"]["reading_from_follower_ratio"],
+            probability_of_daily_follow=client["agents"]["probability_of_daily_follow"],
+            attention_window=client["agents"]["attention_window"],
+            visibility_rounds=client["posts"]["visibility_rounds"],
+            post=client["simulation"]["actions_likelihood"]["post"],
+            share=client["simulation"]["actions_likelihood"]["share"],
+            image=client["simulation"]["actions_likelihood"]["image"],
+            comment=client["simulation"]["actions_likelihood"]["comment"],
+            read=client["simulation"]["actions_likelihood"]["read"],
+            news=client["simulation"]["actions_likelihood"]["news"],
+            search=client["simulation"]["actions_likelihood"]["search"],
+            vote=client["simulation"]["actions_likelihood"]["cast"],
+            llm=client["servers"]["llm"],
+            llm_api_key=client["servers"]["llm_api_key"],
+            llm_max_tokens=client["servers"]["llm_max_tokens"],
+            llm_temperature=client["servers"]["llm_temperature"],
+            llm_v_agent=client["agents"]["llm_v_agent"],
+            llm_v=client["servers"]["llm_v"],
+            llm_v_api_key=client["servers"]["llm_v_api_key"],
+            llm_v_max_tokens=client["servers"]["llm_v_max_tokens"],
+            llm_v_temperature=client["servers"]["llm_v_temperature"]
+        )
+        db.session.add(cl)
+        db.session.commit()
+
+        client_exec = Client_Execution(
+            client_id=cl.id,
+            last_active_hour=0,
+            last_active_day=0,
+            expected_duration_rounds=cl.days * client["simulation"]["slots"]
+        )
+        db.session.add(client_exec)
+        db.session.commit()
 
     return redirect(request.referrer)
 
@@ -294,7 +531,7 @@ def delete_simulation(exp_id):
             db.session.query(Client_Execution).filter_by(client_id=cid).delete()
             db.session.commit()
 
-    return redirect(request.referrer)
+    return settings()
 
 
 @experiments.route("/admin/experiments_data")
@@ -441,29 +678,6 @@ def stop_experiment(uid):
     return redirect(request.referrer)  # experiment_details(uid)
 
 
-@experiments.route("/admin/download/<string:ftype>/<int:uid>")
-@login_required
-def download_experiment(uid, ftype):
-    check_privileges(current_user.username)
-
-    exp = Exps.query.filter_by(idexp=uid).first()
-
-    BASE_DIR = os.path.dirname(os.path.abspath(__file__)).split("routes_admin")[0]
-
-    if ftype == "experiment_db":
-        filename = f"{BASE_DIR}{os.sep}{exp.db_name}"
-
-    if ftype == "population":
-        # @todo: create the population json file
-        pass
-
-    if ftype == "client":
-        # @todo: implement
-        pass
-
-    return send_file(filename, as_attachment=True)
-
-
 @experiments.route("/admin/prompts/<int:uid>")
 @login_required
 def prompts(uid):
@@ -479,7 +693,9 @@ def prompts(uid):
 
     ollamas = ollama_status()
 
-    return render_template("admin/prompts.html", experiment=experiment, prompts=prompts, ollamas=ollamas)
+    return render_template(
+        "admin/prompts.html", experiment=experiment, prompts=prompts, ollamas=ollamas
+    )
 
 
 @experiments.route("/admin/update_prompts/<int:uid>", methods=["POST"])
@@ -503,3 +719,26 @@ def update_prompts(uid):
     json.dump(prompts, open(prompts_filename, "w"), indent=4)
 
     return redirect(request.referrer)
+
+
+@experiments.route("/admin/download_experiment/<int:eid>", methods=["POST", "GET"])
+@login_required
+def download_experiment_file(eid):
+    check_privileges(current_user.username)
+
+    # get experiment details
+    experiment = Exps.query.filter_by(idexp=eid).first()
+    # get the prompts file for the experiment
+    folder = f"y_web{os.sep}experiments{os.sep}{experiment.db_name.split(os.sep)[1]}"
+    # compress the folder and send the file
+    shutil.make_archive(folder, "zip", folder)
+    # move th file to the temp_data folder
+    shutil.move(
+        f"{folder}.zip",
+        f"y_web{os.sep}experiments{os.sep}temp_data{os.sep}{folder.split(os.sep)[-1]}.zip",
+    )
+    # return the file
+    return send_file(
+        f"experiments{os.sep}temp_data{os.sep}{folder.split(os.sep)[-1]}.zip",
+        as_attachment=True,
+    )
