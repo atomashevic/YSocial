@@ -25,7 +25,8 @@ from y_web.models import (
     Agent_Population,
     Agent_Profile,
     Page,
-    Page_Population
+    Page_Population,
+Languages, Leanings, Nationalities, Profession, Education
 )
 from y_web.utils import terminate_process_on_port, start_server
 import json
@@ -742,3 +743,339 @@ def download_experiment_file(eid):
         f"experiments{os.sep}temp_data{os.sep}{folder.split(os.sep)[-1]}.zip",
         as_attachment=True,
     )
+
+
+@experiments.route("/admin/miscellanea/", methods=["GET"])
+@login_required
+def miscellanea():
+    check_privileges(current_user.username)
+
+    ollamas = ollama_status()
+
+    return render_template("admin/miscellanea.html",
+                           ollamas=ollamas)
+
+
+@experiments.route("/admin/languages_data")
+@login_required
+def languages_data():
+    query = Languages.query
+
+    # search filter
+    search = request.args.get("search")
+    if search:
+        query = query.filter(db.or_(Languages.language.like(f"%{search}%")))
+    total = query.count()
+
+    # sorting
+    sort = request.args.get("sort")
+    if sort:
+        order = []
+        for s in sort.split(","):
+            direction = s[0]
+            name = s[1:]
+            if name not in ["language"]:
+                name = "name"
+            col = getattr(Exps, name)
+            if direction == "-":
+                col = col.desc()
+            order.append(col)
+        if order:
+            query = query.order_by(*order)
+
+    # pagination
+    start = request.args.get("start", type=int, default=-1)
+    length = request.args.get("length", type=int, default=-1)
+    if start != -1 and length != -1:
+        query = query.offset(start).limit(length)
+
+    # response
+    res = query.all()
+
+    res = {
+        "data": [
+            {
+                "id": exp.id,
+                "language": exp.language,
+            }
+            for exp in res
+        ],
+        "total": total,
+    }
+
+    return res
+
+
+@experiments.route("/admin/leanings_data")
+@login_required
+def leanings_data():
+    query = Leanings.query
+
+    # search filter
+    search = request.args.get("search")
+    if search:
+        query = query.filter(db.or_(Leanings.leaning.like(f"%{search}%")))
+    total = query.count()
+
+    # sorting
+    sort = request.args.get("sort")
+    if sort:
+        order = []
+        for s in sort.split(","):
+            direction = s[0]
+            name = s[1:]
+            if name not in ["leaning"]:
+                name = "name"
+            col = getattr(Exps, name)
+            if direction == "-":
+                col = col.desc()
+            order.append(col)
+        if order:
+            query = query.order_by(*order)
+
+    # pagination
+    start = request.args.get("start", type=int, default=-1)
+    length = request.args.get("length", type=int, default=-1)
+    if start != -1 and length != -1:
+        query = query.offset(start).limit(length)
+
+    # response
+    res = query.all()
+
+    res = {
+        "data": [
+            {
+                "id": exp.id,
+                "leaning": exp.leaning,
+            }
+            for exp in res
+        ],
+        "total": total,
+    }
+
+    return res
+
+
+@experiments.route("/admin/nationalities_data")
+@login_required
+def nationalities_data():
+    query = Nationalities.query
+
+    # search filter
+    search = request.args.get("search")
+    if search:
+        query = query.filter(db.or_(Nationalities.nationality.like(f"%{search}%")))
+    total = query.count()
+
+    search = request.args.get("search")
+    if search:
+        query = query.filter(db.or_(Leanings.leaning.like(f"%{search}%")))
+    total = query.count()
+
+    # sorting
+    sort = request.args.get("sort")
+    if sort:
+        order = []
+        for s in sort.split(","):
+            direction = s[0]
+            name = s[1:]
+            if name not in ["leaning"]:
+                name = "name"
+            col = getattr(Exps, name)
+            if direction == "-":
+                col = col.desc()
+            order.append(col)
+        if order:
+            query = query.order_by(*order)
+
+    # pagination
+    start = request.args.get("start", type=int, default=-1)
+    length = request.args.get("length", type=int, default=-1)
+    if start != -1 and length != -1:
+        query = query.offset(start).limit(length)
+
+    # response
+    res = query.all()
+
+    res = {
+        "data": [
+            {
+                "id": exp.id,
+                "nationality": exp.nationality,
+            }
+            for exp in res
+        ],
+        "total": total,
+    }
+
+    return res
+
+
+@experiments.route("/admin/professions_data")
+@login_required
+def professions_data():
+    query = Profession.query
+
+    search = request.args.get("search")
+    if search:
+        query = query.filter(db.or_(Profession.profession.like(f"%{search}%")))
+    total = query.count()
+
+    # sorting
+    sort = request.args.get("sort")
+    if sort:
+        order = []
+        for s in sort.split(","):
+            direction = s[0]
+            name = s[1:]
+            if name not in ["profession", "background"]:
+                name = "name"
+            col = getattr(Exps, name)
+            if direction == "-":
+                col = col.desc()
+            order.append(col)
+        if order:
+            query = query.order_by(*order)
+
+    # pagination
+    start = request.args.get("start", type=int, default=-1)
+    length = request.args.get("length", type=int, default=-1)
+    if start != -1 and length != -1:
+        query = query.offset(start).limit(length)
+
+    # response
+    res = query.all()
+
+    res = {
+        "data": [
+            {
+                "id": exp.id,
+                "profession": exp.profession,
+                "background": exp.background,
+            }
+            for exp in res
+        ],
+        "total": total,
+    }
+
+    return res
+
+
+@experiments.route("/admin/educations_data")
+@login_required
+def educations_data():
+    query = Education.query
+
+    search = request.args.get("search")
+    if search:
+        query = query.filter(db.or_(Education.education_level.like(f"%{search}%")))
+    total = query.count()
+
+    # sorting
+    sort = request.args.get("sort")
+    if sort:
+        order = []
+        for s in sort.split(","):
+            direction = s[0]
+            name = s[1:]
+            if name not in ["education_level"]:
+                name = "name"
+            col = getattr(Exps, name)
+            if direction == "-":
+                col = col.desc()
+            order.append(col)
+        if order:
+            query = query.order_by(*order)
+
+    # pagination
+    start = request.args.get("start", type=int, default=-1)
+    length = request.args.get("length", type=int, default=-1)
+    if start != -1 and length != -1:
+        query = query.offset(start).limit(length)
+
+    # response
+    res = query.all()
+
+    res = {
+        "data": [
+            {
+                "id": exp.id,
+                "education_level": exp.education_level,
+            }
+            for exp in res
+        ],
+        "total": total,
+    }
+
+    return res
+
+
+@experiments.route("/admin/create_language")
+@login_required
+def create_language():
+    check_privileges(current_user.username)
+
+    language = request.args.get("language")
+
+    lang = Languages(language=language)
+    db.session.add(lang)
+    db.session.commit()
+
+    return redirect(request.referrer)
+
+
+@experiments.route("/admin/create_leaning")
+@login_required
+def create_leaning():
+    check_privileges(current_user.username)
+
+    leaning = request.args.get("leaning")
+
+    lean = Leanings(leaning=leaning)
+    db.session.add(lean)
+    db.session.commit()
+
+    return redirect(request.referrer)
+
+
+@experiments.route("/admin/create_nationality")
+@login_required
+def create_nationality():
+    check_privileges(current_user.username)
+
+    nationality = request.args.get("nationality")
+    nat = Nationalities(nationality=nationality)
+
+    db.session.add(nat)
+    db.session.commit()
+
+    return redirect(request.referrer)
+
+
+@experiments.route("/admin/create_profession")
+@login_required
+def create_profession():
+    check_privileges(current_user.username)
+
+    profession = request.args.get("profession")
+    background = request.args.get("background")
+
+    prof = Profession(profession=profession, background=background)
+    db.session.add(prof)
+    db.session.commit()
+
+    return redirect(request.referrer)
+
+
+@experiments.route("/admin/create_education")
+@login_required
+def create_education():
+    check_privileges(current_user.username)
+
+    education_level = request.args.get("education_level")
+
+    ed = Education(education_level=education_level)
+    db.session.add(ed)
+    db.session.commit()
+
+    return redirect(request.referrer)

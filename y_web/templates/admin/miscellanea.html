@@ -1,0 +1,664 @@
+{% include "admin/head.html" %}
+
+<div class="view-wrapper is-dashboard">
+    <!--Dashboard container-->
+    <div id="creator-dashboard" class="dashboard-container">
+        <!--Toolbar-->
+        {% include "admin/dash_head.html" %}
+
+        <div class="dashboard-body">
+
+            <div class="columns">
+
+                <div class="column is-12">
+                <h3 class="title is-5 is-thin" style="text-align: center">Agents' Leanings, Education and Professions</h3>
+                </div>
+            </div>
+
+
+            <div class="columns">
+
+
+                <div class="column is-6">
+
+                    <div class="dashboard-box">
+                        <h3 class="title is-5 is-thin">Available Political Leanings</h3>
+
+                        <div class="box-content">
+
+
+                            <div id="leaning_table"></div>
+
+                            <script src="https://unpkg.com/gridjs/dist/gridjs.umd.js"></script>
+                            <script>
+                                const tableDiv = document.getElementById('leaning_table');
+
+                                const updateUrl = (prev, query) => {
+                                    return prev + (prev.indexOf('?') >= 0 ? '&' : '?') + new URLSearchParams(query).toString();
+                                };
+
+                                const editableCellAttributes = (data, row, col) => {
+                                    if (row) {
+                                        return {contentEditable: 'true', 'data-element-id': row.cells[0].data};
+                                    } else {
+                                        return {};
+                                    }
+                                };
+
+                                new gridjs.Grid({
+                                    columns: [
+                                        {id: 'id', 'hidden': true},
+                                        {id: 'leaning', name: 'name', 'attributes': editableCellAttributes},
+                                    ],
+                                    server: {
+                                        url: '/admin/leanings_data',
+                                        then: results => results.data,
+                                        total: results => results.total,
+                                    },
+                                    search: {
+                                        enabled: true,
+                                        server: {
+                                            url: (prev, search) => {
+                                                return updateUrl(prev, {search});
+                                            },
+                                        },
+                                    },
+                                    sort: {
+                                        enabled: true,
+                                        multiColumn: true,
+                                        server: {
+                                            url: (prev, columns) => {
+                                                const columnIds = ['id', 'leaning'];
+                                                const sort = columns.map(col => (col.direction === 1 ? '+' : '-') + columnIds[col.index]);
+                                                return updateUrl(prev, {sort});
+                                            },
+                                        },
+                                    },
+                                    pagination: {
+                                        enabled: true,
+                                        server: {
+                                            url: (prev, page, limit) => {
+                                                return updateUrl(prev, {start: page * limit, length: limit});
+                                            },
+                                        },
+                                    },
+                                }).render(tableDiv);
+
+                                let savedValue;
+
+                                tableDiv.addEventListener('focusin', ev => {
+                                    if (ev.target.tagName === 'TD') {
+                                        savedValue = ev.target.textContent;
+                                    }
+                                });
+
+                                tableDiv.addEventListener('focusout', ev => {
+                                    if (ev.target.tagName === 'TD') {
+                                        if (savedValue !== ev.target.textContent) {
+                                            fetch('/admin/leanings_data', {
+                                                method: 'POST',
+                                                headers: {'Content-Type': 'application/json'},
+                                                body: JSON.stringify({
+                                                    id: ev.target.dataset.elementId,
+                                                    [ev.target.dataset.columnId]: ev.target.textContent
+                                                }),
+                                            });
+                                        }
+                                        savedValue = undefined;
+                                    }
+                                });
+
+                                tableDiv.addEventListener('keydown', ev => {
+                                    if (ev.target.tagName === 'TD') {
+                                        if (ev.key === 'Escape') {
+                                            ev.target.textContent = savedValue;
+                                            ev.target.blur();
+                                        } else if (ev.key === 'Enter') {
+                                            ev.preventDefault();
+                                            ev.target.blur();
+                                        }
+                                    }
+                                });
+                            </script>
+
+                        </div>
+
+                        <div class="box-content" style="margin-top: 30px;">
+                            <h3 class="title is-5 is-thin">New Political Leaning</h3>
+                            <form action="/admin/create_leaning" method="POST">
+                                <div class="box-lines">
+                                    <div class="box-line">
+                                        <span class="left">Name</span>
+                                        <span class="right" style="width: 70%;"><input type="text" name="leaning"
+                                                                                       class="input"></span>
+                                    </div>
+                                </div>
+                                <div class="button-wrap">
+                                    <button class="button is-solid primary-button is-fullwidth">
+                                        Create
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+
+
+                    <div class="dashboard-box">
+                        <h3 class="title is-5 is-thin">Available Education Levels</h3>
+
+                        <div class="box-content">
+
+
+                            <div id="edu_table"></div>
+
+                            <script src="https://unpkg.com/gridjs/dist/gridjs.umd.js"></script>
+                            <script>
+                                const tableDiv5 = document.getElementById('edu_table');
+
+                                const updateUrl5 = (prev, query) => {
+                                    return prev + (prev.indexOf('?') >= 0 ? '&' : '?') + new URLSearchParams(query).toString();
+                                };
+
+                                const editableCellAttributes5 = (data, row, col) => {
+                                    if (row) {
+                                        return {contentEditable: 'true', 'data-element-id': row.cells[0].data};
+                                    } else {
+                                        return {};
+                                    }
+                                };
+
+                                new gridjs.Grid({
+                                    columns: [
+                                        {id: 'id', 'hidden': true},
+                                        {id: 'education_level', name: 'name', 'attributes': editableCellAttributes5},
+                                    ],
+                                    server: {
+                                        url: '/admin/educations_data',
+                                        then: results => results.data,
+                                        total: results => results.total,
+                                    },
+                                    search: {
+                                        enabled: true,
+                                        server: {
+                                            url: (prev, search) => {
+                                                return updateUrl5(prev, {search});
+                                            },
+                                        },
+                                    },
+                                    sort: {
+                                        enabled: true,
+                                        multiColumn: true,
+                                        server: {
+                                            url: (prev, columns) => {
+                                                const columnIds = ['id', 'education_level'];
+                                                const sort = columns.map(col => (col.direction === 1 ? '+' : '-') + columnIds[col.index]);
+                                                return updateUrl5(prev, {sort});
+                                            },
+                                        },
+                                    },
+                                    pagination: {
+                                        enabled: true,
+                                        server: {
+                                            url: (prev, page, limit) => {
+                                                return updateUrl5(prev, {start: page * limit, length: limit});
+                                            },
+                                        },
+                                    },
+                                }).render(tableDiv5);
+
+                                let savedValue5;
+
+                                tableDiv5.addEventListener('focusin', ev => {
+                                    if (ev.target.tagName === 'TD') {
+                                        savedValue5 = ev.target.textContent;
+                                    }
+                                });
+
+                                tableDiv5.addEventListener('focusout', ev => {
+                                    if (ev.target.tagName === 'TD') {
+                                        if (savedValue5 !== ev.target.textContent) {
+                                            fetch('/admin/educations_data', {
+                                                method: 'POST',
+                                                headers: {'Content-Type': 'application/json'},
+                                                body: JSON.stringify({
+                                                    id: ev.target.dataset.elementId,
+                                                    [ev.target.dataset.columnId]: ev.target.textContent
+                                                }),
+                                            });
+                                        }
+                                        savedValue5 = undefined;
+                                    }
+                                });
+
+                                tableDiv5.addEventListener('keydown', ev => {
+                                    if (ev.target.tagName === 'TD') {
+                                        if (ev.key === 'Escape') {
+                                            ev.target.textContent = savedValue5;
+                                            ev.target.blur();
+                                        } else if (ev.key === 'Enter') {
+                                            ev.preventDefault();
+                                            ev.target.blur();
+                                        }
+                                    }
+                                });
+                            </script>
+
+                        </div>
+
+                        <div class="box-content" style="margin-top: 30px;">
+                            <h3 class="title is-5 is-thin">New Education Level</h3>
+                            <form action="/admin/create_education" method="POST">
+                                <div class="box-lines">
+                                    <div class="box-line">
+                                        <span class="left">Name</span>
+                                        <span class="right" style="width: 70%;"><input type="text" name="education"
+                                                                                       class="input"></span>
+                                    </div>
+                                </div>
+                                <div class="button-wrap">
+                                    <button class="button is-solid primary-button is-fullwidth">
+                                        Create
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+
+
+                </div>
+
+                <div class="column is-6">
+
+                    <div class="dashboard-box">
+                        <h3 class="title is-5 is-thin">Available Professions</h3>
+
+                        <div class="box-content">
+                            <div id="profession_table"></div>
+
+                            <script src="https://unpkg.com/gridjs/dist/gridjs.umd.js"></script>
+                            <script>
+                                const tableDiv4 = document.getElementById('profession_table');
+
+                                const updateUrl4 = (prev, query) => {
+                                    return prev + (prev.indexOf('?') >= 0 ? '&' : '?') + new URLSearchParams(query).toString();
+                                };
+
+                                const editableCellAttributes4 = (data, row, col) => {
+                                    if (row) {
+                                        return {contentEditable: 'true', 'data-element-id': row.cells[0].data};
+                                    } else {
+                                        return {};
+                                    }
+                                };
+
+                                new gridjs.Grid({
+                                    columns: [
+                                        {id: 'id', 'hidden': true},
+                                        {id: 'profession', name: 'name', 'attributes': editableCellAttributes4},
+                                        {id: 'background', name: 'category', 'attributes': editableCellAttributes4},
+                                    ],
+                                    server: {
+                                        url: '/admin/professions_data',
+                                        then: results => results.data,
+                                        total: results => results.total,
+                                    },
+                                    search: {
+                                        enabled: true,
+                                        server: {
+                                            url: (prev, search) => {
+                                                return updateUrl4(prev, {search});
+                                            },
+                                        },
+                                    },
+                                    sort: {
+                                        enabled: true,
+                                        multiColumn: true,
+                                        server: {
+                                            url: (prev, columns) => {
+                                                const columnIds = ['id', 'professions', 'background'];
+                                                const sort = columns.map(col => (col.direction === 1 ? '+' : '-') + columnIds[col.index]);
+                                                return updateUrl4(prev, {sort});
+                                            },
+                                        },
+                                    },
+                                    pagination: {
+                                        enabled: true,
+                                        server: {
+                                            url: (prev, page, limit) => {
+                                                return updateUrl4(prev, {start: page * limit, length: limit});
+                                            },
+                                        },
+                                    },
+                                }).render(tableDiv4);
+
+                                let savedValue4;
+
+                                tableDiv4.addEventListener('focusin', ev => {
+                                    if (ev.target.tagName === 'TD') {
+                                        savedValue4 = ev.target.textContent;
+                                    }
+                                });
+
+                                tableDiv4.addEventListener('focusout', ev => {
+                                    if (ev.target.tagName === 'TD') {
+                                        if (savedValue4 !== ev.target.textContent) {
+                                            fetch('/admin/professions_data', {
+                                                method: 'POST',
+                                                headers: {'Content-Type': 'application/json'},
+                                                body: JSON.stringify({
+                                                    id: ev.target.dataset.elementId,
+                                                    [ev.target.dataset.columnId]: ev.target.textContent
+                                                }),
+                                            });
+                                        }
+                                        savedValue4 = undefined;
+                                    }
+                                });
+
+                                tableDiv4.addEventListener('keydown', ev => {
+                                    if (ev.target.tagName === 'TD') {
+                                        if (ev.key === 'Escape') {
+                                            ev.target.textContent = savedValue4;
+                                            ev.target.blur();
+                                        } else if (ev.key === 'Enter') {
+                                            ev.preventDefault();
+                                            ev.target.blur();
+                                        }
+                                    }
+                                });
+                            </script>
+                        </div>
+
+                        <div class="box-content" style="margin-top: 30px;">
+                            <h3 class="title is-5 is-thin">New Profession</h3>
+                            <form action="/admin/create_leaning" method="POST">
+                                <div class="box-lines">
+                                    <div class="box-line">
+                                        <span class="left">Name</span>
+                                        <span class="right" style="width: 70%;"><input type="text" name="profession"
+                                                                                       class="input"></span>
+                                    </div>
+                                    <div class="box-line">
+                                        <span class="left">Category</span>
+                                        <span class="right" style="width: 70%;"><input type="text" name="background"
+                                                                                       class="input"></span>
+                                    </div>
+                                </div>
+                                <div class="button-wrap">
+                                    <button class="button is-solid primary-button is-fullwidth">
+                                        Create
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+
+            <div class="columns">
+
+                <div class="column is-12">
+                    <hr>
+                <h3 class="title is-5 is-thin" style="text-align: center">Spoken Languages and Nationalities</h3>
+                </div>
+            </div>
+
+
+            <div class="columns">
+                <div class="column is-6">
+
+                    <div class="dashboard-box">
+                        <h3 class="title is-5 is-thin">Available Languages</h3>
+
+                        <div class="box-content">
+
+
+                            <div id="language_table"></div>
+                            <script>
+                                const tableDiv1 = document.getElementById('language_table');
+
+                                const updateUrl1 = (prev, query) => {
+                                    return prev + (prev.indexOf('?') >= 0 ? '&' : '?') + new URLSearchParams(query).toString();
+                                };
+
+                                const editableCellAttributes1 = (data, row, col) => {
+                                    if (row) {
+                                        return {contentEditable: 'true', 'data-element-id': row.cells[0].data};
+                                    } else {
+                                        return {};
+                                    }
+                                };
+
+                                new gridjs.Grid({
+                                    columns: [
+                                        {id: 'id', 'hidden': true},
+                                        {id: 'language', name: 'name', 'attributes': editableCellAttributes1},
+                                    ],
+                                    server: {
+                                        url: '/admin/languages_data',
+                                        then: results => results.data,
+                                        total: results => results.total,
+                                    },
+                                    search: {
+                                        enabled: true,
+                                        server: {
+                                            url: (prev, search) => {
+                                                return updateUrl1(prev, {search});
+                                            },
+                                        },
+                                    },
+                                    sort: {
+                                        enabled: true,
+                                        multiColumn: true,
+                                        server: {
+                                            url: (prev, columns) => {
+                                                const columnIds = ['id', 'languages'];
+                                                const sort = columns.map(col => (col.direction === 1 ? '+' : '-') + columnIds[col.index]);
+                                                return updateUrl1(prev, {sort});
+                                            },
+                                        },
+                                    },
+                                    pagination: {
+                                        enabled: true,
+                                        server: {
+                                            url: (prev, page, limit) => {
+                                                return updateUrl1(prev, {start: page * limit, length: limit});
+                                            },
+                                        },
+                                    },
+                                }).render(tableDiv1);
+
+                                let savedValue1;
+
+                                tableDiv1.addEventListener('focusin', ev => {
+                                    if (ev.target.tagName === 'TD') {
+                                        savedValue1 = ev.target.textContent;
+                                    }
+                                });
+
+                                tableDiv1.addEventListener('focusout', ev => {
+                                    if (ev.target.tagName === 'TD') {
+                                        if (savedValue1 !== ev.target.textContent) {
+                                            fetch('/admin/languages_data', {
+                                                method: 'POST',
+                                                headers: {'Content-Type': 'application/json'},
+                                                body: JSON.stringify({
+                                                    id: ev.target.dataset.elementId,
+                                                    [ev.target.dataset.columnId]: ev.target.textContent
+                                                }),
+                                            });
+                                        }
+                                        savedValue1 = undefined;
+                                    }
+                                });
+
+                                tableDiv1.addEventListener('keydown', ev => {
+                                    if (ev.target.tagName === 'TD') {
+                                        if (ev.key === 'Escape') {
+                                            ev.target.textContent = savedValue1;
+                                            ev.target.blur();
+                                        } else if (ev.key === 'Enter') {
+                                            ev.preventDefault();
+                                            ev.target.blur();
+                                        }
+                                    }
+                                });
+                            </script>
+
+                        </div>
+
+
+                        <div class="box-content" style="margin-top: 30px;">
+                            <h3 class="title is-5 is-thin">New Language</h3>
+                            <form action="/admin/create_language" method="POST">
+                                <div class="box-lines">
+                                    <div class="box-line">
+                                        <span class="left">Name</span>
+                                        <span class="right" style="width: 70%;"><input type="text" name="language"
+                                                                                       class="input"></span>
+                                    </div>
+                                </div>
+                                <div class="button-wrap">
+                                    <button class="button is-solid primary-button is-fullwidth">
+                                        Create
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+
+                </div>
+
+                <div class="column is-6">
+
+                    <div class="dashboard-box">
+                        <h3 class="title is-5 is-thin">Available Nationalities</h3>
+
+                        <div class="box-content">
+                            <div id="nationality_table"></div>
+                            <script>
+                                const tableDiv2 = document.getElementById('nationality_table');
+
+                                const updateUrl2 = (prev, query) => {
+                                    return prev + (prev.indexOf('?') >= 0 ? '&' : '?') + new URLSearchParams(query).toString();
+                                };
+
+                                const editableCellAttributes2 = (data, row, col) => {
+                                    if (row) {
+                                        return {contentEditable: 'true', 'data-element-id': row.cells[0].data};
+                                    } else {
+                                        return {};
+                                    }
+                                };
+
+                                new gridjs.Grid({
+                                    columns: [
+                                        {id: 'id', 'hidden': true},
+                                        {id: 'nationality', name: 'name', 'attributes': editableCellAttributes2},
+                                    ],
+                                    server: {
+                                        url: '/admin/nationalities_data',
+                                        then: results => results.data,
+                                        total: results => results.total,
+                                    },
+                                    search: {
+                                        enabled: true,
+                                        server: {
+                                            url: (prev, search) => {
+                                                return updateUrl2(prev, {search});
+                                            },
+                                        },
+                                    },
+                                    sort: {
+                                        enabled: true,
+                                        multiColumn: true,
+                                        server: {
+                                            url: (prev, columns) => {
+                                                const columnIds = ['id', 'nationality'];
+                                                const sort = columns.map(col => (col.direction === 1 ? '+' : '-') + columnIds[col.index]);
+                                                return updateUrl2(prev, {sort});
+                                            },
+                                        },
+                                    },
+                                    pagination: {
+                                        enabled: true,
+                                        server: {
+                                            url: (prev, page, limit) => {
+                                                return updateUrl2(prev, {start: page * limit, length: limit});
+                                            },
+                                        },
+                                    },
+                                }).render(tableDiv2);
+
+                                let savedValue2;
+
+                                tableDiv2.addEventListener('focusin', ev => {
+                                    if (ev.target.tagName === 'TD') {
+                                        savedValue2 = ev.target.textContent;
+                                    }
+                                });
+
+                                tableDiv2.addEventListener('focusout', ev => {
+                                    if (ev.target.tagName === 'TD') {
+                                        if (savedValue2 !== ev.target.textContent) {
+                                            fetch('/admin/nationalities_data', {
+                                                method: 'POST',
+                                                headers: {'Content-Type': 'application/json'},
+                                                body: JSON.stringify({
+                                                    id: ev.target.dataset.elementId,
+                                                    [ev.target.dataset.columnId]: ev.target.textContent
+                                                }),
+                                            });
+                                        }
+                                        savedValue2 = undefined;
+                                    }
+                                });
+
+                                tableDiv2.addEventListener('keydown', ev => {
+                                    if (ev.target.tagName === 'TD') {
+                                        if (ev.key === 'Escape') {
+                                            ev.target.textContent = savedValue2;
+                                            ev.target.blur();
+                                        } else if (ev.key === 'Enter') {
+                                            ev.preventDefault();
+                                            ev.target.blur();
+                                        }
+                                    }
+                                });
+                            </script>
+                        </div>
+
+
+                        <div class="box-content" style="margin-top: 30px;">
+                            <h3 class="title is-5 is-thin">New Nationality</h3>
+                            <form action="/admin/create_nationality" method="POST">
+                                <div class="box-lines">
+                                    <div class="box-line">
+                                        <span class="left">Name</span>
+                                        <span class="right" style="width: 70%;"><input type="text" name="nationality"
+                                                                                       class="input"></span>
+                                    </div>
+                                </div>
+                                <div class="button-wrap">
+                                    <button class="button is-solid primary-button is-fullwidth">
+                                        Create
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+
+
+        </div>
+    </div>
+
+</div>
+
+{% include "admin/footer.html" %}
