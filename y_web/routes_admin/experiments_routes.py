@@ -481,9 +481,9 @@ def create_experiment():
     db.session.commit()
 
     # add first round to the simulation
-    round = Rounds(day=0, hour=0)
+    rnd = Rounds(day=0, hour=0)
 
-    db.session.add(round)
+    db.session.add(rnd)
     db.session.commit()
 
     return settings()
@@ -525,6 +525,10 @@ def delete_simulation(exp_id):
 
         # delete the clients
         db.session.query(Client).filter_by(id_exp=exp_id).delete()
+        db.session.commit()
+
+        # delete exp stats
+        db.session.query(Exp_stats).filter_by(exp_id=exp_id).delete()
         db.session.commit()
 
         for cid in cids:

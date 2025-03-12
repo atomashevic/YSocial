@@ -3,7 +3,7 @@
 FROM ubuntu:latest
 LABEL maintainer="Giulio Rossetti <giulio.rossetti@gmail.com>" \
       version="1.0" \
-      description="This is a Docker image of Y Social" \
+      description="This is a Docker image of YSocial" \
       website="https://ysocialtwin.github.io/"
 
 RUN apt-get update
@@ -16,9 +16,9 @@ WORKDIR /app
 RUN curl -fsSL https://ollama.com/install.sh | sh
 
 RUN git submodule update --init --recursive
-RUN pip install --break-system-packages --no-cache-dir -r requirements_web.txt
-RUN pip install --break-system-packages --no-cache-dir -r external/YClient/requirements_client.txt
-RUN pip install --break-system-packages --no-cache-dir -r external/YServer/requirements_server.txt
+RUN pip install --break-system-packages --no-cache-dir -r requirements.txt
+# RUN pip install --break-system-packages --no-cache-dir -r external/YClient/requirements_client.txt
+# RUN pip install --break-system-packages --no-cache-dir -r external/YServer/requirements_server.txt
 
 # enabling python as default in screen sessions
 RUN echo 'alias python="python3"' >> ~/.bashrc

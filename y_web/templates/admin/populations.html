@@ -215,13 +215,9 @@
                                         <span class="left">Content RecSys</span>
                                         <div class="select">
                                             <select name="recsys_type">
-                                                <option value="ContentRecSys">Random</option>
-                                                <option value="ReverseChrono">(RC) Reverse Chrono</option>
-                                                <option value="ReverseChronoPopularity">(RC) Popularity</option>
-                                                <option value="ReverseChronoFollowers">(RC) Followers</option>
-                                                <option value="ReverseChronoFollowersPopularity">(RC)
-                                                    Followers-Popularity
-                                                </option>
+                                                {% for recsys in crecsys %}
+                                                <option value="{{ recsys.name }}">{{ recsys.value }}</option>
+                                                {% endfor %}
                                             </select>
                                         </div>
                                     </div>
@@ -229,11 +225,9 @@
                                         <span class="left">Friendship RecSys</span>
                                         <div class="select">
                                             <select name="frecsys_type">
-                                                <option value="FollowRecSys">Random</option>
-                                                <option value="CommonNeighbors">Common Neighbors</option>
-                                                <option value="Jaccard">Jaccard</option>
-                                                <option value="AdamicAdar">Adamic Adar</option>
-                                                <option value="PreferentialAttachment">Preferential Attachment</option>
+                                                {% for recsys in frecsys %}
+                                                <option value="{{ recsys.name }}">{{ recsys.value }}</option>
+                                                {% endfor %}
                                             </select>
                                         </div>
                                     </div>
@@ -247,8 +241,8 @@
                                         </div>
                                     </div>
                                     <hr>
-                                    <h4><b>Categorical Attributes</b></h4><small>Lists as comma separated values</small>
-                                    <div class="box-line">
+                                    <h4><b>Categorical Attributes</b></h4>
+                                    <div class="box-line" style="height: 80px;">
                                         <span class="left">Education Levels</span>
                                             <span class="right" style="width: 70%;">
                                                 <div class="select">
@@ -261,7 +255,7 @@
                                             </span>
                                         </span>
                                     </div>
-                                    <div class="box-line" style="height: 100px; margin-bottom: 20px;">
+                                    <div class="box-line" style="height: 80px;">
                                         <span class="left">Political Leanings</span>
                                         <span class="right" style="width: 70%;">
                                             <div class="select">
@@ -271,25 +265,90 @@
                                                 {% endfor %}
                                             </select>
                                             </div>
-                                         <!--   <input type="text" name="political_leanings" class="input" value="democrat, republican"> -->
+                                        </span>
+                                    </div>
+                                    <div class="box-line" style="height: 80px; margin-bottom: 20px;">
+                                        <span class="left">Toxicity Levels</span>
+                                        <span class="right" style="width: 70%;">
+                                            <div class="select">
+                                            <select multiple size="2" name="toxicity_levels">
+                                                <option value="none">None</option>
+                                                <option value="low">Low</option>
+                                                <option value="medium">Medium</option>
+                                                <option value="high">High</option>
+                                            </select>
+                                            </div>
+                                        </span>
+                                    </div>
+
+                                    <div class="box-line">
+                                        <span class="left">Nationalities</span>
+                                        <span class="right" style="width: 70%;">
+                                            <div class="select">
+                                            <select name="nationalities">
+                                                {% for nationality in nationalities %}
+                                                <option value="{{ nationality.nationality }}">{{ nationality.nationality }}</option>
+                                                {% endfor %}
+                                            </select>
+                                            </div>
+                                        </span>
+                                    </div>
+                                     <div class="box-line">
+                                        <span class="left">Spoken Language</span>
+                                        <span class="right" style="width: 70%;">
+                                            <div class="select">
+                                            <select name="languages">
+                                                {% for lang in languages %}
+                                                <option value="{{ lang.language }}">{{ lang.language }}</option>
+                                                {% endfor %}
+                                            </select>
+                                            </div>
+
 
                                         </span>
                                     </div>
                                     <div class="box-line">
-                                        <span class="left">Nationalities</span>
-                                        <span class="right" style="width: 70%;"><input type="text" name="nationalities" class="input" value="American, Italian"></span>
-                                    </div>
-                                     <div class="box-line">
-                                        <span class="left">Spoken Languages</span>
-                                        <span class="right" style="width: 70%;"><input type="text" name="languages" class="input" value="English, Italian"></span>
-                                    </div>
-                                    <div class="box-line">
                                         <span class="left">Interests</span>
-                                        <span class="right" style="width: 70%;"><input type="text" name="interests" class="input" value="Sport, Politics, Smurfs"></span>
-                                    </div>
-                                    <div class="box-line">
-                                        <span class="left">Toxicity Levels</span>
-                                        <span class="right" style="width: 70%;"><input type="text" name="toxicity_levels" class="input" value="none, low, medium"></span>
+                                        <span class="right" style="width: 70%;">
+
+                                            <div class="tags-input" style="width: 100%;">
+                                            <ul id="tags"></ul>
+                                            <input type="hidden" id="tags-hidden" name="tags">
+                                            <input type="text" id="input-tag" placeholder="Enter interest name" style="width: 100%;"/>
+                                        </div>
+
+                                        <script>
+
+                                            const tags = document.getElementById('tags');
+    const input = document.getElementById('input-tag');
+    const hiddenInput = document.getElementById('tags-hidden');
+    const tagList = [];
+
+    input.addEventListener('keydown', function (event) {
+        if (event.key === 'Enter') {
+            event.preventDefault();
+            const tagContent = input.value.trim();
+            if (tagContent !== '' && !tagList.includes(tagContent)) {
+                tagList.push(tagContent);
+                const tag = document.createElement('li');
+                tag.innerHTML = `${tagContent} <button class="delete-button">X</button>`;
+                tags.appendChild(tag);
+                hiddenInput.value = tagList.join(',');
+                input.value = '';
+            }
+        }
+    });
+
+    tags.addEventListener('click', function (event) {
+        if (event.target.classList.contains('delete-button')) {
+            const tagText = event.target.parentNode.textContent.slice(0, -1);
+            tagList.splice(tagList.indexOf(tagText), 1);
+            hiddenInput.value = tagList.join(',');
+            event.target.parentNode.remove();
+        }
+    });
+                                        </script>
+                                        </span>
                                     </div>
 
                                 </div>

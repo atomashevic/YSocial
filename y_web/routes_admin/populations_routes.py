@@ -22,6 +22,10 @@ from y_web.models import (
     Agent_Profile,
     Education,
     Leanings,
+    Nationalities,
+    Languages,
+    Content_Recsys,
+    Follow_Recsys,
 )
 from y_web.utils import (
     generate_population,
@@ -68,10 +72,13 @@ def create_population():
     political_leanings = request.form.getlist("political_leanings")
     political_leanings = ",".join(political_leanings)
 
+    toxicity_levels = request.form.getlist("toxicity_levels")
+    toxicity_levels = ",".join(toxicity_levels)
+
     nationalities = request.form.get("nationalities")
     languages = request.form.get("languages")
-    interests = request.form.get("interests")
-    toxicity_levels = request.form.get("toxicity_levels")
+    interests = request.form.get("tags")
+
     frecsys = request.form.get("frecsys_type")
     crecsys = request.form.get("recsys_type")
 
@@ -157,6 +164,10 @@ def populations():
     ollamas = ollama_status()
     leanings = Leanings.query.all()
     education_levels = Education.query.all()
+    nationalities = Nationalities.query.all()
+    languages = Languages.query.all()
+    crecsys = Content_Recsys.query.all()
+    frecsys = Follow_Recsys.query.all()
 
     return render_template(
         "admin/populations.html",
@@ -164,6 +175,10 @@ def populations():
         ollamas=ollamas,
         leanings=leanings,
         education_levels=education_levels,
+        nationalities=nationalities,
+        languages=languages,
+        crecsys=crecsys,
+        frecsys=frecsys,
     )
 
 

@@ -158,13 +158,10 @@
                                         <span class="left">Content RecSys</span>
                                         <div class="select">
                                             <select name="recsys_type">
-                                                <option value="ContentRecSys">Random</option>
-                                                <option value="ReverseChrono">(RC) Reverse Chrono</option>
-                                                <option value="ReverseChronoPopularity">(RCP) Popularity</option>
-                                                <option value="ReverseChronoFollowers">(RCF) Followers</option>
-                                                <option value="ReverseChronoFollowersPopularity">(FP)
-                                                    Followers-Popularity
-                                                </option>
+                                               {% for recsys in crecsys %}
+                                                <option value="{{recsys.name}}">{{recsys.value}}</option>
+                                                {% endfor %}
+                                                 </select>
                                             </select>
                                         </div>
                                     </div>
@@ -172,12 +169,10 @@
                                         <span class="left">Friendship RecSys</span>
                                         <div class="select">
                                             <select name="frecsys_type">
-                                                <option value="FollowRecSys">Random</option>
-                                                <option value="CommonNeighbors">Common Neighbors</option>
-                                                <option value="Jaccard">Jaccard</option>
-                                                <option value="AdamicAdar">Adamic Adar</option>
-                                                <option value="PreferentialAttachment">Preferential Attachment</option>
-                                            </select>
+                                                {% for recsys in frecsys %}
+                                                <option value="{{recsys.name}}">{{recsys.value}}</option>
+                                                {% endfor %}
+                                                 </select>
                                         </div>
                                     </div>
                                     <div class="box-line">
@@ -284,9 +279,48 @@
                                         </div>
                                     </div>
                                     <div class="box-line">
-                                        <span class="left">Interests <small>(comma separated)</small></span>
-                                        <span class="right" style="width: 70%;"><input type="text" name="interests"
-                                                                                       class="input" value=""></span>
+                                        <span class="left">Interests </span>
+                                        <span class="right" style="width: 70%;">
+
+                                            <div class="tags-input" style="width: 100%;">
+                                            <ul id="tags"></ul>
+                                            <input type="hidden" id="tags-hidden" name="tags">
+                                            <input type="text" id="input-tag" placeholder="Enter interest name" style="width: 100%;"/>
+                                        </div>
+
+                                        <script>
+
+                                            const tags = document.getElementById('tags');
+    const input = document.getElementById('input-tag');
+    const hiddenInput = document.getElementById('tags-hidden');
+    const tagList = [];
+
+    input.addEventListener('keydown', function (event) {
+        if (event.key === 'Enter') {
+            event.preventDefault();
+            const tagContent = input.value.trim();
+            if (tagContent !== '' && !tagList.includes(tagContent)) {
+                tagList.push(tagContent);
+                const tag = document.createElement('li');
+                tag.innerHTML = `${tagContent} <button class="delete-button">X</button>`;
+                tags.appendChild(tag);
+                hiddenInput.value = tagList.join(',');
+                input.value = '';
+            }
+        }
+    });
+
+    tags.addEventListener('click', function (event) {
+        if (event.target.classList.contains('delete-button')) {
+            const tagText = event.target.parentNode.textContent.slice(0, -1);
+            tagList.splice(tagList.indexOf(tagText), 1);
+            hiddenInput.value = tagList.join(',');
+            event.target.parentNode.remove();
+        }
+    });
+                                        </script>
+
+                                        </span>
                                     </div>
 
                                     <hr>

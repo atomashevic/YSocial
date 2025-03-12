@@ -17,6 +17,8 @@ from y_web.models import (
     Education,
     Leanings,
     Languages,
+    Content_Recsys,
+    Follow_Recsys
 )
 from y_web.utils import get_ollama_models
 from y_web.utils.miscellanea import ollama_status
@@ -44,6 +46,8 @@ def agent_data():
     educations = Education.query.all()
     leanings = Leanings.query.all()
     languages = Languages.query.all()
+    crecsys = Content_Recsys.query.all()
+    frecsys = Follow_Recsys.query.all()
 
     return render_template(
         "admin/agents.html",
@@ -55,6 +59,8 @@ def agent_data():
         education_levels=educations,
         leanings=leanings,
         languages=languages,
+        crecsys=crecsys,
+        frecsys=frecsys,
     )
 
 
@@ -125,7 +131,7 @@ def create_agent():
     nationality = request.form.get("nationality")
     education_level = request.form.get("education_level")
     leaning = request.form.get("leaning")
-    interests = request.form.get("interests")
+    interests = request.form.get("tags")
     oe = request.form.get("oe")
     co = request.form.get("co")
     ex = request.form.get("ex")

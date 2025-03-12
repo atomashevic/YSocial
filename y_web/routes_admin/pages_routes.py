@@ -45,7 +45,7 @@ def create_page():
     descr = request.form.get("descr")
     page_type = request.form.get("page_type")
     feed = request.form.get("feed")
-    keywords = request.form.get("keywords")
+    keywords = request.form.get("tags")
     logo = request.form.get("logo")
     pg_type = request.form.get("pg_type")
     leaning = request.form.get("leaning")
