@@ -1,7 +1,10 @@
+import json
+import os
+
 from flask import (
     Blueprint,
     render_template,
-    request,
+    request, redirect, send_file
 )
 from flask_login import login_required, current_user
 
@@ -198,3 +201,70 @@ def add_page_to_population():
     db.session.commit()
 
     return page_details(page_id)
+
+
+@pages.route("/admin/upload_page_collection", methods=["POST"])
+@login_required
+def upload_page_collection():
+    check_privileges(current_user.username)
+
+    collection = request.files["collection"]
+
+    BASE = os.path.dirname(os.path.abspath(__file__)).split("routes_admin")[0]
+    if collection:
+        collection.save(f"{BASE}experiments{os.sep}temp_data{os.sep}{collection.filename}")
+        pages = json.load(open(f"{BASE}experiments{os.sep}temp_data{os.sep}{collection.filename}"))
+        for page in pages:
+            # check if the page already exists
+            p = Page.query.filter_by(name=page["name"], feed=page["feed"]).first()
+            if p:
+                continue
+
+            page = Page(
+                name=page["name"],
+                descr=page["descr"],
+                page_type=page["page_type"],
+                feed=page["feed"],
+                keywords=page["keywords"],
+                logo=page["logo"],
+                pg_type=page["pg_type"],
+                leaning=page["leaning"],
+            )
+            db.session.add(page)
+            db.session.commit()
+
+    # delete the file
+    os.remove(f"{BASE}experiments{os.sep}temp_data{os.sep}{collection.filename}")
+
+    return redirect(request.referrer)
+
+
+@pages.route("/admin/download_pages")
+@login_required
+def download_pages():
+    check_privileges(current_user.username)
+
+    pages = Page.query.all()
+
+    data = []
+    for page in pages:
+        data.append(
+            {
+                "name": page.name,
+                "descr": page.descr,
+                "page_type": page.page_type,
+                "feed": page.feed,
+                "keywords": page.keywords,
+                "logo": page.logo,
+                "pg_type": page.pg_type,
+                "leaning": page.leaning,
+            }
+        )
+
+    BASE = os.path.dirname(os.path.abspath(__file__)).split("routes_admin")[0]
+    with open(f"{BASE}experiments{os.sep}temp_data{os.sep}pages.json", "w") as f:
+        json.dump(data, f)
+
+    return send_file(
+        f"{BASE}experiments{os.sep}temp_data{os.sep}pages.json",
+        as_attachment=True)

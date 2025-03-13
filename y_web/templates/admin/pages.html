@@ -125,6 +125,13 @@
                                 });
                             </script>
 
+                            <div class="box-lines">
+
+                                    <div class="box-line">
+                                        <span class="left"> </span>
+                                        <span class="right"><a href="/admin/download_pages/"> <i class="mdi mdi-download" style="font-size: 24px;"></i></a></span>
+                                    </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -135,6 +142,26 @@
                 <!--Dashboard column-->
                 <div class="column is-8">
                     <!--Dashboard box-->
+
+                    <div class="dashboard-box">
+                        <h3 class="title is-5 is-thin">Pages Collections</h3>
+                        <div class="box-content">
+                            <form action="/admin/upload_page_collection" enctype="multipart/form-data" method="POST">
+                                <div class="box-lines">
+                                    <div class="box-line">
+                                        <span class="left">Pages json file</span>
+                                        <span class="right"><input type="file" id="collection" name="collection"
+                                                                   class="input_file"></span>
+                                    </div>
+                                </div>
+                                <div class="button-wrap">
+                                    <button class="button is-solid primary-button is-fullwidth">
+                                        Load Experiment
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
 
                     <div class="dashboard-box">
                         <h3 class="title is-5 is-thin">Create Page</h3>
