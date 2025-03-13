@@ -7,14 +7,10 @@ import json
 import time
 import random
 from multiprocessing import Process
+import traceback
 from y_web.models import (
     Client_Execution,
-    Agent_Population,
-    Agent,
-    Page,
-    Page_Population,
     Ollama_Pull,
-    Agent_Profile,
 )
 from y_web import db, client_processes
 import requests
@@ -336,13 +332,11 @@ def run_simulation(cl, cli_id, agent_file):
             random.shuffle(sagents)
 
             ################# PARALLELIZED SECTION #################
-            def agent_task(g):
+            #def agent_task(g, tid):
+            for g in sagents:
                 acts = [a for a, v in cl.actions_likelihood.items() if v > 0]
 
                 daily_active[g.name] = None
-
-                # max 1 post per round
-                posted = False
 
                 # get a random integer within g.round_actions. If g.is_page == 1, then rounds = 1
                 if g.is_page == 1:
@@ -353,16 +347,10 @@ def run_simulation(cl, cli_id, agent_file):
                 for _ in range(rounds):
                     # sample two elements from a list with replacement
 
-                    if posted and g.is_page == 0:
-                        # if already posted in this round (and is not a page): only reply, read or other actions
-                        available_acts = [a for a in acts if a != "POST"]
-                    else:
-                        available_acts = acts
-
                     candidates = random.choices(
-                        available_acts,
+                        acts,
                         k=2,
-                        weights=[cl.actions_likelihood[a] for a in available_acts],
+                        weights=[cl.actions_likelihood[a] for a in acts],
                     )
                     candidates.append("NONE")
 
@@ -379,11 +367,12 @@ def run_simulation(cl, cli_id, agent_file):
                         )
                     except Exception as e:
                         print(f"Error ({g.name}): {e}")
+                        print(traceback.format_exc())
                         pass
 
             # Run agent tasks in parallel
-            with concurrent.futures.ThreadPoolExecutor() as executor:
-                executor.map(agent_task, sagents)
+            #with concurrent.futures.ThreadPoolExecutor() as executor:
+            #    executor.map(agent_task, sagents)
             ################# END OF PARALLELIZATION #################
 
             # increment slot
