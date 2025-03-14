@@ -18,12 +18,13 @@ itsdangerous==2.1.2
 Jinja2==3.1.2
 MarkupSafe==2.1.1
 networkx
-nlkt
+nltk
 numpy
+openai==1.66.3
 perspective
 pillow
 pyOpenSSL==22.0.0
-pyautogen==0.2.31
+pyautogen==0.8.1
 pycparser==2.21
 pygments
 requests
