@@ -102,12 +102,12 @@ Assuming you have [Anaconda](https://www.anaconda.com/) installed, you can creat
    ```bash
    pip install -r requirements.txt
    ```
-   4. **Install [Ollama](https://ollama.com/):** (and pull some LLM models)
-       ```bash
-      curl -fsSL https://ollama.com/install.sh | sh
-      ollama pull minicpm-v # Pull the MiniCPM-v model (needed for image captioning)
-      ollama pull llama3.1 # Pull the Llama3.1 model (or any other model you want to use)
-      ```
+4. **Install [Ollama](https://ollama.com/):** (and pull some LLM models)
+   ```bash
+   curl -fsSL https://ollama.com/install.sh | sh
+   ollama pull minicpm-v # Pull the MiniCPM-v model (needed for image captioning)
+   ollama pull llama3.1 # Pull the Llama3.1 model (or any other model you want to use)
+   ```
 5. **Start YSocial:**  
    ```bash
    python y_social.py --host localhost --port 8080
