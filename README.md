@@ -80,6 +80,15 @@ The **Y Social Digital Twin** supports a wide range of simulation configurations
 
 ### 📌 **Installation**
 
+To avoid conflicts with the Python environment, we recommend using a virtual environment to install the server dependencies.
+
+Assuming you have [Anaconda](https://www.anaconda.com/) installed, you can create a new environment with the following command:
+
+  ```bash
+  conda create --name Y python=3.11
+  conda activate Y
+  ```
+
 1. **Clone the repository:**  
    ```bash
    git clone https://github.com/YSocialTwin/YSocial.git
