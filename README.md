@@ -92,6 +92,7 @@ Assuming you have [Anaconda](https://www.anaconda.com/) installed, you can creat
 1. **Clone the repository:**  
    ```bash
    git clone https://github.com/YSocialTwin/YSocial.git
+   cd YSocial
    ```
 2. **Sync submodules:**  
    ```bash
@@ -101,7 +102,13 @@ Assuming you have [Anaconda](https://www.anaconda.com/) installed, you can creat
    ```bash
    pip install -r requirements.txt
    ```
-4. **Start the Flask server:**  
+   4. **Install [Ollama](https://ollama.com/):** (and pull some LLM models)
+       ```bash
+      curl -fsSL https://ollama.com/install.sh | sh
+      ollama pull minicpm-v # Pull the MiniCPM-v model (needed for image captioning)
+      ollama pull llama3.1 # Pull the Llama3.1 model (or any other model you want to use)
+      ```
+5. **Start YSocial:**  
    ```bash
    python y_social.py --host localhost --port 8080
    ```
@@ -125,6 +132,7 @@ To access the **admin panel**, use the default credentials:
 `Y Social` provides a **Dockerized setup** that includes:
 - **[Ollama](https://ollama.com/)** for running LLMs
 - **Y Server / Y Client** for managing simulations
+- **Y Social** for the web interface
 
 ### 📦 **Building & Running the Docker Container**
 ```bash
