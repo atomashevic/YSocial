@@ -10,18 +10,6 @@ services:
             - my-network
         ports:
             - 80:80
-
-    ollama:
-        build:
-            context: ./
-            dockerfile: Dockerfile
-        container_name: ollama
-        volumes:
-            - ./:/app/
-        command: ollama serve
-        networks:
-            - my-network
-
     ysocial:
         build:
             context: ./
@@ -32,8 +20,6 @@ services:
         environment:
             - FLASK_APP=/app/y_social.py
             - NVIDIA_VISIBLE_DEVICES=all
-        depends_on:
-            - ollama
         networks:
             my-network:
                 aliases:
