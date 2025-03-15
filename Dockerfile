@@ -6,7 +6,8 @@ LABEL maintainer="Giulio Rossetti <giulio.rossetti@gmail.com>" \
       description="This is a Docker image of YSocial" \
       website="https://ysocialtwin.github.io/"
 
-RUN apt-get update
+RUN apt-get clean && apt-get update
+RUN apt-get remove -y fonts-mathjax
 RUN apt-get install -y python3-full python3-pip pipx git build-essential python3-dev libffi-dev screen curl  #nvidia-utils-550
 # Update and install dependencies
 #RUN rm -rf /var/lib/apt/lists/* && \
