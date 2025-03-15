@@ -7,8 +7,16 @@ LABEL maintainer="Giulio Rossetti <giulio.rossetti@gmail.com>" \
       website="https://ysocialtwin.github.io/"
 
 RUN apt-get clean && apt-get update
-RUN apt-get remove -y fonts-mathjax
 RUN apt-get install -y python3-full python3-pip pipx git build-essential python3-dev libffi-dev screen curl  #nvidia-utils-550
+# Fix any broken packages
+RUN apt-get install -f
+
+# Remove the problematic fonts-mathjax package if needed
+RUN apt-get remove -y fonts-mathjax || echo "fonts-mathjax not installed"
+
+# Clean up apt lists and package cache
+RUN rm -rf /var/lib/apt/lists/* && apt-get clean
+
 # Update and install dependencies
 #RUN rm -rf /var/lib/apt/lists/* && \
 #    apt-get clean && \
