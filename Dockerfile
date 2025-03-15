@@ -17,15 +17,21 @@ RUN curl -fsSL https://ollama.com/install.sh | sh
 
 RUN git submodule update --init --recursive
 RUN pip install --break-system-packages --no-cache-dir -r requirements.txt
-# RUN pip install --break-system-packages --no-cache-dir -r external/YClient/requirements_client.txt
-# RUN pip install --break-system-packages --no-cache-dir -r external/YServer/requirements_server.txt
 
 # enabling python as default in screen sessions
 RUN echo 'alias python="python3"' >> ~/.bashrc
 RUN ln -s /usr/bin/python3 /usr/bin/python
-RUN ollama serve &
+#RUN ollama serve &
+#VOLUME ["/app", "/root/.ollama/models"]
+
+# Expose Flask port
+EXPOSE 5000
+
+# Define volumes
 VOLUME ["/app", "/root/.ollama/models"]
 
+# Default command (ysocial)
+CMD ["python", "/app/y_social.py", "--host", "0.0.0.0", "--port", "5000"]
 
 
 

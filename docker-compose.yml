@@ -11,6 +11,17 @@ services:
         ports:
             - 80:80
 
+    ollama:
+        build:
+            context: ./
+            dockerfile: Dockerfile
+        container_name: ollama
+        volumes:
+            - ./:/app/
+        command: ollama serve
+        networks:
+            - my-network
+
     ysocial:
         build:
             context: ./
@@ -20,6 +31,8 @@ services:
             - ./:/app/
         environment:
             - FLASK_APP=/app/y_social.py
+        depends_on:
+            - ollama
         networks:
             my-network:
                 aliases:
