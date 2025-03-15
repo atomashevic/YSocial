@@ -23,8 +23,10 @@ RUN pip install --break-system-packages --no-cache-dir -r requirements.txt
 # enabling python as default in screen sessions
 RUN echo 'alias python="python3"' >> ~/.bashrc
 RUN ln -s /usr/bin/python3 /usr/bin/python
-RUN ollama serve &
+#RUN ollama serve &
+COPY entrypoint.sh /app/entrypoint.sh
 VOLUME ["/app", "/root/.ollama/models"]
+ENTRYPOINT ["/app/entrypoint.sh"]
 
 
 
