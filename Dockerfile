@@ -9,11 +9,14 @@ LABEL maintainer="Giulio Rossetti <giulio.rossetti@gmail.com>" \
 #RUN apt-get update
 #RUN apt-get install -y python3-full python3-pip pipx git build-essential python3-dev libffi-dev screen curl nvidia-utils-550
 # Update and install dependencies
-RUN apt-get update && \
+RUN rm -rf /var/lib/apt/lists/* && \
+    apt-get clean && \
+    apt-get update -o Acquire::CompressionTypes::Order::=gz && \
     DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
     python3-full python3-pip pipx git build-essential python3-dev libffi-dev screen curl && \
     apt-get purge python3-colorama -y && \
     rm -rf /var/lib/apt/lists/*
+
 
 # Add NVIDIA CUDA repository
 RUN curl -fsSL https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/cuda-keyring_1.0-1_all.deb -o cuda-keyring.deb && \
