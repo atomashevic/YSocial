@@ -6,13 +6,22 @@ LABEL maintainer="Giulio Rossetti <giulio.rossetti@gmail.com>" \
       description="This is a Docker image of YSocial" \
       website="https://ysocialtwin.github.io/"
 
-RUN apt-get update
+#RUN apt-get update
 #RUN apt-get install -y python3-full python3-pip pipx git build-essential python3-dev libffi-dev screen curl nvidia-utils-550
+# Update and install dependencies
 RUN apt-get update && \
     DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
     python3-full python3-pip pipx git build-essential python3-dev libffi-dev screen curl && \
-    apt-get install -y --no-install-recommends nvidia-utils-550 || apt-get install -y --no-install-recommends nvidia-utils && \
-    apt-get purge python3-colorama -y
+    apt-get purge python3-colorama -y && \
+    rm -rf /var/lib/apt/lists/*
+
+# Add NVIDIA CUDA repository
+RUN curl -fsSL https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/cuda-keyring_1.0-1_all.deb -o cuda-keyring.deb && \
+    dpkg -i cuda-keyring.deb && rm cuda-keyring.deb
+
+# Install NVIDIA utils (adjust version as needed)
+RUN apt-get update && apt-get install -y --no-install-recommends nvidia-utils-550
+
 
 RUN mkdir /app
 COPY . /app
