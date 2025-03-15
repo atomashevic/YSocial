@@ -6,16 +6,16 @@ LABEL maintainer="Giulio Rossetti <giulio.rossetti@gmail.com>" \
       description="This is a Docker image of YSocial" \
       website="https://ysocialtwin.github.io/"
 
-#RUN apt-get update
-#RUN apt-get install -y python3-full python3-pip pipx git build-essential python3-dev libffi-dev screen curl nvidia-utils-550
+RUN apt-get update
+RUN apt-get install -y python3-full python3-pip pipx git build-essential python3-dev libffi-dev screen curl  #nvidia-utils-550
 # Update and install dependencies
-RUN rm -rf /var/lib/apt/lists/* && \
-    apt-get clean && \
-    apt-get update -o Acquire::CompressionTypes::Order::=gz && \
-    DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-    python3-full python3-pip pipx git build-essential python3-dev libffi-dev screen curl && \
-    apt-get purge python3-colorama -y && \
-    rm -rf /var/lib/apt/lists/*
+#RUN rm -rf /var/lib/apt/lists/* && \
+#    apt-get clean && \
+#    apt-get update -o Acquire::CompressionTypes::Order::=gz && \
+#    DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+#    python3-full python3-pip pipx git build-essential python3-dev libffi-dev screen curl && \
+#    apt-get purge python3-colorama -y && \
+#    rm -rf /var/lib/apt/lists/*
 
 
 # Add NVIDIA CUDA repository
