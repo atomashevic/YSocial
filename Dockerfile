@@ -7,8 +7,12 @@ LABEL maintainer="Giulio Rossetti <giulio.rossetti@gmail.com>" \
       website="https://ysocialtwin.github.io/"
 
 RUN apt-get update
-RUN apt-get install -y python3-full python3-pip pipx git build-essential python3-dev libffi-dev screen curl nvidia-utils-550
-RUN apt-get purge python3-colorama -y
+#RUN apt-get install -y python3-full python3-pip pipx git build-essential python3-dev libffi-dev screen curl nvidia-utils-550
+RUN apt-get update && \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+    python3-full python3-pip pipx git build-essential python3-dev libffi-dev screen curl && \
+    apt-get install -y --no-install-recommends nvidia-utils-550 || apt-get install -y --no-install-recommends nvidia-utils && \
+    apt-get purge python3-colorama -y
 
 RUN mkdir /app
 COPY . /app
