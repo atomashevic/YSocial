@@ -358,6 +358,9 @@ def population_details(uid):
     models = get_ollama_models()
     ollamas = ollama_status()
 
+    crecsys = Content_Recsys.query.all()
+    frecsys = Follow_Recsys.query.all()
+
     return render_template(
         "admin/population_details.html",
         population=population,
@@ -367,6 +370,8 @@ def population_details(uid):
         data=dd,
         models=models,
         ollamas=ollamas,
+        crecsys=crecsys,
+        frecsys=frecsys,
     )
 
 

@@ -24,6 +24,8 @@ from y_web.models import (
     Client_Execution,
     User_mgmt,
     Agent_Profile,
+    Follow_Recsys,
+    Content_Recsys,
 )
 from y_web.utils import start_client, terminate_client, get_ollama_models
 import json
@@ -587,6 +589,9 @@ def client_details(uid):
 
     ollamas = ollama_status()
 
+    frecsys = Follow_Recsys.query.all()
+    crecsys = Content_Recsys.query.all()
+
     return render_template(
         "admin/client_details.html",
         data=data,
@@ -598,6 +603,8 @@ def client_details(uid):
         pages=pages,
         models=models,
         ollamas=ollamas,
+        frecsys=frecsys,
+        crecsys=crecsys,
     )
 
 

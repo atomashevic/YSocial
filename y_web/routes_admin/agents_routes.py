@@ -18,7 +18,7 @@ from y_web.models import (
     Leanings,
     Languages,
     Content_Recsys,
-    Follow_Recsys
+    Follow_Recsys,
 )
 from y_web.utils import get_ollama_models
 from y_web.utils.miscellanea import ollama_status

@@ -1,11 +1,7 @@
 import json
 import os
 
-from flask import (
-    Blueprint,
-    render_template,
-    request, redirect, send_file
-)
+from flask import Blueprint, render_template, request, redirect, send_file
 from flask_login import login_required, current_user
 
 from y_web.models import (
@@ -212,8 +208,12 @@ def upload_page_collection():
 
     BASE = os.path.dirname(os.path.abspath(__file__)).split("routes_admin")[0]
     if collection:
-        collection.save(f"{BASE}experiments{os.sep}temp_data{os.sep}{collection.filename}")
-        pages = json.load(open(f"{BASE}experiments{os.sep}temp_data{os.sep}{collection.filename}"))
+        collection.save(
+            f"{BASE}experiments{os.sep}temp_data{os.sep}{collection.filename}"
+        )
+        pages = json.load(
+            open(f"{BASE}experiments{os.sep}temp_data{os.sep}{collection.filename}")
+        )
         for page in pages:
             # check if the page already exists
             p = Page.query.filter_by(name=page["name"], feed=page["feed"]).first()
@@ -266,5 +266,5 @@ def download_pages():
         json.dump(data, f)
 
     return send_file(
-        f"{BASE}experiments{os.sep}temp_data{os.sep}pages.json",
-        as_attachment=True)
+        f"{BASE}experiments{os.sep}temp_data{os.sep}pages.json", as_attachment=True
+    )
