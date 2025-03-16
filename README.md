@@ -142,6 +142,7 @@ docker-compose -f docker-compose.yml build
 docker-compose up
 ```
 
+
 #### ⚡ **Enable GPU Support (NVIDIA Only)**
 ```bash
 docker-compose -f docker-compose.yml -f docker-compose_gpu.yml build
