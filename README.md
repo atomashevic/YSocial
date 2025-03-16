@@ -136,25 +136,7 @@ Don't want to deal with dependencies? `Y Social` provides a **Dockerized setup**
 - **Y Server / Y Client** for managing simulations
 - **Y Social** for the web interface
 
-To use Docker, two options are available:
-- Using the pre-built Docker image;
-- Building and running the Docker container.
-
-### 📦 Option 1: **Install the pre-built Docker Image**
-
-Assuming you have Docker installed, you can pull the pre-built image from Docker Hub:
-
-```bash
-docker pull rossetti/ysocial:latest
-```
-
-Then, run the container:
-
-```bash
-docker run rossetti/ysocial:latest
-```
-
-### 📦 Option 2: **Building & Running the Docker Container**
+### 📦 **Building & Running the Docker Container**
 ```bash
 docker-compose -f docker-compose.yml build
 docker-compose up
