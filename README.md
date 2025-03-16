@@ -191,7 +191,8 @@ docker-compose up --gpus all
 ---
 
 ## 📜 License
-This project is licensed under the **GNU General Public License (GPL)**. See the [LICENSE](LICENSE) file for details.
+This project, for what concerns the businsess logic, is licensed under the **GNU General Public License (GPL)**. See the [LICENSE](LICENSE) file for details.
+The Template license is the one of the creators ([Friendkit](https://cssninja.io/product/friendkit)) 
 
 📌 **If you use Y Social for research, please cite:**
 ```bibtex
