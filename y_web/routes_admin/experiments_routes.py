@@ -26,7 +26,11 @@ from y_web.models import (
     Agent_Profile,
     Page,
     Page_Population,
-Languages, Leanings, Nationalities, Profession, Education
+    Languages,
+    Leanings,
+    Nationalities,
+    Profession,
+    Education,
 )
 from y_web.utils import terminate_process_on_port, start_server
 import json
@@ -200,19 +204,22 @@ def upload_experiment():
     populations = [
         f
         for f in os.listdir(f"{BASE_DIR}experiments{os.sep}{uid}")
-        if f.endswith(".json") and not f.startswith("client") and f != "config_server.json" and f != "prompts.json"
+        if f.endswith(".json")
+        and not f.startswith("client")
+        and f != "config_server.json"
+        and f != "prompts.json"
     ]
 
     for population in populations:
         name = population.split(".")[0]
-        pop = json.load(
-            open(f"{BASE_DIR}experiments{os.sep}{uid}{os.sep}{population}")
-        )
+        pop = json.load(open(f"{BASE_DIR}experiments{os.sep}{uid}{os.sep}{population}"))
 
         # check if the population already exists
         population = Population.query.filter_by(name=name).first()
         if population:
-            flash("The population already exists. Please check the population name and try again.")
+            flash(
+                "The population already exists. Please check the population name and try again."
+            )
             shutil.rmtree(f"{BASE_DIR}experiments{os.sep}{uid}", ignore_errors=True)
             return redirect(request.referrer)
 
@@ -225,9 +232,7 @@ def upload_experiment():
         db.session.commit()
 
         for agent in pop["agents"]:
-
             if agent["is_page"] == 1:
-
                 # check if the page already exists
                 page = Page.query.filter_by(name=agent["name"]).first()
 
@@ -344,7 +349,7 @@ def upload_experiment():
             llm_v=client["servers"]["llm_v"],
             llm_v_api_key=client["servers"]["llm_v_api_key"],
             llm_v_max_tokens=client["servers"]["llm_v_max_tokens"],
-            llm_v_temperature=client["servers"]["llm_v_temperature"]
+            llm_v_temperature=client["servers"]["llm_v_temperature"],
         )
         db.session.add(cl)
         db.session.commit()
@@ -353,7 +358,7 @@ def upload_experiment():
             client_id=cl.id,
             last_active_hour=0,
             last_active_day=0,
-            expected_duration_rounds=cl.days * client["simulation"]["slots"]
+            expected_duration_rounds=cl.days * client["simulation"]["slots"],
         )
         db.session.add(client_exec)
         db.session.commit()
@@ -756,8 +761,7 @@ def miscellanea():
 
     ollamas = ollama_status()
 
-    return render_template("admin/miscellanea.html",
-                           ollamas=ollamas)
+    return render_template("admin/miscellanea.html", ollamas=ollamas)
 
 
 @experiments.route("/admin/languages_data")

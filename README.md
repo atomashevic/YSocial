@@ -129,7 +129,9 @@ To access the **admin panel**, use the default credentials:
 
 ## 🐳 Running with Docker
 
-`Y Social` provides a **Dockerized setup** that includes:
+What is Docker? Docker is a platform for developing, shipping, and running applications in containers.
+
+Don't want to deal with dependencies? `Y Social` provides a **Dockerized setup** that includes:
 - **[Ollama](https://ollama.com/)** for running LLMs
 - **Y Server / Y Client** for managing simulations
 - **Y Social** for the web interface
@@ -140,7 +142,7 @@ docker-compose -f docker-compose.yml build
 docker-compose up
 ```
 
-### ⚡ **Enable GPU Support (NVIDIA Only)**
+#### ⚡ **Enable GPU Support (NVIDIA Only)**
 ```bash
 docker-compose -f docker-compose.yml -f docker-compose_gpu.yml build
 docker-compose up --gpus all

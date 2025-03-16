@@ -195,13 +195,9 @@
                                         <span class="right">
                                             <div class="select">
                                             <select name="recsys_type">
-                                                <option value="ContentRecSys">Random</option>
-                                                <option value="ReverseChrono">(RC) Reverse Chrono</option>
-                                                <option value="ReverseChronoPopularity">(RC) Popularity</option>
-                                                <option value="ReverseChronoFollowers">(RC) Followers</option>
-                                                <option value="ReverseChronoFollowersPopularity">(RC)
-                                                    Followers-Popularity
-                                                </option>
+                                                {% for recsys in crecsys %}
+                                                <option value="{{ recsys.name }}">{{ recsys.value }}</option>
+                                                {% endfor %}
                                             </select>
                                         </div>
                                         </span>
@@ -213,11 +209,9 @@
                                             <div class="select">
                                                  <div class="select">
                                             <select name="frecsys_type">
-                                                <option value="FollowRecSys">Random</option>
-                                                <option value="CommonNeighbors">Common Neighbors</option>
-                                                <option value="Jaccard">Jaccard</option>
-                                                <option value="AdamicAdar">Adamic Adar</option>
-                                                <option value="PreferentialAttachment">Preferential Attachment</option>
+                                                {% for recsys in frecsys %}
+                                                <option value="{{ recsys.name }}">{{ recsys.value }}</option>
+                                                {% endfor %}
                                             </select>
                                         </div>
                                             </div>
