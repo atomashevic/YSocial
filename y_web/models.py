@@ -404,6 +404,7 @@ class Client(db.Model):
     llm_v_temperature = db.Column(db.REAL)
     status = db.Column(db.Integer, nullable=False, default=0)
     id_exp = db.Column(db.Integer, db.ForeignKey("exps.idexp"), nullable=False)
+    probability_of_secondary_follow = db.Column(db.REAL, default=0.0)
     population_id = db.Column(
         db.Integer, db.ForeignKey("population.id"), nullable=False
     )

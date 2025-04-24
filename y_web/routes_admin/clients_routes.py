@@ -187,6 +187,7 @@ def create_client():
     max_length_thread_reading = request.form.get("max_length_thread_reading")
     reading_from_follower_ratio = request.form.get("reading_from_follower_ratio")
     probability_of_daily_follow = request.form.get("probability_of_daily_follow")
+    probability_of_secondary_follow = request.form.get("probability_of_secondary_follow")
     attention_window = request.form.get("attention_window")
     visibility_rounds = request.form.get("visibility_rounds")
     post = request.form.get("post")
@@ -251,6 +252,7 @@ def create_client():
         llm_v_api_key=llm_v_api_key,
         llm_v_max_tokens=llm_v_max_tokens,
         llm_v_temperature=llm_v_temperature,
+        probability_of_secondary_follow=probability_of_secondary_follow,
         status=0,
     )
 
@@ -355,6 +357,7 @@ def create_client():
             "max_length_thread_reading": int(max_length_thread_reading),
             "attention_window": int(attention_window),
             "probability_of_daily_follow": float(probability_of_daily_follow),
+            "probability_of_secondary_follow": float(probability_of_secondary_follow),
             "age": {"min": 18, "max": 65},
             "political_leaning": [],
             "toxicity_levels": [],
@@ -380,21 +383,21 @@ def create_client():
     political_leaning = set(
         [Agent.query.filter_by(id=a.agent_id).first().leaning for a in agents]
     )
-    # get agents age
+    # get agents' age
     age = set([Agent.query.filter_by(id=a.agent_id).first().age for a in agents])
     # get agents toxicity levels
     toxicity = set(
         [Agent.query.filter_by(id=a.agent_id).first().toxicity for a in agents]
     )
-    # get agents language
+    # get agents' language
     language = set(
         [Agent.query.filter_by(id=a.agent_id).first().language for a in agents]
     )
-    # get agents type
+    # get agents' type
     ag_type = set(
         [Agent.query.filter_by(id=a.agent_id).first().ag_type for a in agents]
     )
-    # get agents education level
+    # get agents' education level
     education_level = set(
         [Agent.query.filter_by(id=a.agent_id).first().education_level for a in agents]
     )

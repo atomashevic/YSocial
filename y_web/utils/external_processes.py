@@ -332,13 +332,13 @@ def run_simulation(cl, cli_id, agent_file):
             random.shuffle(sagents)
 
             ################# PARALLELIZED SECTION #################
-            #def agent_task(g, tid):
+            # def agent_task(g, tid):
             for g in sagents:
                 acts = [a for a, v in cl.actions_likelihood.items() if v > 0]
 
                 daily_active[g.name] = None
 
-                # get a random integer within g.round_actions. If g.is_page == 1, then rounds = 1
+                # Get a random integer within g.round_actions. If g.is_page == 1, then rounds = 1
                 if g.is_page == 1:
                     rounds = 1
                 else:
@@ -385,20 +385,21 @@ def run_simulation(cl, cli_id, agent_file):
             ce.last_active_day = d
             db.session.commit()
 
-            # evaluate following (once per day, only for a random sample of daily active agents)
-        da = [
-            agent
-            for agent in cl.agents.agents
-            if agent.name in daily_active
-            and agent not in cl.pages
-            and random.random()
-            < float(cl.config["agents"]["probability_of_daily_follow"])
-        ]
+        # evaluate follows (once per day, only for a random sample of daily active agents)
+        if float(cl.config["agents"]["probability_of_daily_follow"]) > 0:
+            da = [
+                agent
+                for agent in cl.agents.agents
+                if agent.name in daily_active
+                and agent not in cl.pages
+                and random.random()
+                < float(cl.config["agents"]["probability_of_daily_follow"])
+            ]
 
-        # Evaluating new friendship ties
-        for agent in da:
-            if agent not in cl.pages:
-                agent.select_action(tid=tid, actions=["FOLLOW", "NONE"])
+            # Evaluating new friendship ties
+            for agent in da:
+                if agent not in cl.pages:
+                    agent.select_action(tid=tid, actions=["FOLLOW", "NONE"])
 
         # daily churn and new agents
         if len(daily_active) > 0:
@@ -416,8 +417,4 @@ def run_simulation(cl, cli_id, agent_file):
                     cl.add_agent()
 
         # saving "living" agents at the end of the day
-        if (
-            cl.percentage_removed_agents_iteration != 0
-            or cl.percentage_removed_agents_iteration != 0
-        ):
-            cl.save_agents(agent_file)
+        cl.save_agents(agent_file)

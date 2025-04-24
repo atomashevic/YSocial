@@ -46,6 +46,13 @@ if __name__ == "__main__":
         help="port to run the app on",
     )
 
+    parser.add_argument(
+        "-d",
+        "--debug",
+        default=f"False",
+        help="whether to run the app in debug mode",
+    )
+
     args = parser.parse_args()
 
-    start_app(host=args.host, port=args.port)
+    start_app(debug=bool(args.debug), host=args.host, port=args.port)
