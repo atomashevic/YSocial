@@ -49,10 +49,10 @@ if __name__ == "__main__":
     parser.add_argument(
         "-d",
         "--debug",
-        default=f"False",
+        default=False,
         help="whether to run the app in debug mode",
     )
 
     args = parser.parse_args()
 
-    start_app(debug=bool(args.debug), host=args.host, port=args.port)
+    start_app(debug=args.debug, host=args.host, port=args.port)
