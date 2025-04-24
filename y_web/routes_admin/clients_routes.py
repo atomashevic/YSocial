@@ -67,6 +67,36 @@ def reset_client(uid):
     return redirect(request.referrer)
 
 
+@clientsr.route("/admin/extend_simulation/<int:id_client>", methods=["POST", "GET"])
+@login_required
+def extend_simulation(id_client):
+    check_privileges(current_user.username)
+
+    # check if the client exists
+    client = Client.query.filter_by(id=id_client).first()
+    if client is None:
+        flash("Client not found.", "error")
+        return redirect(request.referrer)
+
+    # get the days from the form
+    days = request.form.get("days")
+
+    # get the client execution
+    client_execution = Client_Execution.query.filter_by(client_id=id_client).first()
+
+    # extend the simulation
+    client_execution.expected_duration_rounds += int(days) * 24
+
+    db.session.commit()
+
+    # update the client days field
+    client = db.session.query(Client).filter_by(id=id_client).first()
+    client.days = int(client.days) + int(days)
+    db.session.commit()
+
+    return redirect(request.referrer)
+
+
 @clientsr.route("/admin/run_client/<int:uid>/<int:idexp>")
 @login_required
 def run_client(uid, idexp):

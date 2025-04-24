@@ -279,6 +279,10 @@ def start_client_process(exp, cli, population, resume=False):
     if first_run and cli.network_type is not None and cli.network_type != "":
         cl.add_network()
 
+    # check if filename exists
+    if not os.path.exists(filename):
+        cl.save_agents(filename)
+
     run_simulation(cl, cli.id, filename)
 
 
