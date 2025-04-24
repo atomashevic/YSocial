@@ -161,6 +161,8 @@ def __follow_suggestions(rectype, user_id, n_neighbors, leaning_biased):
 
     res = [k for k, v in res.items() if v > 0]
     users = [User_mgmt.query.filter_by(id=user).first() for user in res]
+    if len(users) > n_neighbors:
+        users = users[:n_neighbors]
     return users
 
 

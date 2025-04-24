@@ -877,6 +877,10 @@ def __get_discussions(posts, username, page):
                     profile_pic = pg.logo
             else:
                 ag = Agent.query.filter_by(name=user.username).first()
+
+                if ag is None:
+                    continue
+
                 profile_pic = (
                     ag.profile_pic
                     if ag is not None and ag.profile_pic is not None
@@ -963,6 +967,9 @@ def __get_discussions(posts, username, page):
                 profile_pic = pg.logo
         else:
             ag = Agent.query.filter_by(name=aa.username).first()
+            if ag is None:
+                continue
+
             profile_pic = (
                 ag.profile_pic
                 if ag is not None

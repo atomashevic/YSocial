@@ -518,7 +518,7 @@ def upload_population():
     population_file = request.files["population_file"]
 
     BASE_DIR = os.path.dirname(os.path.abspath(__file__)).split("routes_admin")[0]
-    filename = f"{BASE_DIR}{os.sep}experiments{os.sep}temp_data{os.sep}{population_file.filename}"
+    filename = f"{BASE_DIR}{os.sep}experiments{os.sep}temp_data{os.sep}{population_file.filename}".replace(f"{os.sep}{os.sep}", f"{os.sep}")
     population_file.save(filename)
 
     data = json.load(open(filename, "r"))

@@ -155,13 +155,14 @@ def upload_experiment():
     )
     # remove the zip file
     os.remove(f"{BASE_DIR}experiments{os.sep}{uid}{os.sep}exp.zip")
-
     # create the experiment in the database from the config_server.json file
     try:
+
+        # list the files in the directory
+        files = os.listdir(f"{BASE_DIR}experiments{os.sep}{uid}")
         experiment = json.load(
             open(f"{BASE_DIR}experiments{os.sep}{uid}{os.sep}config_server.json")
         )
-        print(experiment)
         name = experiment["name"]
 
         # check if the experiment already exists
@@ -199,6 +200,7 @@ def upload_experiment():
         )
         # remove the directory containing the files
         shutil.rmtree(f"{BASE_DIR}experiments{os.sep}{uid}", ignore_errors=True)
+        return redirect(request.referrer)
 
     # get the json files that do not start with "client"
     populations = [
@@ -263,41 +265,42 @@ def upload_experiment():
                     db.session.commit()
 
             # add agent to the database
-            ag = Agent(
-                name=agent["name"],
-                age=agent["age"],
-                ag_type=agent["type"],
-                leaning=agent["leaning"],
-                interests=",".join(agent["interests"][0]),
-                oe=agent["oe"],
-                co=agent["co"],
-                ne=agent["ne"],
-                ag=agent["ag"],
-                ex=agent["ex"],
-                language=agent["language"],
-                education_level=agent["education_level"],
-                round_actions=agent["round_actions"],
-                nationality=agent["nationality"],
-                toxicity=agent["toxicity"],
-                gender=agent["gender"],
-                crecsys=agent["rec_sys"],
-                frecsys=agent["frec_sys"],
-                profile_pic="",
-                daily_activity_level=agent["daily_activity_level"],
-                profession=agent["profession"],
-            )
-            db.session.add(ag)
-            db.session.commit()
-
-            if agent["prompts"] is not None:
-                ag_profile = Agent_Profile(agent_id=ag.id, profile=agent["prompts"])
-                db.session.add(ag_profile)
+            else:
+                ag = Agent(
+                    name=agent["name"],
+                    age=agent["age"],
+                    ag_type=agent["type"],
+                    leaning=agent["leaning"],
+                    interests=",".join(agent["interests"][0]),
+                    oe=agent["oe"],
+                    co=agent["co"],
+                    ne=agent["ne"],
+                    ag=agent["ag"],
+                    ex=agent["ex"],
+                    language=agent["language"],
+                    education_level=agent["education_level"],
+                    round_actions=agent["round_actions"],
+                    nationality=agent["nationality"],
+                    toxicity=agent["toxicity"],
+                    gender=agent["gender"],
+                    crecsys=agent["rec_sys"],
+                    frecsys=agent["frec_sys"],
+                    profile_pic="",
+                    daily_activity_level=agent["daily_activity_level"],
+                    profession= agent["profession"] if "profession" in agent else "",
+                )
+                db.session.add(ag)
                 db.session.commit()
 
-            # add agent to population
-            ap = Agent_Population(agent_id=ag.id, population_id=population.id)
-            db.session.add(ap)
-            db.session.commit()
+                if "prompts" in agent and agent["prompts"] is not None:
+                    ag_profile = Agent_Profile(agent_id=ag.id, profile=agent["prompts"])
+                    db.session.add(ag_profile)
+                    db.session.commit()
+
+                # add agent to population
+                ap = Agent_Population(agent_id=ag.id, population_id=population.id)
+                db.session.add(ap)
+                db.session.commit()
 
         # get the json file that start with "client" and contains "population"
         client = [
