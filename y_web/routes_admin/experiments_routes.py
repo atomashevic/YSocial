@@ -157,7 +157,6 @@ def upload_experiment():
     os.remove(f"{BASE_DIR}experiments{os.sep}{uid}{os.sep}exp.zip")
     # create the experiment in the database from the config_server.json file
     try:
-
         # list the files in the directory
         files = os.listdir(f"{BASE_DIR}experiments{os.sep}{uid}")
         experiment = json.load(
@@ -287,7 +286,7 @@ def upload_experiment():
                     frecsys=agent["frec_sys"],
                     profile_pic="",
                     daily_activity_level=agent["daily_activity_level"],
-                    profession= agent["profession"] if "profession" in agent else "",
+                    profession=agent["profession"] if "profession" in agent else "",
                 )
                 db.session.add(ag)
                 db.session.commit()

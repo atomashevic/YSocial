@@ -217,7 +217,9 @@ def create_client():
     max_length_thread_reading = request.form.get("max_length_thread_reading")
     reading_from_follower_ratio = request.form.get("reading_from_follower_ratio")
     probability_of_daily_follow = request.form.get("probability_of_daily_follow")
-    probability_of_secondary_follow = request.form.get("probability_of_secondary_follow")
+    probability_of_secondary_follow = request.form.get(
+        "probability_of_secondary_follow"
+    )
     attention_window = request.form.get("attention_window")
     visibility_rounds = request.form.get("visibility_rounds")
     post = request.form.get("post")

@@ -3,7 +3,6 @@ from sqlalchemy.sql.expression import func
 from y_web.models import (
     Post,
     Follow,
-    Reactions,
 )
 from y_web import db
 
@@ -40,11 +39,9 @@ def get_suggested_posts(uid, mode, page=1, per_page=10, follower_ratio=0.6):
         # get posts ordered by likes in reverse chronological order
 
         posts = (
-            db.session.query(Post, func.count(Reactions.user_id).label("total"))
+            db.session.query(Post)
             .filter(Post.user_id != uid, Post.comment_to == -1)
-            .outerjoin(Reactions)
-            .group_by(Post.id)
-            .order_by(desc(func.count(Reactions.user_id)), desc(Post.id))
+            .order_by(desc(Post.id), desc(Post.reaction_count))
             .paginate(page=page, per_page=per_page, error_out=False)
         )
         additional_posts = None
@@ -80,11 +77,9 @@ def get_suggested_posts(uid, mode, page=1, per_page=10, follower_ratio=0.6):
 
         # get posts from followers ordered by likes and reverse chronologically
         posts = (
-            db.session.query(Post, func.count(Reactions.user_id).label("total"))
-            .outerjoin(Reactions)
+            db.session.query(Post)
             .filter(Post.user_id.in_(follower_ids), Post.comment_to == -1)
-            .group_by(Post)
-            .order_by(desc(func.count(Reactions.user_id)), desc(Post.id))
+            .order_by(desc(Post.id), desc(Post.reaction_count))
             .paginate(
                 page=page, per_page=int(per_page * follower_ratio), error_out=False
             )

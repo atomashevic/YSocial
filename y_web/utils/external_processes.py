@@ -375,7 +375,7 @@ def run_simulation(cl, cli_id, agent_file):
                         pass
 
             # Run agent tasks in parallel
-            #with concurrent.futures.ThreadPoolExecutor() as executor:
+            # with concurrent.futures.ThreadPoolExecutor() as executor:
             #    executor.map(agent_task, sagents)
             ################# END OF PARALLELIZATION #################
 

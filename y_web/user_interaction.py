@@ -129,6 +129,12 @@ def react():
         db.session.add(reaction)
         db.session.commit()
 
+    # update the reaction count of the post
+    post = Post.query.filter_by(id=post_id).first()
+    if post is not None:
+        post.reaction_count += 1
+        db.session.commit()
+
     return {"message": "Reaction added successfully", "status": 200}
 
 

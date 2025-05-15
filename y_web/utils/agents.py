@@ -124,7 +124,7 @@ def generate_population(population_name):
             frecsys=population.frecsys,
             crecsys=population.crecsys,
             daily_activity_level=daily_activity_level,
-            profession=profession.profession
+            profession=profession.profession,
         )
 
         db.session.add(agent)
