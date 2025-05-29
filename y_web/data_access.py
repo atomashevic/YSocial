@@ -15,7 +15,6 @@ from .models import (
     Images,
     Page,
     Agent,
-    Admin_users,
     Post_Sentiment,
 )
 from sqlalchemy.sql.expression import func
@@ -32,6 +31,7 @@ def get_user_recent_posts(user_id, page, per_page=10, mode="rf", current_user=No
     :param page:
     :param per_page:
     :param mode:
+    :param current_user:
     :return:
     """
 
