@@ -47,6 +47,7 @@
                                         {id: 'exp_name', name: 'Name', 'attributes': editableCellAttributes},
                                         {id: 'exp_descr', name: 'Description', sort: false},
                                         {id: 'owner', name: 'Owner', sort: false},
+                                        {id: 'platform_type', name: 'Platform Type', sort: true},
                                         {id: 'web', name: 'Web Interface', sort: true},
                                         {id: 'running', name: 'YServer Status', sort: true},
                                         {
@@ -73,7 +74,7 @@
                                         multiColumn: true,
                                         server: {
                                             url: (prev, columns) => {
-                                                const columnIds = ['idexp', 'exp_name', 'exp_descr', 'owner', 'web', 'running'];
+                                                const columnIds = ['idexp', 'exp_name', 'platform_type', 'exp_descr', 'owner', 'web', 'running'];
                                                 const sort = columns.map(col => (col.direction === 1 ? '+' : '-') + columnIds[col.index]);
                                                 return updateUrl(prev, {sort});
                                             },
@@ -143,6 +144,7 @@
                         <div class="box-content">
                             <form action="/admin/upload_experiment" enctype="multipart/form-data" method="POST">
                                 <div class="box-lines">
+
                                     <div class="box-line">
                                         <span class="left">Experiment zip</span>
                                         <span class="right"><input type="file" id="experiment" name="experiment"
@@ -175,6 +177,18 @@
                         <div class="box-content">
                             <form action="/admin/create_experiment" enctype="multipart/form-data" method="POST">
                                 <div class="box-lines">
+
+                                    <div class="box-line">
+                                        <span class="left">Platform Type</span>
+                                        <span class="right" style="width: 70%;">
+                                            <div class="select">
+                                                <select name="platform_type" style="width: 100%">
+                                                    <option value="microblogging">Microblogging (i.e., X/BlueSky)</option>
+                                                    <option value="microblogging" disabled>Forum (i.e., Reddit)</option>
+                                                </select>
+                                            </div>
+                                        </span>
+                                    </div>
 
                                     <div class="box-line">
                                         <span class="left">Name</span>

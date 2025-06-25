@@ -55,10 +55,13 @@ def reset_client(uid):
 
     # copy the original prompts.json file
     BASE = os.path.dirname(os.path.abspath(__file__)).split("y_web")[0]
-    shutil.copy(
-        f"{BASE}data_schema{os.sep}prompts.json",
-        f"y_web{os.sep}experiments{os.sep}{exp.db_name.split(os.sep)[1]}{os.sep}prompts.json",
-    )
+    if exp.platform_type == "microblogging":
+        shutil.copy(
+            f"{BASE}data_schema{os.sep}prompts.json",
+            f"y_web{os.sep}experiments{os.sep}{exp.db_name.split(os.sep)[1]}{os.sep}prompts.json",
+        )
+    else:
+        raise Exception(f"unsupported platform: {exp.platform_type}")
 
     # delete client execution
     db.session.query(Client_Execution).filter_by(client_id=uid).delete()
@@ -246,6 +249,7 @@ def create_client():
         return redirect(request.referrer)
 
     exp = Exps.query.filter_by(idexp=exp_id).first()
+
     # get population
     population = Population.query.filter_by(id=population_id).first()
 
@@ -460,12 +464,17 @@ def create_client():
     ) as f:
         json.dump(config, f)
 
-    # copy prompts.json into the experiment folder
     data_base_path = f"{BASE_DIR}y_web{os.sep}experiments{os.sep}{uid}{os.sep}"
-    shutil.copyfile(
-        f"{BASE_DIR}data_schema{os.sep}prompts.json".replace("/y_web/utils", ""),
-        f"{data_base_path}prompts.json",
-    )
+    # copy prompts.json into the experiment folder
+
+    if exp.platform_type == "microblogging":
+
+        shutil.copyfile(
+            f"{BASE_DIR}data_schema{os.sep}prompts.json".replace("/y_web/utils", ""),
+            f"{data_base_path}prompts.json",
+        )
+    else:
+        raise Exception(f"unsupported platform: {exp.platform_type}")
 
     # Create agent population file
     BASE_DIR = os.path.dirname(os.path.abspath(__file__)).split("routes_admin")[0]

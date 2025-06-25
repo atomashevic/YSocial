@@ -182,6 +182,7 @@ def upload_experiment():
             status=0,
             port=experiment["port"],
             server=experiment["host"],
+            platform_type= experiment["platform_type"],
         )
 
         db.session.add(exp)
@@ -435,6 +436,7 @@ def create_experiment():
     exp_name = request.form.get("exp_name")
     exp_descr = request.form.get("exp_descr")
     owner = request.form.get("owner")
+    platform_type = request.form.get("platform_type")
     host = request.form.get("host")
     port = int(request.form.get("port"))
     perspective_api = request.form.get("perspective_api")
@@ -445,12 +447,16 @@ def create_experiment():
     )
 
     # copy the clean database to the experiments folder
-    shutil.copyfile(
-        f"data_schema{os.sep}database_clean_server.db",
-        f"y_web{os.sep}experiments{os.sep}{uid}{os.sep}database_server.db",
-    )
+    if platform_type == "microblogging":
+        shutil.copyfile(
+            f"data_schema{os.sep}database_clean_server.db",
+            f"y_web{os.sep}experiments{os.sep}{uid}{os.sep}database_server.db",
+        )
+    else:
+        raise NotImplementedError(f"Unsupported platform {platform_type}")
 
     config = {
+        "platform_type": platform_type,
         "name": exp_name,
         "host": host,
         "port": port,
@@ -469,6 +475,7 @@ def create_experiment():
 
     exp = Exps(
         exp_name=exp_name,
+        platform_type=platform_type,
         db_name=f"experiments{os.sep}{uid}{os.sep}database_server.db",
         owner=db.session.query(Admin_users).filter_by(id=owner).first().username,
         exp_descr=exp_descr,
@@ -588,6 +595,7 @@ def experiments_data():
                 "idexp": exp.idexp,
                 "exp_name": exp.exp_name,
                 "exp_descr": exp.exp_descr,
+                "platform_type": exp.platform_type,
                 "owner": exp.owner,
                 "web": "Loaded" if exp.status == 1 else "Not loaded",
                 "running": "Running" if exp.running == 1 else "Stopped",

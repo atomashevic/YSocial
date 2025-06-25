@@ -242,6 +242,7 @@ class Exps(db.Model):
     __bind_key__ = "db_admin"
     __tablename__ = "exps"
     idexp = db.Column(db.Integer, primary_key=True)
+    platform_type = db.Column(db.String(50), nullable=False, default="microblogging")
     exp_name = db.Column(db.String(50), nullable=False)
     db_name = db.Column(db.String(50), nullable=False)
     owner = db.Column(db.String(50), nullable=False)

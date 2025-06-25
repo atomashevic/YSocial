@@ -42,6 +42,10 @@
                                     <span class="right">{{ experiment.exp_descr }}</span>
                                 </div>
                                 <div class="box-line">
+                                    <span class="left">Platform Type</span>
+                                    <span class="right">{{ experiment.platform_type }}</span>
+                                </div>
+                                <div class="box-line">
                                     <span class="left">Owner</span>
                                     <span class="right">{{ experiment.owner }}</span>
                                 </div>
@@ -53,6 +57,7 @@
                                 </div>
                                 {% endif %}
                             </div>
+                            {% if len(clients)>0 %}
                             <div class="box-line">
                                     <span class="left">Edit LLM Prompts</span>
                                     <span class="right">
@@ -60,6 +65,7 @@
                                             <i class="mdi mdi-credit-card" style="font-size: 24px;"></i></a>
                                     </span>
                                 </div>
+                            {% endif %}
 
                             <div class="box-line">
                                     <span class="left">Download Experiment</span>

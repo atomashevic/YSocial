@@ -53,7 +53,11 @@ def start_server(exp):
     BASE_DIR = os.path.dirname(os.path.abspath(__file__)).split("utils")[0]
     config = f"{yserver_path}y_web{os.sep}{exp.db_name.split('database_server.db')[0]}config_server.json"
     exp_uid = exp.db_name.split(os.sep)[1]
-    flask_command = f"python {yserver_path}external{os.sep}YServer{os.sep}y_server_run.py -c {config}"
+
+    if exp.platform_type == "microblogging":
+        flask_command = f"python {yserver_path}external{os.sep}YServer{os.sep}y_server_run.py -c {config}"
+    else:
+        raise NotImplementedError(f"Unsupported platform {exp.platform_type}")
 
     # Command to run in the detached screen
     screen_command = f"screen -dmS {exp_uid} {flask_command}"
@@ -224,8 +228,13 @@ def start_client_process(exp, cli, population, resume=False):
     """
 
     yclient_path = os.path.dirname(os.path.abspath(__file__)).split("y_web")[0]
-    sys.path.append(f"{yclient_path}{os.sep}external{os.sep}YClient/")
-    from y_client.clients import YClientWeb
+
+    if exp.platform_type == "microblogging":
+        sys.path.append(f"{yclient_path}{os.sep}external{os.sep}YClient/")
+        from y_client.clients import YClientWeb
+
+    else:
+        raise NotImplementedError(f"Unsupported platform {exp.platform_type}")
 
     # get experiment base path
     BASE_DIR = os.path.dirname(os.path.abspath(__file__)).split("utils")[0]
