@@ -394,6 +394,7 @@ class Client(db.Model):
     news = db.Column(db.REAL)
     search = db.Column(db.REAL)
     vote = db.Column(db.REAL)
+    share_link = db.Column(db.REAL)
     llm = db.Column(db.String(100))
     llm_api_key = db.Column(db.String(300))
     llm_max_tokens = db.Column(db.Integer)

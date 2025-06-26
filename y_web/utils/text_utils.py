@@ -157,3 +157,26 @@ def strip_tags(html):
     s = MLStripper()
     s.feed(html)
     return s.get_data()
+
+
+def process_reddit_post(text):
+    """
+    Process post text for Reddit-style display.
+    Handles TITLE: prefix and formats properly.
+
+    :param text: the raw post text
+    :return: tuple of (title, content) or (None, text) if no title
+    """
+    if text.startswith("TITLE: "):
+        # Split on first newline after title
+        lines = text.split('\n', 1)
+        title = lines[0].replace("TITLE: ", "").strip()
+        if len(lines) > 1:
+            # Remove all leading whitespace from the content
+            content = lines[1].lstrip()
+        else:
+            content = ""
+        return title, content
+    else:
+        # For non-title posts, still remove leading whitespace
+        return None, text.lstrip()

@@ -60,6 +60,11 @@ def reset_client(uid):
             f"{BASE}data_schema{os.sep}prompts.json",
             f"y_web{os.sep}experiments{os.sep}{exp.db_name.split(os.sep)[1]}{os.sep}prompts.json",
         )
+    elif exp.platform_type == "forum":
+        shutil.copy(
+            f"{BASE}data_schema{os.sep}prompts_forum.json",
+            f"y_web{os.sep}experiments{os.sep}{exp.db_name.split(os.sep)[1]}{os.sep}prompts.json",
+        )
     else:
         raise Exception(f"unsupported platform: {exp.platform_type}")
 
@@ -233,6 +238,7 @@ def create_client():
     news = request.form.get("news")
     search = request.form.get("search")
     vote = request.form.get("vote")
+    share_link = request.form.get("share_link")
     llm = request.form.get("llm")
     llm_api_key = request.form.get("llm_api_key")
     llm_max_tokens = request.form.get("llm_max_tokens")
@@ -279,6 +285,7 @@ def create_client():
         news=news,
         search=search,
         vote=vote,
+        share_link=share_link,
         llm=llm,
         llm_api_key=llm_api_key,
         llm_max_tokens=llm_max_tokens,
@@ -345,13 +352,14 @@ def create_client():
             },
             "actions_likelihood": {
                 "post": float(post),
-                "image": float(image),
-                "news": float(news),
-                "comment": float(comment),
-                "read": float(read),
-                "share": float(share),
-                "search": float(search),
-                "cast": float(vote),
+                "image": float(image) if image is not None else 0,
+                "news": float(news) if news is not None else 0,
+                "comment": float(comment) if comment is not None else 0,
+                "read": float(read) if read is not None else 0,
+                "share": float(share) if share is not None else 0,
+                "search": float(search) if search is not None else 0,
+                "cast": float(vote) if vote is not None else 0,
+                "share_link": float(share_link) if share_link is not None else 0,
             },
         },
         "posts": {
@@ -471,6 +479,12 @@ def create_client():
 
         shutil.copyfile(
             f"{BASE_DIR}data_schema{os.sep}prompts.json".replace("/y_web/utils", ""),
+            f"{data_base_path}prompts.json",
+        )
+
+    elif exp.platform_type == "forum":
+        shutil.copyfile(
+            f"{BASE_DIR}data_schema{os.sep}prompts_forum.json".replace("/y_web/utils", ""),
             f"{data_base_path}prompts.json",
         )
     else:

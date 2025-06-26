@@ -1,12 +1,41 @@
 from flask import Blueprint, render_template, redirect, request, flash
 from flask_login import login_required, current_user
 from .data_access import *
-from .models import Admin_users, Images, Page
+from .models import Admin_users, Images, Page, Exps
 from werkzeug.security import generate_password_hash
 from y_web import db
 from y_web.recsys_support import get_suggested_posts, get_suggested_users
 
 main = Blueprint("main", __name__)
+
+
+def get_safe_profile_pic(username, is_page=0):
+    """
+    Safely get profile picture for a user with fallbacks
+    """
+    if is_page == 1:
+        try:
+            pg = Page.query.filter_by(name=username).first()
+            if pg is not None and hasattr(pg, 'logo') and pg.logo:
+                return pg.logo
+        except:
+            pass
+    else:
+        try:
+            ag = Agent.query.filter_by(name=username).first()
+            if ag is not None and hasattr(ag, 'profile_pic') and ag.profile_pic:
+                return ag.profile_pic
+        except:
+            pass
+
+        try:
+            admin_user = Admin_users.query.filter_by(username=username).first()
+            if admin_user is not None and hasattr(admin_user, 'profile_pic') and admin_user.profile_pic:
+                return admin_user.profile_pic
+        except:
+            pass
+
+    return ""
 
 
 def is_admin(username):
@@ -24,7 +53,13 @@ def page_not_found(e):
 @main.route("/")
 def index():
     if current_user.is_authenticated:
-        return redirect(f"/feed/{current_user.id}/feed/rf/1")
+        # get active experiment if exists
+        exp = Exps.query.filter(Exps.status != 0).first()
+        if exp is not None:
+            if exp.platform_type == "microblogging":
+                return redirect(f"/feed/{current_user.id}/feed/rf/1")
+            elif exp.platform_type == "forum":
+                return redirect(f"/rfeed/{current_user.id}/rfeed/rf/1")
     return render_template("login.html")
 
 
@@ -966,17 +1001,17 @@ def __get_discussions(posts, username, page):
             if pg is not None:
                 profile_pic = pg.logo
         else:
-            ag = Agent.query.filter_by(name=aa.username).first()
-            if ag is None:
-                continue
-
-            profile_pic = (
-                ag.profile_pic
-                if ag is not None
-                else Admin_users.query.filter_by(username=aa.username)
-                .first()
-                .profile_pic
-            )
+            try:
+                ag = Agent.query.filter_by(name=aa.username).first()
+                profile_pic = (
+                    ag.profile_pic
+                    if ag is not None and ag.profile_pic is not None
+                    else Admin_users.query.filter_by(username=aa.username)
+                    .first()
+                    .profile_pic
+                )
+            except:
+                profile_pic = ""
 
         topics = get_topics(post.id, post.user_id)
         if len(topics) == 0:
@@ -1028,3 +1063,395 @@ def __get_discussions(posts, username, page):
         )
 
     return res
+
+#### Thread
+
+
+@main.get("/rthread/<int:post_id>")
+@login_required
+def get_thread_reddit(post_id):
+    # get thread_id for post_id
+    thread_id = Post.query.filter_by(id=post_id).first().thread_id
+
+    # get all posts with the specified thread id
+    posts = Post.query.filter_by(thread_id=thread_id).order_by(Post.id.asc()).all()
+
+    root = posts[0].id
+
+    c = Rounds.query.filter_by(id=posts[0].round).first()
+    if c is None:
+        day = "None"
+        hour = "00"
+    else:
+        day = c.day
+        hour = c.hour
+
+    image = Images.query.filter_by(id=posts[0].image_id).first()
+
+    user = User_mgmt.query.filter_by(id=posts[0].user_id).first()
+    profile_pic = ""
+    if user.is_page == 1:
+        pg = Page.query.filter_by(name=user.username).first()
+        if pg is not None:
+            profile_pic = pg.logo
+    else:
+        try:
+            ag = Agent.query.filter_by(name=user.username).first()
+            profile_pic = (
+                ag.profile_pic
+                if ag is not None and ag.profile_pic is not None
+                else Admin_users.query.filter_by(username=user.username)
+                .first()
+                .profile_pic
+            )
+        except:
+            profile_pic = ""
+
+    # Process post content for Reddit-style display
+    title, content = process_reddit_post(posts[0].tweet)
+    processed_content = augment_text(content) if content else ""
+
+    # Get article for main post
+    article = Articles.query.filter_by(id=posts[0].news_id).first()
+    if article is None:
+        art = 0
+    else:
+        art = {
+            "title": article.title,
+            "summary": strip_tags(article.summary),
+            "url": article.link,
+            "source": Websites.query.filter_by(id=article.website_id).first().name,
+        }
+
+    discussion_tree = {
+        "title": title,
+        "post": processed_content,
+        "profile_pic": profile_pic,
+        "image": image,
+        "shared_from": -1
+        if posts[0].shared_from == -1
+        else (
+            posts[0].shared_from,
+            db.session.query(User_mgmt)
+            .join(Post, User_mgmt.id == Post.user_id)
+            .filter(Post.id == posts[0].shared_from)
+            .first()
+            .username,
+        ),
+        "post_id": posts[0].id,
+        "author": user.username,
+        "author_id": posts[0].user_id,
+        "day": day,
+        "hour": hour,
+        "article": art,
+        posts[0].id: None,
+        "children": [],
+        "likes": len(
+            list(Reactions.query.filter_by(post_id=posts[0].id, type="like").all())
+        ),
+        "dislikes": len(
+            list(Reactions.query.filter_by(post_id=posts[0].id, type="dislike").all())
+        ),
+        "is_liked": Reactions.query.filter_by(
+            post_id=posts[0].id, user_id=current_user.id, type="like"
+        ).first()
+                    is not None,
+        "is_disliked": Reactions.query.filter_by(
+            post_id=posts[0].id, user_id=current_user.id, type="dislike"
+        ).first()
+                       is not None,
+        "is_shared": len(Post.query.filter_by(shared_from=posts[0].id).all()),
+        "emotions": get_elicited_emotions(posts[0].id),
+        "topics": get_topics(posts[0].id, posts[0].user_id),
+    }
+
+    reverse_map = {posts[0].id: None}
+    post_to_child = {posts[0].id: []}
+    post_to_data = {posts[0].id: discussion_tree}
+    parent_id = posts[0].id
+
+    for post in posts[1:]:
+        c = Rounds.query.filter_by(id=post.round).first()
+        if c is None:
+            day = "None"
+            hour = "00"
+        else:
+            day = c.day
+            hour = c.hour
+
+        user = User_mgmt.query.filter_by(id=post.user_id).first()
+        profile_pic = ""
+        if user.is_page == 1:
+            pg = Page.query.filter_by(name=user.username).first()
+            if pg is not None:
+                profile_pic = pg.logo
+        else:
+            try:
+                ag = Agent.query.filter_by(name=user.username).first()
+                profile_pic = (
+                    ag.profile_pic
+                    if ag is not None and ag.profile_pic is not None
+                    else Admin_users.query.filter_by(username=user.username)
+                    .first()
+                    .profile_pic
+                )
+            except:
+                profile_pic = ""
+
+        # Process comment content for Reddit-style display
+        comment_title, comment_content = process_reddit_post(post.tweet)
+        processed_comment = augment_text(comment_content) if comment_content else ""
+
+        # Get article for comment (if any)
+        article = Articles.query.filter_by(id=post.news_id).first()
+        if article is None:
+            art = 0
+        else:
+            art = {
+                "title": article.title,
+                "summary": strip_tags(article.summary),
+                "url": article.link,
+                "source": Websites.query.filter_by(id=article.website_id).first().name,
+            }
+        data = {
+            "title": comment_title,
+            "post": processed_comment,
+            "post_id": post.id,
+            "author": user.username,
+            "author_id": post.user_id,
+            "profile_pic": profile_pic,
+            "day": day,
+            "hour": hour,
+            "article": art,
+            "children": [],
+            "likes": len(
+                list(Reactions.query.filter_by(post_id=post.id, type="like").all())
+            ),
+            "dislikes": len(
+                list(Reactions.query.filter_by(post_id=post.id, type="dislike").all())
+            ),
+            "is_liked": Reactions.query.filter_by(
+                post_id=post.id, user_id=current_user.id, type="like"
+            ).first()
+                        is None,
+            "is_disliked": Reactions.query.filter_by(
+                post_id=post.id, user_id=current_user.id, type="dislike"
+            ).first()
+                           is None,
+            "is_shared": len(Post.query.filter_by(shared_from=post.id).all()),
+            "emotions": get_elicited_emotions(post.id),
+            "topics": get_topics(post.id, post.user_id),
+        }
+
+        parent = post.comment_to
+        reverse_map[post.id] = parent
+
+        if parent != -1:
+            if parent in post_to_child:
+                post_to_child[parent].append(post.id)
+                post_to_child[post.id] = []
+                post_to_data[post.id] = data
+
+    tree = __expand_tree(post_to_child, post_to_data)
+    discussion_tree = tree[root]
+    trending_ht = get_trending_hashtags()
+    mentions = get_unanswered_mentions(current_user.id)
+
+    # get user profile pic
+    user = User_mgmt.query.filter_by(id=current_user.id).first()
+    profile_pic = ""
+    if user.is_page == 1:
+        pg = Page.query.filter_by(name=user.username).first()
+        if pg is not None:
+            profile_pic = pg.logo
+    else:
+        try:
+            ag = Agent.query.filter_by(name=user.username).first()
+            profile_pic = (
+                ag.profile_pic
+                if ag is not None and ag.profile_pic is not None
+                else Admin_users.query.filter_by(username=user.username)
+                .first()
+                .profile_pic
+            )
+        except:
+            profile_pic = ""
+
+    return render_template(
+        "reddit/thread.html",
+        thread=discussion_tree,
+        profile_pic=profile_pic,
+        user_id=current_user.id,
+        username=current_user.username,
+        logged_username=current_user.username,
+        logged_id=int(current_user.id),
+        str=str,
+        bool=bool,
+        enumerate=enumerate,
+        trending_ht=trending_ht,
+        len=len,
+        mentions=mentions,
+        is_admin=is_admin(current_user.username),
+    )
+
+
+@main.get("/rfeed")
+@login_required
+def feeed_logged_reddit():
+    user_id = "all"  # Show all posts including user's own posts
+    return redirect(f"/feed/{user_id}/feed/rf/1")
+
+
+@main.get("/rfeed/<string:user_id>/<string:timeline>/<string:mode>/<int:page>")
+@login_required
+def feed_reddit(user_id="all", timeline="timeline", mode="rf", page=1):
+    if page < 1:
+        page = 1
+
+    max_post_per_page = 10
+    username = ""
+    posts, additional = None, None
+
+    feed_type = request.args.get('feed_type', 'new')
+
+    print("HERE", feed_type)
+
+    if user_id == "all":
+        if feed_type == 'top':
+            # Top: all time, by upvotes - downvotes
+            posts_query = (
+                Post.query.filter_by(comment_to=-1)
+                .outerjoin(Reactions, Post.id == Reactions.post_id)
+                .add_columns(Post, func.sum((Reactions.type == 'like').cast(db.Integer) - (Reactions.type == 'dislike').cast(db.Integer)).label('score'))
+                .group_by(Post.id)
+                .order_by(desc('score'), desc(Post.id))
+            )
+            posts = posts_query.paginate(page=page, per_page=max_post_per_page, error_out=False)
+
+            additional = None
+        elif feed_type == 'most_commented':
+            # Fallback to slow subquery version or remove this option for now
+            posts = (
+                Post.query.filter_by(comment_to=-1)
+                .order_by(desc(Post.id))
+                .paginate(page=page, per_page=max_post_per_page, error_out=False)
+            )
+            additional = None
+        else:
+            # New: enforce reverse chronological order
+            posts = (
+                Post.query.filter_by(comment_to=-1)
+                .order_by(desc(Post.id))
+                .paginate(page=page, per_page=max_post_per_page, error_out=False)
+            )
+            additional = None
+
+    elif user_id != "all":
+        user = User_mgmt.query.filter_by(id=int(user_id)).first()
+        recsys = user.recsys_type
+        if feed_type == 'top':
+            posts_query = (
+                Post.query.filter(Post.user_id != user_id, Post.comment_to == -1)
+                .outerjoin(Reactions, Post.id == Reactions.post_id)
+                .add_columns(Post, func.sum((Reactions.type == 'like').cast(db.Integer) - (Reactions.type == 'dislike').cast(db.Integer)).label('score'))
+                .group_by(Post.id)
+                .order_by(desc('score'), desc(Post.id))
+            )
+            posts = posts_query.paginate(page=page, per_page=max_post_per_page, error_out=False)
+            additional = None
+        elif feed_type == 'most_commented':
+            posts = (
+                Post.query.filter( Post.comment_to == -1)
+                .order_by(desc(Post.id))
+                .paginate(page=page, per_page=max_post_per_page, error_out=False)
+            )
+            additional = None
+        else:
+            posts = (
+                Post.query.filter( Post.comment_to == -1)
+                .order_by(desc(Post.id))
+                .paginate(page=page, per_page=max_post_per_page, error_out=False)
+            )
+            additional = None
+        username = user.username
+
+    res, res_additional = [], []
+
+    if posts is not None:
+        res = __get_discussions(posts, username, page)
+    if additional is not None:
+        res_additional = __get_discussions(additional, username, page)
+
+    # combine the posts and additional posts
+    if len(res_additional) > 0:
+        for add in res_additional:
+            res.append(add)
+
+    # not enough posts to display
+    if len(res) == 0 and page > 1:
+        return redirect(f"/rfeed/{user_id}/{timeline}/{mode}/{page - 1}")
+
+    trending_ht = get_trending_hashtags()
+    mentions = get_unanswered_mentions(current_user.id)
+    sfollow = get_suggested_users(user_id, pages=False)
+    spages = get_suggested_users(user_id, pages=True)
+
+    # get user profile pic
+    if user_id != "all":
+        user = User_mgmt.query.filter_by(id=user_id).first()
+    else:
+        user = User_mgmt.query.filter_by(id=current_user.id).first()
+
+    try:
+        ag = Agent.query.filter_by(name=current_user.username).first()
+        profile_pic = (
+            ag.profile_pic
+            if ag is not None and ag.profile_pic is not None
+            else Admin_users.query.filter_by(username=current_user.username)
+            .first()
+            .profile_pic
+        )
+    except:
+        profile_pic = ""
+
+    profile_pic_feed = ""
+    if user.is_page == 1:
+        pg = Page.query.filter_by(name=user.username).first()
+        if pg is not None:
+            profile_pic_feed = pg.logo
+    else:
+        try:
+            ag = Agent.query.filter_by(name=user.username).first()
+            profile_pic_feed = (
+                ag.profile_pic
+                if ag is not None and ag.profile_pic is not None
+                else Admin_users.query.filter_by(username=user.username)
+                .first()
+                .profile_pic
+            )
+        except:
+            profile_pic_feed = ""
+
+    return render_template(
+        "reddit/feed.html",
+        items=res,
+        page=page,
+        profile_pic=profile_pic,
+        profile_pic_feed=profile_pic_feed,
+        user_id=user_id,
+        timeline=timeline,
+        username=username,
+        mode=mode,
+        enumerate=enumerate,
+        len=len,
+        logged_username=current_user.username,
+        logged_id=current_user.id,
+        trending_ht=trending_ht,
+        str=str,
+        bool=bool,
+        mentions=mentions,
+        is_admin=is_admin(current_user.username),
+        sfollow=sfollow,
+        spages=spages,
+        feed_type=feed_type,
+    )

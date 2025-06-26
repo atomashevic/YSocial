@@ -23,6 +23,35 @@ from y_web.utils.text_utils import *
 from y_web import db
 
 
+def get_safe_profile_pic(username, is_page=0):
+    """
+    Safely get profile picture for a user with fallbacks
+    """
+    if is_page == 1:
+        try:
+            pg = Page.query.filter_by(name=username).first()
+            if pg is not None and hasattr(pg, 'logo') and pg.logo:
+                return pg.logo
+        except:
+            pass
+    else:
+        try:
+            ag = Agent.query.filter_by(name=username).first()
+            if ag is not None and hasattr(ag, 'profile_pic') and ag.profile_pic:
+                return ag.profile_pic
+        except:
+            pass
+
+        try:
+            admin_user = Admin_users.query.filter_by(username=username).first()
+            if admin_user is not None and hasattr(admin_user, 'profile_pic') and admin_user.profile_pic:
+                return admin_user.profile_pic
+        except:
+            pass
+
+    return ""
+
+
 def get_user_recent_posts(user_id, page, per_page=10, mode="rf", current_user=None):
     """
 

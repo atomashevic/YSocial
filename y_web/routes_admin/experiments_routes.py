@@ -81,7 +81,15 @@ def join_simulation():
         return redirect(request.referrer)
 
     # route the simulation home for the user
-    return redirect(f"/feed/{user_id}/feed/rf/1")
+    if exp.platform_type == "microblogging":
+        return redirect(f"/feed/{user_id}/feed/rf/1")
+
+    elif exp.platform_type == "forum":
+        return redirect(f"/rfeed/{user_id}/feed/rf/1")
+
+    else:
+        flash("Wrong Platform Type. Please load an experiment.")
+        return redirect(request.referrer)
 
 
 @experiments.route("/admin/select_experiment/<int:exp_id>")
@@ -447,7 +455,7 @@ def create_experiment():
     )
 
     # copy the clean database to the experiments folder
-    if platform_type == "microblogging":
+    if platform_type == "microblogging" or platform_type == "forum":
         shutil.copyfile(
             f"data_schema{os.sep}database_clean_server.db",
             f"y_web{os.sep}experiments{os.sep}{uid}{os.sep}database_server.db",

@@ -56,6 +56,8 @@ def start_server(exp):
 
     if exp.platform_type == "microblogging":
         flask_command = f"python {yserver_path}external{os.sep}YServer{os.sep}y_server_run.py -c {config}"
+    elif exp.platform_type == "forum":
+        flask_command = f"python {yserver_path}external{os.sep}YServerReddit{os.sep}y_server_run.py -c {config}"
     else:
         raise NotImplementedError(f"Unsupported platform {exp.platform_type}")
 
@@ -233,6 +235,9 @@ def start_client_process(exp, cli, population, resume=False):
         sys.path.append(f"{yclient_path}{os.sep}external{os.sep}YClient/")
         from y_client.clients import YClientWeb
 
+    elif exp.platform_type == "forum":
+        sys.path.append(f"{yclient_path}{os.sep}external{os.sep}YClientReddit/")
+        from y_client.clients import YClientWeb
     else:
         raise NotImplementedError(f"Unsupported platform {exp.platform_type}")
 
@@ -332,13 +337,19 @@ def run_simulation(cl, cli_id, agent_file):
                 break
 
             # get the daily activities of each agent
-            weights = [a.daily_activity_level for a in cl.agents.agents]
-            # normalize weights to sum to 1
-            weights = [w / sum(weights) for w in weights]
-            # sample agents
-            sagents = np.random.choice(
-                cl.agents.agents, size=expected_active_users, p=weights, replace=False
-            )
+            # @todo: simplifiy once the daily_activity_level is always set on YReddit
+            try:
+                weights = [a.daily_activity_level for a in cl.agents.agents]
+                # normalize weights to sum to 1
+                weights = [w / sum(weights) for w in weights]
+                # sample agents
+                sagents = np.random.choice(
+                    cl.agents.agents, size=expected_active_users, p=weights, replace=False
+                )
+            except Exception as e:
+                sagents = np.random.choice(
+                    cl.agents.agents, size=expected_active_users, replace=False
+                )
 
             # available actions
             # shuffle agents

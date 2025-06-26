@@ -135,20 +135,22 @@
                                                                                        class="input"
                                                                                        value="0.2"></span>
                                     </div>
+                                    {% if experiment.platform_type == "microblogging" %}
                                     <div class="box-line">
                                         <span class="left">Share and comment an Image</span>
                                         <span class="right" style="width: 70%;"><input type="text"
                                                                                        name="image"
                                                                                        class="input"
-                                                                                       value="0.15"></span>
+                                                                                       value="0"></span>
                                     </div>
                                     <div class="box-line">
                                         <span class="left">Comment on a News</span>
                                         <span class="right" style="width: 70%;"><input type="text"
                                                                                        name="news"
                                                                                        class="input"
-                                                                                       value="0.15"></span>
+                                                                                       value="0"></span>
                                     </div>
+                                    {% endif %}
                                     <div class="box-line">
                                         <span class="left">Comment a Post</span>
                                         <span class="right" style="width: 70%;"><input type="text"
@@ -177,6 +179,7 @@
                                                                                        class="input"
                                                                                        value="0.1"></span>
                                     </div>
+                                    {% if experiment.platform_type == "microblogging" %}
                                     <div class="box-line">
                                         <span class="left">Cast Vote</span>
                                         <span class="right" style="width: 70%;"><input type="text"
@@ -184,6 +187,16 @@
                                                                                        class="input"
                                                                                        value="0"></span>
                                     </div>
+                                    {% endif %}
+                                    {% if experiment.platform_type == "forum" %}
+                                    <div class="box-line">
+                                        <span class="left">Share Link</span>
+                                        <span class="right" style="width: 70%;"><input type="text"
+                                                                                       name="share_link"
+                                                                                       class="input"
+                                                                                       value="0"></span>
+                                    </div>
+                                    {% endif %}
                                     <hr>
                                     <h4><b>Large Language Models</b></h4>
                                     <div class="box-line">

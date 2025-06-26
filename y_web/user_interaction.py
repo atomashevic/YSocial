@@ -18,10 +18,13 @@ from .models import (
     Admin_users,
     Images,
     Post_Sentiment,
+    Articles,
+    Websites
 )
 from flask import request
 from .llm_annotations import ContentAnnotator, Annotator
 from .utils.text_utils import vader_sentiment, toxicity
+from .utils.article_extractor import extract_article_info
 
 user = Blueprint("user_actions", __name__)
 
@@ -169,6 +172,192 @@ def publish_post():
         user_id=current_user.id,
         comment_to=-1,
         image_id=img_id,
+    )
+
+    db.session.add(post)
+    db.session.commit()
+
+    post.thread_id = post.id
+    db.session.commit()
+
+    toxicity(text, current_user.username, post.id, db)
+    sentiment = vader_sentiment(text)
+
+    user = Admin_users.query.filter_by(username=current_user.username).first()
+    llm = user.llm if user.llm != "" else "llama3.2:latest"
+
+    annotator = ContentAnnotator(llm=llm)
+    emotions = annotator.annotate_emotions(text)
+    hashtags = annotator.extract_components(text, c_type="hashtags")
+    mentions = annotator.extract_components(text, c_type="mentions")
+    topics = annotator.annotate_topics(text)
+
+    for topic in topics:
+        res = Interests.query.filter_by(interest=topic).first()
+        if res is None:
+            interest = Interests(interest=topic)
+            db.session.add(interest)
+            db.session.commit()
+            res = Interests.query.filter_by(interest=topic).first()
+
+        topic_id = res.iid
+
+        ui = User_interest(
+            user_id=current_user.id, interest_id=topic_id, round_id=current_round.id
+        )
+        db.session.add(ui)
+        ti = Post_topics(post_id=post.id, topic_id=topic_id)
+        db.session.add(ti)
+        db.session.commit()
+
+        post_sentiment = Post_Sentiment(
+            post_id=post.id,
+            user_id=current_user.id,
+            topic_id=topic_id,
+            pos=sentiment["pos"],
+            neg=sentiment["neg"],
+            neu=sentiment["neu"],
+            compound=sentiment["compound"],
+            round=current_round.id,
+        )
+        db.session.add(post_sentiment)
+        db.session.commit()
+
+    for emotion in emotions:
+        if len(emotion) < 1:
+            continue
+
+        em = Emotions.query.filter_by(emotion=emotion).first()
+        if em is not None:
+            post_emotion = Post_emotions(post_id=post.id, emotion_id=em.id)
+            db.session.add(post_emotion)
+            db.session.commit()
+
+    for tag in hashtags:
+        if len(tag) < 4:
+            continue
+
+        ht = Hashtags.query.filter_by(hashtag=tag).first()
+        if ht is None:
+            ht = Hashtags(hashtag=tag)
+            db.session.add(ht)
+            db.session.commit()
+            ht = Hashtags.query.filter_by(hashtag=tag).first()
+
+        post_tag = Post_hashtags(post_id=post.id, hashtag_id=ht.id)
+        db.session.add(post_tag)
+        db.session.commit()
+
+    for mention in mentions:
+        if len(mention) < 1:
+            continue
+
+        us = User_mgmt.query.filter_by(username=mention.strip("@")).first()
+
+        # existing user and not self
+        if us is not None and us.id != current_user.id:
+            mn = Mentions(user_id=us.id, post_id=post.id, round=current_round.id)
+            db.session.add(mn)
+            db.session.commit()
+        else:
+            text = text.replace(mention, "")
+
+            # update post
+            post.tweet = text.lstrip().rstrip()
+            db.session.commit()
+
+    return {"message": "Published successfully", "status": 200}
+
+
+@user.route("/publish_reddit")
+@login_required
+def publish_post_reddit():
+    text = request.args.get("post")
+    url = request.args.get("url")
+
+    # Normalize URL: prepend http:// if missing
+    if url and not url.lower().startswith(("http://", "https://")):
+        url = "http://" + url
+
+    img_id = None
+    if url is not None and url != "":
+        # Check if URL is likely an image based on extension
+        image_extensions = ('.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp', '.svg')
+        is_image_url = url.lower().endswith(image_extensions)
+
+        if is_image_url:
+            try:
+                llm_v = "minicpm-v"
+                image_annotator = Annotator(llm_v)
+                annotation = image_annotator.annotate(url)
+
+                img = Images.query.filter_by(url=url).first()
+                if img is None:
+                    img = Images(url=url, description=annotation, article_id=-1)
+                    db.session.add(img)
+                    db.session.commit()
+                    img_id = img.id
+                else:
+                    img_id = img.id
+            except Exception as e:
+                print(f"Error processing image URL {url}: {e}")
+                # Continue without image processing
+                pass
+        else:
+            # For non-image URLs, store as article reference without image annotation
+            pass
+
+    # get the last round id from Rounds
+    current_round = Rounds.query.order_by(Rounds.id.desc()).first()
+
+    # Handle article URL storage
+    news_id = None
+    if url is not None and url != "" and not url.lower().endswith(
+            ('.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp', '.svg')):
+        # Check if article already exists
+        existing_article = Articles.query.filter_by(link=url).first()
+        if existing_article:
+            news_id = existing_article.id
+        else:
+            # Extract article information from URL
+            import time
+            article_info = extract_article_info(url)
+
+            # Get or create website entry
+            website = Websites.query.filter_by(name=article_info['source']).first()
+            if not website:
+                website = Websites(
+                    name=article_info['source'],
+                    rss="",
+                    leaning="neutral",
+                    category="user_shared",
+                    last_fetched=int(time.time()),
+                    language="en",
+                    country="us"
+                )
+                db.session.add(website)
+                db.session.commit()
+
+            # Create article entry with extracted information
+            article = Articles(
+                title=article_info['title'],
+                summary=article_info['summary'],
+                website_id=website.id,
+                link=url,
+                fetched_on=int(time.time())
+            )
+            db.session.add(article)
+            db.session.commit()
+            news_id = article.id
+
+    # add post to the db
+    post = Post(
+        tweet=text,
+        round=current_round.id,
+        user_id=current_user.id,
+        comment_to=-1,
+        image_id=img_id,
+        news_id=news_id,
     )
 
     db.session.add(post)
