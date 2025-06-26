@@ -10,7 +10,7 @@ from multiprocessing import Process
 import traceback
 from y_web.models import (
     Client_Execution,
-    Ollama_Pull,
+    Ollama_Pull, Exps,
 )
 from y_web import db, client_processes
 import requests
@@ -297,13 +297,14 @@ def start_client_process(exp, cli, population, resume=False):
     if not os.path.exists(filename):
         cl.save_agents(filename)
 
-    run_simulation(cl, cli.id, filename)
+    run_simulation(cl, cli.id, filename, exp)
 
 
-def run_simulation(cl, cli_id, agent_file):
+def run_simulation(cl, cli_id, agent_file, exp):
     """
     Run the simulation
     """
+    platform_type = exp.platform_type
 
     total_days = int(cl.days)
     daily_slots = int(cl.slots)
@@ -322,15 +323,16 @@ def run_simulation(cl, cli_id, agent_file):
 
             page_agents = [p for p in cl.agents.agents if p.is_page]
 
-            # pages post at least a news each slot of the day (7-22), more if they were selected randomly
-            for page in page_agents:
-                if h < 7 or h > 22:
-                    continue
-                page.select_action(
-                    tid=tid,
-                    actions=[],
-                    max_length_thread_reading=cl.max_length_thread_reading,
-                )
+            if platform_type == "microblogging":
+                # pages post at least a news each slot of the day (7-22), more if they were selected randomly
+                for page in page_agents:
+                    if h < 7 or h > 22:
+                        continue
+                    page.select_action(
+                        tid=tid,
+                        actions=[],
+                        max_length_thread_reading=cl.max_length_thread_reading,
+                    )
 
                 # check whether there are agents left
             if len(cl.agents.agents) == 0:
@@ -362,9 +364,10 @@ def run_simulation(cl, cli_id, agent_file):
 
                 daily_active[g.name] = None
 
-                # Get a random integer within g.round_actions. If g.is_page == 1, then rounds = 1
+                # Get a random integer within g.round_actions.
+                # If g.is_page == 1, then rounds = 0 (the page does not perform actions)
                 if g.is_page == 1:
-                    rounds = 1
+                    rounds = 0
                 else:
                     rounds = random.randint(1, int(g.round_actions))
 

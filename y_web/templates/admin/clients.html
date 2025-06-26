@@ -165,13 +165,15 @@
                                                                                        class="input"
                                                                                        value="0.2"></span>
                                     </div>
+                                    {% if experiment.platform_type == "microblogging" %}
                                     <div class="box-line">
                                         <span class="left">Share News from a Page</span>
                                         <span class="right" style="width: 70%;"><input type="text"
                                                                                        name="share"
                                                                                        class="input"
-                                                                                       value="0.2"></span>
+                                                                                       value="0"></span>
                                     </div>
+                                    {% endif %}
                                     <div class="box-line">
                                         <span class="left">Search a Hashtag</span>
                                         <span class="right" style="width: 70%;"><input type="text"
