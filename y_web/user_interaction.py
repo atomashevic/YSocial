@@ -309,6 +309,11 @@ def publish_post_reddit():
 
     # get the last round id from Rounds
     current_round = Rounds.query.order_by(Rounds.id.desc()).first()
+    if current_round is None:
+        # Create initial round if none exists
+        current_round = Rounds(day=0, hour=0)
+        db.session.add(current_round)
+        db.session.commit()
 
     # Handle article URL storage
     news_id = None
