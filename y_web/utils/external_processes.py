@@ -61,8 +61,36 @@ def start_server(exp):
     else:
         raise NotImplementedError(f"Unsupported platform {exp.platform_type}")
 
+    # Check if pyenv is available and detect environment
+    pyenv_env = None
+    try:
+        # Check if pyenv is installed
+        subprocess.run(["pyenv", "--version"], capture_output=True, check=True)
+        
+        # Try to detect ysocial environment first
+        result = subprocess.run(["pyenv", "versions"], capture_output=True, text=True, check=True)
+        if "ysocial" in result.stdout:
+            pyenv_env = "ysocial"
+        else:
+            # Get current pyenv environment
+            result = subprocess.run(["pyenv", "version"], capture_output=True, text=True, check=True)
+            current_env = result.stdout.strip().split()[0]
+            if current_env != "system":
+                pyenv_env = current_env
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        # pyenv not available, use system python
+        pass
+
     # Command to run in the detached screen
-    screen_command = f"screen -dmS {exp_uid} {flask_command}"
+    if pyenv_env:
+        # launch via a login shell so pyenv and environment are initialized
+        screen_command = (
+            f"screen -dmS {exp_uid} bash -lc \"pyenv activate {pyenv_env} && {flask_command}\""
+        )
+        print(f"Starting server with pyenv environment: {pyenv_env}")
+    else:
+        screen_command = f"screen -dmS {exp_uid} {flask_command}"
+        print("Starting server with system python")
     print(f"Starting server for experiment {exp_uid}...")
     subprocess.run(screen_command, shell=True, check=True)
 
@@ -233,11 +261,11 @@ def start_client_process(exp, cli, population, resume=False):
 
     if exp.platform_type == "microblogging":
         sys.path.append(f"{yclient_path}{os.sep}external{os.sep}YClient/")
-        from y_client.clients import YClientWeb
+        from y_client.clients import YClientWeb  # noqa: E402,F401
 
     elif exp.platform_type == "forum":
         sys.path.append(f"{yclient_path}{os.sep}external{os.sep}YClientReddit/")
-        from y_client.clients import YClientWeb
+        from y_client.clients import YClientWeb  # noqa: E402,F401
     else:
         raise NotImplementedError(f"Unsupported platform {exp.platform_type}")
 
