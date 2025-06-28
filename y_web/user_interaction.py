@@ -309,6 +309,8 @@ def publish_post_reddit():
 
     # get the last round id from Rounds
     current_round = Rounds.query.order_by(Rounds.id.desc()).first()
+
+    # TODO this needs to be removed because we always expect to be at least in the initial first round
     if current_round is None:
         # Create initial round if none exists
         current_round = Rounds(day=0, hour=0)

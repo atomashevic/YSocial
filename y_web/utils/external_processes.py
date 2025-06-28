@@ -383,7 +383,8 @@ def run_simulation(cl, cli_id, agent_file, exp):
 
                     try:
                         # reply to received mentions
-                        if g not in cl.pages:
+                        # For forum experiments, all agents are regular users (no pages)
+                        if platform_type == "forum" or g not in cl.pages:
                             g.reply(tid=tid)
 
                         # select action to be performed
@@ -418,14 +419,14 @@ def run_simulation(cl, cli_id, agent_file, exp):
                 agent
                 for agent in cl.agents.agents
                 if agent.name in daily_active
-                and agent not in cl.pages
+                and (platform_type == "forum" or agent not in cl.pages)
                 and random.random()
                 < float(cl.config["agents"]["probability_of_daily_follow"])
             ]
 
             # Evaluating new friendship ties
             for agent in da:
-                if agent not in cl.pages:
+                if platform_type == "forum" or agent not in cl.pages:
                     agent.select_action(tid=tid, actions=["FOLLOW", "NONE"])
 
         # daily churn and new agents
