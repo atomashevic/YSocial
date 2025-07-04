@@ -8,7 +8,7 @@ from y_web.models import (
     Population,
     Page,
     Page_Population,
-    Leanings,
+    Leanings, Topic_List, Page_Topic
 )
 from y_web.utils import (
     get_feed,
@@ -162,6 +162,14 @@ def page_details(uid):
     # get all populations
     populations = Population.query.all()
 
+    topics = Topic_List.query.all()
+    page_topics = Page_Topic.query.filter_by(page_id=uid).all()
+
+    # get topic names for page_topics from Topic_List
+    page_topics = [
+        Topic_List.query.filter_by(id=pt.topic_id).first().name for pt in page_topics
+    ]
+
     feed = get_feed(page.feed)
 
     ollamas = ollama_status()
@@ -173,7 +181,30 @@ def page_details(uid):
         populations=populations,
         feeds=feed[:3],
         ollamas=ollamas,
+        topics=topics,
+        page_topics=page_topics,
     )
+
+
+@pages.route("/admin/add_topic_to_page", methods=["POST"])
+@login_required
+def add_topic_to_page():
+    check_privileges(current_user.username)
+
+    page_id = request.form.get("page_id")
+    topic_id = request.form.get("topic_id")
+
+    # check if the topic is already in the page
+    pt = Page_Topic.query.filter_by(page_id=page_id, topic_id=topic_id).first()
+    if pt:
+        return page_details(page_id)
+
+    pt = Page_Topic(page_id=page_id, topic_id=topic_id)
+
+    db.session.add(pt)
+    db.session.commit()
+
+    return page_details(page_id)
 
 
 @pages.route("/admin/add_page_to_population", methods=["POST"])

@@ -58,10 +58,6 @@
                                     <span class="left">Initial Size<small>(initial agents)</small></span>
                                     <span class="right">{{ population.size }}</span>
                                 </div>
-                                <div class="box-line">
-                                    <span class="left">Topics of Interest<small>(initial agents)</small></span>
-                                    <span class="right">{{ population.interests }}</span>
-                                </div>
                                 <hr>
                                 <b>Agents Data</b>
                                 <div class="box-line">
@@ -300,7 +296,7 @@
                                             label: 'Political Leanings',
                                           data:  {{ data["leaning"]["total"] }},
                                         }],
-                                        labels: {{ data["leaning"]["leanings"]|tojson  }}
+                                        labels: {{ data["leaning"]["leanings"]|tojson }}
                                       },
                                     options: {
                                         scales: {

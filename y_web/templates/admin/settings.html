@@ -224,6 +224,51 @@
                                                                                        class="input"
                                                                                        value="5000"></span>
                                     </div>
+
+                                       <div class="box-line">
+                                        <span class="left">Simulation Topics</span>
+                                        <span class="right" style="width: 70%;">
+
+                                            <div class="tags-input" style="width: 100%;">
+                                            <ul id="tags"></ul>
+                                            <input type="hidden" id="tags-hidden" name="tags">
+                                            <input type="text" id="input-tag" placeholder="Enter topic name" style="width: 100%;"/>
+                                        </div>
+
+                                        <script>
+
+                                            const tags = document.getElementById('tags');
+    const input = document.getElementById('input-tag');
+    const hiddenInput = document.getElementById('tags-hidden');
+    const tagList = [];
+
+    input.addEventListener('keydown', function (event) {
+        if (event.key === 'Enter') {
+            event.preventDefault();
+            const tagContent = input.value.trim();
+            if (tagContent !== '' && !tagList.includes(tagContent)) {
+                tagList.push(tagContent);
+                const tag = document.createElement('li');
+                tag.innerHTML = `${tagContent} <button class="delete-button">X</button>`;
+                tags.appendChild(tag);
+                hiddenInput.value = tagList.join(',');
+                input.value = '';
+            }
+        }
+    });
+
+    tags.addEventListener('click', function (event) {
+        if (event.target.classList.contains('delete-button')) {
+            const tagText = event.target.parentNode.textContent.slice(0, -1);
+            tagList.splice(tagList.indexOf(tagText), 1);
+            hiddenInput.value = tagList.join(',');
+            event.target.parentNode.remove();
+        }
+    });
+                                        </script>
+                                        </span>
+                                    </div>
+
                                     <div class="box-line">
                                         <span class="left">Perspective API<br> <small>(Toxicity annotation - optional)</small></span>
                                         <span class="right" style="width: 70%;"><input type="text" name="perspective_api"

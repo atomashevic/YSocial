@@ -1,6 +1,7 @@
 import os
 import networkx as nx
 import random
+import faker
 
 from flask import (
     Blueprint,
@@ -25,7 +26,7 @@ from y_web.models import (
     User_mgmt,
     Agent_Profile,
     Follow_Recsys,
-    Content_Recsys,
+    Content_Recsys, Exp_Topic, Topic_List
 )
 from y_web.utils import start_client, terminate_client, get_ollama_models
 import json
@@ -248,6 +249,17 @@ def create_client():
     llm_v_api_key = request.form.get("llm_v_api_key")
     llm_v_max_tokens = request.form.get("llm_v_max_tokens")
     llm_v_temperature = request.form.get("llm_v_temperature")
+
+    # get experiment topics
+    topics = Exp_Topic.query.filter_by(exp_id=exp_id).all()
+    topics_ids = [t.topic_id for t in topics]
+    # get the topics names from the Topic_list table
+    topics = (
+        db.session.query(Topic_List)
+        .filter(Topic_List.id.in_(topics_ids))
+        .all()
+    )
+    topics = [t.name for t in topics]
 
     # if name already exists, return to the previous page
     if Client.query.filter_by(name=name).first():
@@ -505,6 +517,19 @@ def create_client():
         if custom_prompt:
             custom_prompt = custom_prompt.profile
 
+        # randomly select from 1 to 5 topics without replacement and save as interests
+        fake = faker.Faker()
+
+        interests = list(set(fake.random_elements(
+            elements=set(topics),
+            length=fake.random_int(
+                min=1,
+                max=5,
+            ),
+        )))
+
+        ints = [interests, len(interests)]
+
         res["agents"].append(
             {
                 "name": a.name,
@@ -513,12 +538,7 @@ def create_client():
                 "age": a.age,
                 "type": a.ag_type,
                 "leaning": a.leaning,
-                "interests": [
-                    [x.strip() for x in a.interests.split(",")],
-                    [len([x for x in a.interests.split(",")])],
-                ]
-                if a.interests
-                else [[], 0],
+                "interests": ints,
                 "oe": a.oe,
                 "co": a.co,
                 "ex": a.ex,
@@ -545,6 +565,17 @@ def create_client():
     pages = [Page.query.filter_by(id=p.page_id).first() for p in pages]
 
     for p in pages:
+
+        # get pages topics
+        page_topics = (
+            db.session.query(Exp_Topic, Topic_List)
+            .join(Topic_List)
+            .filter(Exp_Topic.exp_id == exp_id, Exp_Topic.topic_id == Topic_List.id)
+            .all()
+        )
+        page_topics = [t[1].name for t in page_topics]
+        page_topics = list(set(page_topics) & set(topics))
+
         res["agents"].append(
             {
                 "name": p.name,
@@ -553,7 +584,7 @@ def create_client():
                 "age": 0,
                 "type": p.pg_type,
                 "leaning": p.leaning,
-                "interests": [[], 0],
+                "interests": [page_topics, len(page_topics)],
                 "oe": "",
                 "co": "",
                 "ex": "",

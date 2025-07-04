@@ -31,95 +31,132 @@
 
                             <script src="https://unpkg.com/gridjs/dist/gridjs.umd.js"></script>
                             <script>
-                                const tableDiv = document.getElementById('leaning_table');
+    const tableDiv = document.getElementById('leaning_table');
 
-                                const updateUrl = (prev, query) => {
-                                    return prev + (prev.indexOf('?') >= 0 ? '&' : '?') + new URLSearchParams(query).toString();
-                                };
+    const updateUrl = (prev, query) => {
+        return prev + (prev.indexOf('?') >= 0 ? '&' : '?') + new URLSearchParams(query).toString();
+    };
 
-                                const editableCellAttributes = (data, row, col) => {
-                                    if (row) {
-                                        return {contentEditable: 'true', 'data-element-id': row.cells[0].data};
-                                    } else {
-                                        return {};
-                                    }
-                                };
+    const editableCellAttributes = (data, row, col) => {
+        if (row) {
+            return {
+                contentEditable: 'true',
+                'data-element-id': row.cells[0].data,
+                'data-column-id': 'leaning'
+            };
+        } else {
+            return {};
+        }
+    };
 
-                                new gridjs.Grid({
-                                    columns: [
-                                        {id: 'id', 'hidden': true},
-                                        {id: 'leaning', name: 'name', 'attributes': editableCellAttributes},
-                                    ],
-                                    server: {
-                                        url: '/admin/leanings_data',
-                                        then: results => results.data,
-                                        total: results => results.total,
-                                    },
-                                    search: {
-                                        enabled: true,
-                                        server: {
-                                            url: (prev, search) => {
-                                                return updateUrl(prev, {search});
-                                            },
-                                        },
-                                    },
-                                    sort: {
-                                        enabled: true,
-                                        multiColumn: true,
-                                        server: {
-                                            url: (prev, columns) => {
-                                                const columnIds = ['id', 'leaning'];
-                                                const sort = columns.map(col => (col.direction === 1 ? '+' : '-') + columnIds[col.index]);
-                                                return updateUrl(prev, {sort});
-                                            },
-                                        },
-                                    },
-                                    pagination: {
-                                        enabled: true,
-                                        server: {
-                                            url: (prev, page, limit) => {
-                                                return updateUrl(prev, {start: page * limit, length: limit});
-                                            },
-                                        },
-                                    },
-                                }).render(tableDiv);
-
-                                let savedValue;
-
-                                tableDiv.addEventListener('focusin', ev => {
-                                    if (ev.target.tagName === 'TD') {
-                                        savedValue = ev.target.textContent;
-                                    }
-                                });
-
-                                tableDiv.addEventListener('focusout', ev => {
-                                    if (ev.target.tagName === 'TD') {
-                                        if (savedValue !== ev.target.textContent) {
-                                            fetch('/admin/leanings_data', {
-                                                method: 'POST',
-                                                headers: {'Content-Type': 'application/json'},
-                                                body: JSON.stringify({
-                                                    id: ev.target.dataset.elementId,
-                                                    [ev.target.dataset.columnId]: ev.target.textContent
-                                                }),
-                                            });
+    const grid = new gridjs.Grid({
+        columns: [
+            { id: 'id', hidden: true },
+            {
+                id: 'leaning',
+                name: 'Name',
+                attributes: editableCellAttributes
+            },
+            {
+                name: 'Actions',
+                attributes: () => ({ style: 'text-align: center;' }),
+                formatter: (cell, row) => {
+                    return gridjs.h(
+                        'div',
+                        { style: 'display: flex; justify-content: center;' },
+                        gridjs.h(
+                            'button',
+                            {
+                                className: 'btn btn-sm btn-danger',
+                                onClick: () => {
+                                    const id = row.cells[0].data;
+                                    fetch(`/admin/delete_leaning/${id}`, {
+                                        method: 'DELETE',
+                                    }).then(res => {
+                                        if (res.ok) {
+                                            grid.forceRender();
+                                        } else {
+                                            alert("Failed to delete leaning.");
                                         }
-                                        savedValue = undefined;
-                                    }
-                                });
+                                    });
+                                }
+                            },
+                            'Delete'
+                        )
+                    );
+                }
+            }
+        ],
+        server: {
+            url: '/admin/leanings_data',
+            then: results => results.data,
+            total: results => results.total,
+        },
+        search: {
+            enabled: true,
+            server: {
+                url: (prev, search) => updateUrl(prev, { search }),
+            },
+        },
+        sort: {
+            enabled: true,
+            multiColumn: true,
+            server: {
+                url: (prev, columns) => {
+                    const columnIds = ['id', 'leaning'];
+                    const sort = columns.map(col => (col.direction === 1 ? '+' : '-') + columnIds[col.index]);
+                    return updateUrl(prev, { sort });
+                },
+            },
+        },
+        pagination: {
+            enabled: true,
+            server: {
+                url: (prev, page, limit) => updateUrl(prev, { start: page * limit, length: limit }),
+            },
+        },
+    });
 
-                                tableDiv.addEventListener('keydown', ev => {
-                                    if (ev.target.tagName === 'TD') {
-                                        if (ev.key === 'Escape') {
-                                            ev.target.textContent = savedValue;
-                                            ev.target.blur();
-                                        } else if (ev.key === 'Enter') {
-                                            ev.preventDefault();
-                                            ev.target.blur();
-                                        }
-                                    }
-                                });
-                            </script>
+    grid.render(tableDiv);
+
+    // Inline edit tracking
+    let savedValue;
+
+    tableDiv.addEventListener('focusin', ev => {
+        if (ev.target.tagName === 'TD') {
+            savedValue = ev.target.textContent;
+        }
+    });
+
+    tableDiv.addEventListener('focusout', ev => {
+        if (ev.target.tagName === 'TD' && ev.target.dataset.elementId) {
+            if (savedValue !== ev.target.textContent) {
+                fetch('/admin/leanings_data', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        id: ev.target.dataset.elementId,
+                        [ev.target.dataset.columnId]: ev.target.textContent
+                    }),
+                });
+            }
+            savedValue = undefined;
+        }
+    });
+
+    tableDiv.addEventListener('keydown', ev => {
+        if (ev.target.tagName === 'TD') {
+            if (ev.key === 'Escape') {
+                ev.target.textContent = savedValue;
+                ev.target.blur();
+            } else if (ev.key === 'Enter') {
+                ev.preventDefault();
+                ev.target.blur();
+            }
+        }
+    });
+</script>
+
 
                         </div>
 
@@ -153,95 +190,132 @@
 
                             <script src="https://unpkg.com/gridjs/dist/gridjs.umd.js"></script>
                             <script>
-                                const tableDiv5 = document.getElementById('edu_table');
+    const tableDiv5 = document.getElementById('edu_table');
 
-                                const updateUrl5 = (prev, query) => {
-                                    return prev + (prev.indexOf('?') >= 0 ? '&' : '?') + new URLSearchParams(query).toString();
-                                };
+    const updateUrl5 = (prev, query) => {
+        return prev + (prev.indexOf('?') >= 0 ? '&' : '?') + new URLSearchParams(query).toString();
+    };
 
-                                const editableCellAttributes5 = (data, row, col) => {
-                                    if (row) {
-                                        return {contentEditable: 'true', 'data-element-id': row.cells[0].data};
-                                    } else {
-                                        return {};
-                                    }
-                                };
+    const editableCellAttributes5 = (data, row, col) => {
+        if (row) {
+            return {
+                contentEditable: 'true',
+                'data-element-id': row.cells[0].data,
+                'data-column-id': 'education_level'
+            };
+        } else {
+            return {};
+        }
+    };
 
-                                new gridjs.Grid({
-                                    columns: [
-                                        {id: 'id', 'hidden': true},
-                                        {id: 'education_level', name: 'name', 'attributes': editableCellAttributes5},
-                                    ],
-                                    server: {
-                                        url: '/admin/educations_data',
-                                        then: results => results.data,
-                                        total: results => results.total,
-                                    },
-                                    search: {
-                                        enabled: true,
-                                        server: {
-                                            url: (prev, search) => {
-                                                return updateUrl5(prev, {search});
-                                            },
-                                        },
-                                    },
-                                    sort: {
-                                        enabled: true,
-                                        multiColumn: true,
-                                        server: {
-                                            url: (prev, columns) => {
-                                                const columnIds = ['id', 'education_level'];
-                                                const sort = columns.map(col => (col.direction === 1 ? '+' : '-') + columnIds[col.index]);
-                                                return updateUrl5(prev, {sort});
-                                            },
-                                        },
-                                    },
-                                    pagination: {
-                                        enabled: true,
-                                        server: {
-                                            url: (prev, page, limit) => {
-                                                return updateUrl5(prev, {start: page * limit, length: limit});
-                                            },
-                                        },
-                                    },
-                                }).render(tableDiv5);
-
-                                let savedValue5;
-
-                                tableDiv5.addEventListener('focusin', ev => {
-                                    if (ev.target.tagName === 'TD') {
-                                        savedValue5 = ev.target.textContent;
-                                    }
-                                });
-
-                                tableDiv5.addEventListener('focusout', ev => {
-                                    if (ev.target.tagName === 'TD') {
-                                        if (savedValue5 !== ev.target.textContent) {
-                                            fetch('/admin/educations_data', {
-                                                method: 'POST',
-                                                headers: {'Content-Type': 'application/json'},
-                                                body: JSON.stringify({
-                                                    id: ev.target.dataset.elementId,
-                                                    [ev.target.dataset.columnId]: ev.target.textContent
-                                                }),
-                                            });
+    const grid5 = new gridjs.Grid({
+        columns: [
+            { id: 'id', hidden: true },
+            {
+                id: 'education_level',
+                name: 'Name',
+                attributes: editableCellAttributes5
+            },
+            {
+                name: 'Actions',
+                attributes: () => ({ style: 'text-align: center;' }),
+                formatter: (cell, row) => {
+                    return gridjs.h(
+                        'div',
+                        { style: 'display: flex; justify-content: center;' },
+                        gridjs.h(
+                            'button',
+                            {
+                                className: 'btn btn-sm btn-danger',
+                                onClick: () => {
+                                    const id = row.cells[0].data;
+                                    fetch(`/admin/delete_education/${id}`, {
+                                        method: 'DELETE',
+                                    }).then(res => {
+                                        if (res.ok) {
+                                            grid5.forceRender();
+                                        } else {
+                                            alert("Failed to delete education level.");
                                         }
-                                        savedValue5 = undefined;
-                                    }
-                                });
+                                    });
+                                }
+                            },
+                            'Delete'
+                        )
+                    );
+                }
+            }
+        ],
+        server: {
+            url: '/admin/educations_data',
+            then: results => results.data,
+            total: results => results.total,
+        },
+        search: {
+            enabled: true,
+            server: {
+                url: (prev, search) => updateUrl5(prev, { search }),
+            },
+        },
+        sort: {
+            enabled: true,
+            multiColumn: true,
+            server: {
+                url: (prev, columns) => {
+                    const columnIds = ['id', 'education_level'];
+                    const sort = columns.map(col => (col.direction === 1 ? '+' : '-') + columnIds[col.index]);
+                    return updateUrl5(prev, { sort });
+                },
+            },
+        },
+        pagination: {
+            enabled: true,
+            server: {
+                url: (prev, page, limit) => updateUrl5(prev, { start: page * limit, length: limit }),
+            },
+        },
+    });
 
-                                tableDiv5.addEventListener('keydown', ev => {
-                                    if (ev.target.tagName === 'TD') {
-                                        if (ev.key === 'Escape') {
-                                            ev.target.textContent = savedValue5;
-                                            ev.target.blur();
-                                        } else if (ev.key === 'Enter') {
-                                            ev.preventDefault();
-                                            ev.target.blur();
-                                        }
-                                    }
-                                });
-                            </script>
+    grid5.render(tableDiv5);
+
+    // Inline editing
+    let savedValue5;
+
+    tableDiv5.addEventListener('focusin', ev => {
+        if (ev.target.tagName === 'TD') {
+            savedValue5 = ev.target.textContent;
+        }
+    });
+
+    tableDiv5.addEventListener('focusout', ev => {
+        if (ev.target.tagName === 'TD' && ev.target.dataset.elementId) {
+            if (savedValue5 !== ev.target.textContent) {
+                fetch('/admin/educations_data', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        id: ev.target.dataset.elementId,
+                        [ev.target.dataset.columnId]: ev.target.textContent
+                    }),
+                });
+            }
+            savedValue5 = undefined;
+        }
+    });
+
+    tableDiv5.addEventListener('keydown', ev => {
+        if (ev.target.tagName === 'TD') {
+            if (ev.key === 'Escape') {
+                ev.target.textContent = savedValue5;
+                ev.target.blur();
+            } else if (ev.key === 'Enter') {
+                ev.preventDefault();
+                ev.target.blur();
+            }
+        }
+    });
+</script>
+
 
                         </div>
 
@@ -251,7 +325,7 @@
                                 <div class="box-lines">
                                     <div class="box-line">
                                         <span class="left">Name</span>
-                                        <span class="right" style="width: 70%;"><input type="text" name="education"
+                                        <span class="right" style="width: 70%;"><input type="text" name="education_level"
                                                                                        class="input"></span>
                                     </div>
                                 </div>
@@ -277,101 +351,142 @@
 
                             <script src="https://unpkg.com/gridjs/dist/gridjs.umd.js"></script>
                             <script>
-                                const tableDiv4 = document.getElementById('profession_table');
+    const tableDiv4 = document.getElementById('profession_table');
 
-                                const updateUrl4 = (prev, query) => {
-                                    return prev + (prev.indexOf('?') >= 0 ? '&' : '?') + new URLSearchParams(query).toString();
-                                };
+    const updateUrl4 = (prev, query) => {
+        return prev + (prev.indexOf('?') >= 0 ? '&' : '?') + new URLSearchParams(query).toString();
+    };
 
-                                const editableCellAttributes4 = (data, row, col) => {
-                                    if (row) {
-                                        return {contentEditable: 'true', 'data-element-id': row.cells[0].data};
-                                    } else {
-                                        return {};
-                                    }
-                                };
+    const editableCellAttributes4 = (data, row, col) => {
+        if (row) {
+            const columnId = col.id;
+            return {
+                contentEditable: 'true',
+                'data-element-id': row.cells[0].data,
+                'data-column-id': columnId
+            };
+        } else {
+            return {};
+        }
+    };
 
-                                new gridjs.Grid({
-                                    columns: [
-                                        {id: 'id', 'hidden': true},
-                                        {id: 'profession', name: 'name', 'attributes': editableCellAttributes4},
-                                        {id: 'background', name: 'category', 'attributes': editableCellAttributes4},
-                                    ],
-                                    server: {
-                                        url: '/admin/professions_data',
-                                        then: results => results.data,
-                                        total: results => results.total,
-                                    },
-                                    search: {
-                                        enabled: true,
-                                        server: {
-                                            url: (prev, search) => {
-                                                return updateUrl4(prev, {search});
-                                            },
-                                        },
-                                    },
-                                    sort: {
-                                        enabled: true,
-                                        multiColumn: true,
-                                        server: {
-                                            url: (prev, columns) => {
-                                                const columnIds = ['id', 'professions', 'background'];
-                                                const sort = columns.map(col => (col.direction === 1 ? '+' : '-') + columnIds[col.index]);
-                                                return updateUrl4(prev, {sort});
-                                            },
-                                        },
-                                    },
-                                    pagination: {
-                                        enabled: true,
-                                        server: {
-                                            url: (prev, page, limit) => {
-                                                return updateUrl4(prev, {start: page * limit, length: limit});
-                                            },
-                                        },
-                                    },
-                                }).render(tableDiv4);
-
-                                let savedValue4;
-
-                                tableDiv4.addEventListener('focusin', ev => {
-                                    if (ev.target.tagName === 'TD') {
-                                        savedValue4 = ev.target.textContent;
-                                    }
-                                });
-
-                                tableDiv4.addEventListener('focusout', ev => {
-                                    if (ev.target.tagName === 'TD') {
-                                        if (savedValue4 !== ev.target.textContent) {
-                                            fetch('/admin/professions_data', {
-                                                method: 'POST',
-                                                headers: {'Content-Type': 'application/json'},
-                                                body: JSON.stringify({
-                                                    id: ev.target.dataset.elementId,
-                                                    [ev.target.dataset.columnId]: ev.target.textContent
-                                                }),
-                                            });
+    const grid4 = new gridjs.Grid({
+        columns: [
+            { id: 'id', hidden: true },
+            {
+                id: 'profession',
+                name: 'Name',
+                attributes: editableCellAttributes4
+            },
+            {
+                id: 'background',
+                name: 'Category',
+                attributes: editableCellAttributes4
+            },
+            {
+                name: 'Actions',
+                attributes: () => ({ style: 'text-align: center;' }),
+                formatter: (cell, row) => {
+                    return gridjs.h(
+                        'div',
+                        { style: 'display: flex; justify-content: center;' },
+                        gridjs.h(
+                            'button',
+                            {
+                                className: 'btn btn-sm btn-danger',
+                                onClick: () => {
+                                    const id = row.cells[0].data;
+                                    fetch(`/admin/delete_profession/${id}`, {
+                                        method: 'DELETE',
+                                    }).then(res => {
+                                        if (res.ok) {
+                                            grid4.forceRender();
+                                        } else {
+                                            alert("Failed to delete profession.");
                                         }
-                                        savedValue4 = undefined;
-                                    }
-                                });
+                                    });
+                                }
+                            },
+                            'Delete'
+                        )
+                    );
+                }
+            }
+        ],
+        server: {
+            url: '/admin/professions_data',
+            then: results => results.data,
+            total: results => results.total,
+        },
+        search: {
+            enabled: true,
+            server: {
+                url: (prev, search) => updateUrl4(prev, { search }),
+            },
+        },
+        sort: {
+            enabled: true,
+            multiColumn: true,
+            server: {
+                url: (prev, columns) => {
+                    const columnIds = ['id', 'profession', 'background'];
+                    const sort = columns.map(col => (col.direction === 1 ? '+' : '-') + columnIds[col.index]);
+                    return updateUrl4(prev, { sort });
+                },
+            },
+        },
+        pagination: {
+            enabled: true,
+            server: {
+                url: (prev, page, limit) => updateUrl4(prev, { start: page * limit, length: limit }),
+            },
+        },
+    });
 
-                                tableDiv4.addEventListener('keydown', ev => {
-                                    if (ev.target.tagName === 'TD') {
-                                        if (ev.key === 'Escape') {
-                                            ev.target.textContent = savedValue4;
-                                            ev.target.blur();
-                                        } else if (ev.key === 'Enter') {
-                                            ev.preventDefault();
-                                            ev.target.blur();
-                                        }
-                                    }
-                                });
-                            </script>
+    grid4.render(tableDiv4);
+
+    let savedValue4;
+
+    tableDiv4.addEventListener('focusin', ev => {
+        if (ev.target.tagName === 'TD') {
+            savedValue4 = ev.target.textContent;
+        }
+    });
+
+    tableDiv4.addEventListener('focusout', ev => {
+        if (ev.target.tagName === 'TD' && ev.target.dataset.elementId) {
+            if (savedValue4 !== ev.target.textContent) {
+                fetch('/admin/professions_data', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        id: ev.target.dataset.elementId,
+                        [ev.target.dataset.columnId]: ev.target.textContent
+                    }),
+                });
+            }
+            savedValue4 = undefined;
+        }
+    });
+
+    tableDiv4.addEventListener('keydown', ev => {
+        if (ev.target.tagName === 'TD') {
+            if (ev.key === 'Escape') {
+                ev.target.textContent = savedValue4;
+                ev.target.blur();
+            } else if (ev.key === 'Enter') {
+                ev.preventDefault();
+                ev.target.blur();
+            }
+        }
+    });
+</script>
+
                         </div>
 
                         <div class="box-content" style="margin-top: 30px;">
                             <h3 class="title is-5 is-thin">New Profession</h3>
-                            <form action="/admin/create_leaning" method="POST">
+                            <form action="/admin/create_profession" method="POST">
                                 <div class="box-lines">
                                     <div class="box-line">
                                         <span class="left">Name</span>
@@ -381,6 +496,163 @@
                                     <div class="box-line">
                                         <span class="left">Category</span>
                                         <span class="right" style="width: 70%;"><input type="text" name="background"
+                                                                                       class="input"></span>
+                                    </div>
+                                </div>
+                                <div class="button-wrap">
+                                    <button class="button is-solid primary-button is-fullwidth">
+                                        Create
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+
+                    </div>
+
+                    <div class="dashboard-box">
+                        <h3 class="title is-5 is-thin">Available Topics</h3>
+
+                        <div class="box-content">
+                            <div id="topics_table"></div>
+
+                            <script src="https://unpkg.com/gridjs/dist/gridjs.umd.js"></script>
+                            <script>
+    const tableDiv6 = document.getElementById('topics_table');
+
+    const updateUrl6 = (prev, query) => {
+        return prev + (prev.indexOf('?') >= 0 ? '&' : '?') + new URLSearchParams(query).toString();
+    };
+
+    const editableCellAttributes6 = (data, row, col) => {
+        if (row) {
+            return {
+                contentEditable: 'true',
+                'data-element-id': row.cells[0].data,
+                'data-column-id': 'name'
+            };
+        } else {
+            return {};
+        }
+    };
+
+    const grid6 = new gridjs.Grid({
+        columns: [
+            { id: 'id', hidden: true },
+            {
+                id: 'name',
+                name: 'Name',
+                attributes: editableCellAttributes6
+            },
+            {
+                name: 'Actions',
+                attributes: () => ({ style: 'text-align: center;' }),
+                formatter: (cell, row) => {
+                    return gridjs.h(
+                        'div',
+                        { style: 'display: flex; justify-content: center;' },
+                        gridjs.h(
+                            'button',
+                            {
+                                className: 'btn btn-sm btn-danger',
+                                onClick: () => {
+                                    const id = row.cells[0].data;
+                                    fetch(`/admin/delete_topic/${id}`, {
+                                        method: 'DELETE',
+                                    }).then(res => {
+                                        if (res.ok) {
+                                            grid6.forceRender(); // refresh table
+                                        } else {
+                                            alert("Failed to delete topic.");
+                                        }
+                                    });
+                                }
+                            },
+                            'Delete'
+                        )
+                    );
+                }
+            }
+        ],
+        server: {
+            url: '/admin/topic_data',
+            then: results => results.data,
+            total: results => results.total,
+        },
+        search: {
+            enabled: true,
+            server: {
+                url: (prev, search) => updateUrl6(prev, { search }),
+            },
+        },
+        sort: {
+            enabled: true,
+            multiColumn: true,
+            server: {
+                url: (prev, columns) => {
+                    const columnIds = ['id', 'name'];
+                    const sort = columns.map(col => (col.direction === 1 ? '+' : '-') + columnIds[col.index]);
+                    return updateUrl6(prev, { sort });
+                },
+            },
+        },
+        pagination: {
+            enabled: true,
+            server: {
+                url: (prev, page, limit) => updateUrl6(prev, { start: page * limit, length: limit }),
+            },
+        },
+    });
+
+    grid6.render(tableDiv6);
+
+    // Handle inline editing
+    let savedValue6;
+
+    tableDiv6.addEventListener('focusin', ev => {
+        if (ev.target.tagName === 'TD') {
+            savedValue6 = ev.target.textContent;
+        }
+    });
+
+    tableDiv6.addEventListener('focusout', ev => {
+        if (ev.target.tagName === 'TD' && ev.target.dataset.elementId) {
+            if (savedValue6 !== ev.target.textContent) {
+                fetch('/admin/topic_data', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        id: ev.target.dataset.elementId,
+                        [ev.target.dataset.columnId]: ev.target.textContent
+                    }),
+                });
+            }
+            savedValue6 = undefined;
+        }
+    });
+
+    tableDiv6.addEventListener('keydown', ev => {
+        if (ev.target.tagName === 'TD') {
+            if (ev.key === 'Escape') {
+                ev.target.textContent = savedValue6;
+                ev.target.blur();
+            } else if (ev.key === 'Enter') {
+                ev.preventDefault();
+                ev.target.blur();
+            }
+        }
+    });
+</script>
+
+
+                        </div>
+
+                        <div class="box-content" style="margin-top: 30px;">
+                            <h3 class="title is-5 is-thin">New Topic</h3>
+                            <form action="/admin/create_topic" method="POST">
+                                <div class="box-lines">
+                                    <div class="box-line">
+                                        <span class="left">Name</span>
+                                        <span class="right" style="width: 70%;"><input type="text" name="topic"
                                                                                        class="input"></span>
                                     </div>
                                 </div>
@@ -419,95 +691,132 @@
 
                             <div id="language_table"></div>
                             <script>
-                                const tableDiv1 = document.getElementById('language_table');
+    const tableDiv1 = document.getElementById('language_table');
 
-                                const updateUrl1 = (prev, query) => {
-                                    return prev + (prev.indexOf('?') >= 0 ? '&' : '?') + new URLSearchParams(query).toString();
-                                };
+    const updateUrl1 = (prev, query) => {
+        return prev + (prev.indexOf('?') >= 0 ? '&' : '?') + new URLSearchParams(query).toString();
+    };
 
-                                const editableCellAttributes1 = (data, row, col) => {
-                                    if (row) {
-                                        return {contentEditable: 'true', 'data-element-id': row.cells[0].data};
-                                    } else {
-                                        return {};
-                                    }
-                                };
+    const editableCellAttributes1 = (data, row, col) => {
+        if (row) {
+            const columnId = col.id;
+            return {
+                contentEditable: 'true',
+                'data-element-id': row.cells[0].data,
+                'data-column-id': columnId
+            };
+        } else {
+            return {};
+        }
+    };
 
-                                new gridjs.Grid({
-                                    columns: [
-                                        {id: 'id', 'hidden': true},
-                                        {id: 'language', name: 'name', 'attributes': editableCellAttributes1},
-                                    ],
-                                    server: {
-                                        url: '/admin/languages_data',
-                                        then: results => results.data,
-                                        total: results => results.total,
-                                    },
-                                    search: {
-                                        enabled: true,
-                                        server: {
-                                            url: (prev, search) => {
-                                                return updateUrl1(prev, {search});
-                                            },
-                                        },
-                                    },
-                                    sort: {
-                                        enabled: true,
-                                        multiColumn: true,
-                                        server: {
-                                            url: (prev, columns) => {
-                                                const columnIds = ['id', 'languages'];
-                                                const sort = columns.map(col => (col.direction === 1 ? '+' : '-') + columnIds[col.index]);
-                                                return updateUrl1(prev, {sort});
-                                            },
-                                        },
-                                    },
-                                    pagination: {
-                                        enabled: true,
-                                        server: {
-                                            url: (prev, page, limit) => {
-                                                return updateUrl1(prev, {start: page * limit, length: limit});
-                                            },
-                                        },
-                                    },
-                                }).render(tableDiv1);
-
-                                let savedValue1;
-
-                                tableDiv1.addEventListener('focusin', ev => {
-                                    if (ev.target.tagName === 'TD') {
-                                        savedValue1 = ev.target.textContent;
-                                    }
-                                });
-
-                                tableDiv1.addEventListener('focusout', ev => {
-                                    if (ev.target.tagName === 'TD') {
-                                        if (savedValue1 !== ev.target.textContent) {
-                                            fetch('/admin/languages_data', {
-                                                method: 'POST',
-                                                headers: {'Content-Type': 'application/json'},
-                                                body: JSON.stringify({
-                                                    id: ev.target.dataset.elementId,
-                                                    [ev.target.dataset.columnId]: ev.target.textContent
-                                                }),
-                                            });
+    const grid1 = new gridjs.Grid({
+        columns: [
+            { id: 'id', hidden: true },
+            {
+                id: 'language',
+                name: 'Name',
+                attributes: editableCellAttributes1
+            },
+            {
+                name: 'Actions',
+                attributes: () => ({ style: 'text-align: center;' }),
+                formatter: (cell, row) => {
+                    return gridjs.h(
+                        'div',
+                        { style: 'display: flex; justify-content: center;' },
+                        gridjs.h(
+                            'button',
+                            {
+                                className: 'btn btn-sm btn-danger',
+                                onClick: () => {
+                                    const id = row.cells[0].data;
+                                    fetch(`/admin/delete_language/${id}`, {
+                                        method: 'DELETE',
+                                    }).then(res => {
+                                        if (res.ok) {
+                                            grid1.forceRender();
+                                        } else {
+                                            alert("Failed to delete language.");
                                         }
-                                        savedValue1 = undefined;
-                                    }
-                                });
+                                    });
+                                }
+                            },
+                            'Delete'
+                        )
+                    );
+                }
+            }
+        ],
+        server: {
+            url: '/admin/languages_data',
+            then: results => results.data,
+            total: results => results.total,
+        },
+        search: {
+            enabled: true,
+            server: {
+                url: (prev, search) => updateUrl1(prev, { search }),
+            },
+        },
+        sort: {
+            enabled: true,
+            multiColumn: true,
+            server: {
+                url: (prev, columns) => {
+                    const columnIds = ['id', 'language'];
+                    const sort = columns.map(col => (col.direction === 1 ? '+' : '-') + columnIds[col.index]);
+                    return updateUrl1(prev, { sort });
+                },
+            },
+        },
+        pagination: {
+            enabled: true,
+            server: {
+                url: (prev, page, limit) => updateUrl1(prev, { start: page * limit, length: limit }),
+            },
+        },
+    });
 
-                                tableDiv1.addEventListener('keydown', ev => {
-                                    if (ev.target.tagName === 'TD') {
-                                        if (ev.key === 'Escape') {
-                                            ev.target.textContent = savedValue1;
-                                            ev.target.blur();
-                                        } else if (ev.key === 'Enter') {
-                                            ev.preventDefault();
-                                            ev.target.blur();
-                                        }
-                                    }
-                                });
-                            </script>
+    grid1.render(tableDiv1);
+
+    let savedValue1;
+
+    tableDiv1.addEventListener('focusin', ev => {
+        if (ev.target.tagName === 'TD') {
+            savedValue1 = ev.target.textContent;
+        }
+    });
+
+    tableDiv1.addEventListener('focusout', ev => {
+        if (ev.target.tagName === 'TD' && ev.target.dataset.elementId) {
+            if (savedValue1 !== ev.target.textContent) {
+                fetch('/admin/languages_data', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        id: ev.target.dataset.elementId,
+                        [ev.target.dataset.columnId]: ev.target.textContent
+                    }),
+                });
+            }
+            savedValue1 = undefined;
+        }
+    });
+
+    tableDiv1.addEventListener('keydown', ev => {
+        if (ev.target.tagName === 'TD') {
+            if (ev.key === 'Escape') {
+                ev.target.textContent = savedValue1;
+                ev.target.blur();
+            } else if (ev.key === 'Enter') {
+                ev.preventDefault();
+                ev.target.blur();
+            }
+        }
+    });
+</script>
+
 
                         </div>
 
@@ -540,96 +849,133 @@
 
                         <div class="box-content">
                             <div id="nationality_table"></div>
-                            <script>
-                                const tableDiv2 = document.getElementById('nationality_table');
+                           <script>
+    const tableDiv2 = document.getElementById('nationality_table');
 
-                                const updateUrl2 = (prev, query) => {
-                                    return prev + (prev.indexOf('?') >= 0 ? '&' : '?') + new URLSearchParams(query).toString();
-                                };
+    const updateUrl2 = (prev, query) => {
+        return prev + (prev.indexOf('?') >= 0 ? '&' : '?') + new URLSearchParams(query).toString();
+    };
 
-                                const editableCellAttributes2 = (data, row, col) => {
-                                    if (row) {
-                                        return {contentEditable: 'true', 'data-element-id': row.cells[0].data};
-                                    } else {
-                                        return {};
-                                    }
-                                };
+    const editableCellAttributes2 = (data, row, col) => {
+        if (row) {
+            const columnId = col.id;
+            return {
+                contentEditable: 'true',
+                'data-element-id': row.cells[0].data,
+                'data-column-id': columnId
+            };
+        } else {
+            return {};
+        }
+    };
 
-                                new gridjs.Grid({
-                                    columns: [
-                                        {id: 'id', 'hidden': true},
-                                        {id: 'nationality', name: 'name', 'attributes': editableCellAttributes2},
-                                    ],
-                                    server: {
-                                        url: '/admin/nationalities_data',
-                                        then: results => results.data,
-                                        total: results => results.total,
-                                    },
-                                    search: {
-                                        enabled: true,
-                                        server: {
-                                            url: (prev, search) => {
-                                                return updateUrl2(prev, {search});
-                                            },
-                                        },
-                                    },
-                                    sort: {
-                                        enabled: true,
-                                        multiColumn: true,
-                                        server: {
-                                            url: (prev, columns) => {
-                                                const columnIds = ['id', 'nationality'];
-                                                const sort = columns.map(col => (col.direction === 1 ? '+' : '-') + columnIds[col.index]);
-                                                return updateUrl2(prev, {sort});
-                                            },
-                                        },
-                                    },
-                                    pagination: {
-                                        enabled: true,
-                                        server: {
-                                            url: (prev, page, limit) => {
-                                                return updateUrl2(prev, {start: page * limit, length: limit});
-                                            },
-                                        },
-                                    },
-                                }).render(tableDiv2);
-
-                                let savedValue2;
-
-                                tableDiv2.addEventListener('focusin', ev => {
-                                    if (ev.target.tagName === 'TD') {
-                                        savedValue2 = ev.target.textContent;
-                                    }
-                                });
-
-                                tableDiv2.addEventListener('focusout', ev => {
-                                    if (ev.target.tagName === 'TD') {
-                                        if (savedValue2 !== ev.target.textContent) {
-                                            fetch('/admin/nationalities_data', {
-                                                method: 'POST',
-                                                headers: {'Content-Type': 'application/json'},
-                                                body: JSON.stringify({
-                                                    id: ev.target.dataset.elementId,
-                                                    [ev.target.dataset.columnId]: ev.target.textContent
-                                                }),
-                                            });
+    const grid2 = new gridjs.Grid({
+        columns: [
+            { id: 'id', hidden: true },
+            {
+                id: 'nationality',
+                name: 'Name',
+                attributes: editableCellAttributes2
+            },
+            {
+                name: 'Actions',
+                attributes: () => ({ style: 'text-align: center;' }),
+                formatter: (cell, row) => {
+                    return gridjs.h(
+                        'div',
+                        { style: 'display: flex; justify-content: center;' },
+                        gridjs.h(
+                            'button',
+                            {
+                                className: 'btn btn-sm btn-danger',
+                                onClick: () => {
+                                    const id = row.cells[0].data;
+                                    fetch(`/admin/delete_nationality/${id}`, {
+                                        method: 'DELETE',
+                                    }).then(res => {
+                                        if (res.ok) {
+                                            grid2.forceRender();
+                                        } else {
+                                            alert("Failed to delete nationality.");
                                         }
-                                        savedValue2 = undefined;
-                                    }
-                                });
+                                    });
+                                }
+                            },
+                            'Delete'
+                        )
+                    );
+                }
+            }
+        ],
+        server: {
+            url: '/admin/nationalities_data',
+            then: results => results.data,
+            total: results => results.total,
+        },
+        search: {
+            enabled: true,
+            server: {
+                url: (prev, search) => updateUrl2(prev, { search }),
+            },
+        },
+        sort: {
+            enabled: true,
+            multiColumn: true,
+            server: {
+                url: (prev, columns) => {
+                    const columnIds = ['id', 'nationality'];
+                    const sort = columns.map(col => (col.direction === 1 ? '+' : '-') + columnIds[col.index]);
+                    return updateUrl2(prev, { sort });
+                },
+            },
+        },
+        pagination: {
+            enabled: true,
+            server: {
+                url: (prev, page, limit) => updateUrl2(prev, { start: page * limit, length: limit }),
+            },
+        },
+    });
 
-                                tableDiv2.addEventListener('keydown', ev => {
-                                    if (ev.target.tagName === 'TD') {
-                                        if (ev.key === 'Escape') {
-                                            ev.target.textContent = savedValue2;
-                                            ev.target.blur();
-                                        } else if (ev.key === 'Enter') {
-                                            ev.preventDefault();
-                                            ev.target.blur();
-                                        }
-                                    }
-                                });
-                            </script>
+    grid2.render(tableDiv2);
+
+    let savedValue2;
+
+    tableDiv2.addEventListener('focusin', ev => {
+        if (ev.target.tagName === 'TD') {
+            savedValue2 = ev.target.textContent;
+        }
+    });
+
+    tableDiv2.addEventListener('focusout', ev => {
+        if (ev.target.tagName === 'TD' && ev.target.dataset.elementId) {
+            if (savedValue2 !== ev.target.textContent) {
+                fetch('/admin/nationalities_data', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        id: ev.target.dataset.elementId,
+                        [ev.target.dataset.columnId]: ev.target.textContent
+                    }),
+                });
+            }
+            savedValue2 = undefined;
+        }
+    });
+
+    tableDiv2.addEventListener('keydown', ev => {
+        if (ev.target.tagName === 'TD') {
+            if (ev.key === 'Escape') {
+                ev.target.textContent = savedValue2;
+                ev.target.blur();
+            } else if (ev.key === 'Enter') {
+                ev.preventDefault();
+                ev.target.blur();
+            }
+        }
+    });
+</script>
+
                         </div>
 
 

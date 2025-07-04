@@ -25,7 +25,7 @@ from y_web.models import (
     Nationalities,
     Languages,
     Content_Recsys,
-    Follow_Recsys,
+    Follow_Recsys, Exp_Topic, Topic_List,
 )
 from y_web.utils import (
     generate_population,
@@ -295,16 +295,6 @@ def population_details(uid):
         "toxicity": tox,
         "activity": activity,
     }
-
-    topics = {}
-    for a in agents:
-        if a[0].interests:
-            ints = a[0].interests.split(",")
-            for t in ints:
-                if t in topics:
-                    topics[t] += 1
-                else:
-                    topics[t] = 1
 
     # most frequent crecsys amon agents
     crecsys = {}

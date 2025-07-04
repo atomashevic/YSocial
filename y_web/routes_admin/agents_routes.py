@@ -131,7 +131,6 @@ def create_agent():
     nationality = request.form.get("nationality")
     education_level = request.form.get("education_level")
     leaning = request.form.get("leaning")
-    interests = request.form.get("tags")
     oe = request.form.get("oe")
     co = request.form.get("co")
     ex = request.form.get("ex")
@@ -148,7 +147,6 @@ def create_agent():
         age=age,
         ag_type=user_type,
         leaning=leaning,
-        interests=interests,
         ag=ag,
         co=co,
         oe=oe,

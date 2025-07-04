@@ -295,7 +295,6 @@ class Agent(db.Model):
     leaning = db.Column(db.String(50))
     age = db.Column(db.Integer)
     education_level = db.Column(db.String(50))
-    interests = db.Column(db.String(200))
     oe = db.Column(db.String(50))
     co = db.Column(db.String(50))
     ex = db.Column(db.String(50))
@@ -482,3 +481,26 @@ class Follow_Recsys(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(50), nullable=False)
     value = db.Column(db.String(500), nullable=False)
+
+
+class Topic_List(db.Model):
+    __bind_key__ = "db_admin"
+    __tablename__ = "topic_list"
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(50), nullable=False)
+
+
+class Exp_Topic(db.Model):
+    __bind_key__ = "db_admin"
+    __tablename__ = "exp_topic"
+    id = db.Column(db.Integer, primary_key=True)
+    exp_id = db.Column(db.Integer, db.ForeignKey("exps.idexp"), nullable=False)
+    topic_id = db.Column(db.Integer, db.ForeignKey("topic_list.id"), nullable=False)
+
+
+class Page_Topic(db.Model):
+    __bind_key__ = "db_admin"
+    __tablename__ = "page_topic"
+    id = db.Column(db.Integer, primary_key=True)
+    page_id = db.Column(db.Integer, db.ForeignKey("pages.id"), nullable=False)
+    topic_id = db.Column(db.Integer, db.ForeignKey("topic_list.id"), nullable=False)

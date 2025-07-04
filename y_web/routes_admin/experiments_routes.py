@@ -31,6 +31,8 @@ from y_web.models import (
     Nationalities,
     Profession,
     Education,
+    Topic_List,
+    Exp_Topic
 )
 from y_web.utils import terminate_process_on_port, start_server
 import json
@@ -448,6 +450,7 @@ def create_experiment():
     host = request.form.get("host")
     port = int(request.form.get("port"))
     perspective_api = request.form.get("perspective_api")
+    topics = request.form.get("tags").split(",")
 
     uid = uuid.uuid4()
     pathlib.Path(f"y_web{os.sep}experiments{os.sep}{uid}").mkdir(
@@ -508,6 +511,21 @@ def create_experiment():
     db.session.add(rnd)
     db.session.commit()
 
+    for topic in topics:
+        # check if the topic already exists in Topics
+        topic = topic.strip()
+        if topic:
+            existing_topic = Topic_List.query.filter_by(name=topic).first()
+            if not existing_topic:
+                existing_topic = Topic_List(name=topic)
+                db.session.add(existing_topic)
+                db.session.commit()
+
+            # add the topic to the experiment
+            exp_topic = Exp_Topic(exp_id=exp.idexp, topic_id=existing_topic.id)
+            db.session.add(exp_topic)
+            db.session.commit()
+
     return settings()
 
 
@@ -557,6 +575,10 @@ def delete_simulation(exp_id):
             # delete the client executions
             db.session.query(Client_Execution).filter_by(client_id=cid).delete()
             db.session.commit()
+
+        # delete experiment topics
+        db.session.query(Exp_Topic).filter_by(exp_id=exp_id).delete()
+        db.session.commit()
 
     return settings()
 
@@ -1036,12 +1058,12 @@ def educations_data():
     return res
 
 
-@experiments.route("/admin/create_language")
+@experiments.route("/admin/create_language", methods=["POST"])
 @login_required
 def create_language():
     check_privileges(current_user.username)
 
-    language = request.args.get("language")
+    language = request.form.get("language")
 
     lang = Languages(language=language)
     db.session.add(lang)
@@ -1050,12 +1072,12 @@ def create_language():
     return redirect(request.referrer)
 
 
-@experiments.route("/admin/create_leaning")
+@experiments.route("/admin/create_leaning", methods=["POST"])
 @login_required
 def create_leaning():
     check_privileges(current_user.username)
 
-    leaning = request.args.get("leaning")
+    leaning = request.form.get("leaning")
 
     lean = Leanings(leaning=leaning)
     db.session.add(lean)
@@ -1064,12 +1086,12 @@ def create_leaning():
     return redirect(request.referrer)
 
 
-@experiments.route("/admin/create_nationality")
+@experiments.route("/admin/create_nationality", methods=["POST"])
 @login_required
 def create_nationality():
     check_privileges(current_user.username)
 
-    nationality = request.args.get("nationality")
+    nationality = request.form.get("nationality")
     nat = Nationalities(nationality=nationality)
 
     db.session.add(nat)
@@ -1078,13 +1100,13 @@ def create_nationality():
     return redirect(request.referrer)
 
 
-@experiments.route("/admin/create_profession")
+@experiments.route("/admin/create_profession", methods=["POST"])
 @login_required
 def create_profession():
     check_privileges(current_user.username)
 
-    profession = request.args.get("profession")
-    background = request.args.get("background")
+    profession = request.form.get("profession")
+    background = request.form.get("background")
 
     prof = Profession(profession=profession, background=background)
     db.session.add(prof)
@@ -1093,15 +1115,167 @@ def create_profession():
     return redirect(request.referrer)
 
 
-@experiments.route("/admin/create_education")
+@experiments.route("/admin/create_education", methods=["POST"])
 @login_required
 def create_education():
     check_privileges(current_user.username)
 
-    education_level = request.args.get("education_level")
+    education_level = request.form.get("education_level")
 
     ed = Education(education_level=education_level)
     db.session.add(ed)
     db.session.commit()
 
     return redirect(request.referrer)
+
+
+@experiments.route("/admin/create_topic", methods=["POST"])
+@login_required
+def create_topic():
+    check_privileges(current_user.username)
+
+    topic = request.form.get("topic")
+
+    # check if the topic already exists
+    existing_topic = Topic_List.query.filter_by(name=topic).first()
+    if existing_topic:
+        flash("The topic already exists.")
+        return redirect(request.referrer)
+
+    new_topic = Topic_List(name=topic)
+    db.session.add(new_topic)
+    db.session.commit()
+
+    return redirect(request.referrer)
+
+
+@experiments.route("/admin/topic_data")
+@login_required
+def topic_data():
+    query = Topic_List.query
+
+    # search filter
+    search = request.args.get("search")
+    if search:
+        query = query.filter(db.or_(Topic_List.name.like(f"%{search}%")))
+    total = query.count()
+
+    # sorting
+    sort = request.args.get("sort")
+    if sort:
+        order = []
+        for s in sort.split(","):
+            direction = s[0]
+            name = s[1:]
+            if name not in ["name"]:
+                name = "name"
+            col = getattr(Topic_List, name)
+            if direction == "-":
+                col = col.desc()
+            order.append(col)
+        if order:
+            query = query.order_by(*order)
+
+    # pagination
+    start = request.args.get("start", type=int, default=-1)
+    length = request.args.get("length", type=int, default=-1)
+    if start != -1 and length != -1:
+        query = query.offset(start).limit(length)
+
+    # response
+    res = query.all()
+
+    return {
+        "data": [
+            {
+                "id": exp.id,
+                "name": exp.name,
+            }
+            for exp in res
+        ],
+        "total": total,
+    }
+
+
+@app.route('/admin/delete_topic/<int:topic_id>', methods=['DELETE'])
+@login_required
+def delete_topic(topic_id):
+    check_privileges(current_user.username)
+
+    topic = Topic_List.query.filter_by(id=topic_id).first()
+    if not topic:
+        flash("Topic not found.")
+        return miscellanea()
+    db.session.delete(topic)
+    db.session.commit()
+    return miscellanea()
+
+
+@app.route('/admin/delete_language/<int:language_id>', methods=['DELETE'])
+@login_required
+def delete_language(language_id):
+    check_privileges(current_user.username)
+
+    language = Languages.query.filter_by(id=language_id).first()
+    if not language:
+        flash("Language not found.")
+        return miscellanea()
+    db.session.delete(language)
+    db.session.commit()
+    return miscellanea()
+
+
+@app.route('/admin/delete_leaning/<int:leaning_id>', methods=['DELETE'])
+@login_required
+def delete_leaning(leaning_id):
+    check_privileges(current_user.username)
+
+    leaning = Leanings.query.filter_by(id=leaning_id).first()
+    if not leaning:
+        flash("Leaning not found.")
+        return miscellanea()
+    db.session.delete(leaning)
+    db.session.commit()
+    return miscellanea()
+
+
+@app.route('/admin/delete_nationality/<int:nationality_id>', methods=['DELETE'])
+@login_required
+def delete_nationality(nationality_id):
+    check_privileges(current_user.username)
+
+    nationality = Nationalities.query.filter_by(id=nationality_id).first()
+    if not nationality:
+        flash("Nationality not found.")
+        return miscellanea()
+    db.session.delete(nationality)
+    db.session.commit()
+    return miscellanea()
+
+
+@app.route('/admin/delete_education/<int:education_level_id>', methods=['DELETE'])
+@login_required
+def delete_education_level(education_level_id):
+    check_privileges(current_user.username)
+
+    education_level = Education.query.filter_by(id=education_level_id).first()
+    if not education_level:
+        flash("Education level not found.")
+        return miscellanea()
+    db.session.delete(education_level)
+    db.session.commit()
+    return miscellanea()
+
+
+@app.route('/admin/delete_profession/<int:profession_id>', methods=['DELETE'])
+@login_required
+def delete_profession(profession_id):
+    check_privileges(current_user.username)
+
+    profession = Profession.query.filter_by(id=profession_id).first()
+    if not profession:
+        flash("Profession not found.")
+        return miscellanea()
+    db.session.delete(profession)
+    db.session.commit()
+    return miscellanea()

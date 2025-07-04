@@ -47,7 +47,6 @@
                                         {id: 'name', name: 'Name', 'attributes': editableCellAttributes},
                                         {id: 'descr', name: 'Description'},
                                         {id: 'page_type', name: 'Type'},
-                                        {id: 'keywords', name: 'Keywords'},
                                         {
                                             id: 'details', name: 'Details', formatter: (cell, row) => {
                                                 return gridjs.html(`<a href="/admin/page_details/${row.cells[0].data}">Details</a>`);
@@ -215,7 +214,7 @@
                                         <span class="right" style="width: 70%;"><input type="text" name="feed"
                                                                                        class="input"></span>
                                     </div>
-                                    <div class="box-line">
+                                    <!-- <div class="box-line">
                                         <span class="left">Keywords</span>
                                         <span class="right" style="width: 70%;">
                                             <div class="tags-input" style="width: 100%;">
@@ -257,7 +256,7 @@
                                         </script>
 
                                         </span>
-                                    </div>
+                                    </div> -->
 
                                     <div class="box-line">
                                         <span class="left">Logo Image<small>(public url)</small></span>
