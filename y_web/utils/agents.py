@@ -61,14 +61,6 @@ def generate_population(population_name):
             population.age_max,
         )
 
-        interests = fake.random_elements(
-            elements=set(population.interests.split(",")),
-            length=fake.random_int(
-                min=1,
-                max=5,
-            ),
-        )
-
         toxicity = fake.random_element(
             elements=(population.toxicity.split(","))
         ).strip()
@@ -109,7 +101,6 @@ def generate_population(population_name):
             age=age,
             ag_type=ag_type,
             leaning=political_leaning,
-            interests=",".join(list(interests)),
             ag=ag,
             co=co,
             oe=oe,

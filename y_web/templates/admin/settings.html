@@ -27,105 +27,116 @@
 
                             <script src="https://unpkg.com/gridjs/dist/gridjs.umd.js"></script>
                             <script>
-                                const tableDiv = document.getElementById('table');
+    const tableDiv = document.getElementById('table');
 
-                                const updateUrl = (prev, query) => {
-                                    return prev + (prev.indexOf('?') >= 0 ? '&' : '?') + new URLSearchParams(query).toString();
-                                };
+    const updateUrl = (prev, query) => {
+        return prev + (prev.indexOf('?') >= 0 ? '&' : '?') + new URLSearchParams(query).toString();
+    };
 
-                                const editableCellAttributes = (data, row, col) => {
-                                    if (row) {
-                                        return {contentEditable: 'true', 'data-element-id': row.cells[0].data};
-                                    } else {
-                                        return {};
-                                    }
-                                };
+    const editableCellAttributes = (data, row, col) => {
+        if (row) {
+            return { contentEditable: 'true', 'data-element-id': row.cells[0].data };
+        } else {
+            return {};
+        }
+    };
 
-                                new gridjs.Grid({
-                                    columns: [
-                                        {id: 'idexp', 'hidden': true},
-                                        {id: 'exp_name', name: 'Name', 'attributes': editableCellAttributes},
-                                        {id: 'exp_descr', name: 'Description', sort: false},
-                                        {id: 'owner', name: 'Owner', sort: false},
-                                        {id: 'platform_type', name: 'Platform Type', sort: true},
-                                        {id: 'web', name: 'Web Interface', sort: true},
-                                        {id: 'running', name: 'YServer Status', sort: true},
-                                        {
-                                            id: 'details', name: 'Details', sort: false, formatter: (cell, row) => {
-                                                return gridjs.html(`<a href="/admin/experiment_details/${row.cells[0].data}">Details</a>`);
-                                            }
-                                        },
-                                    ],
-                                    server: {
-                                        url: '/admin/experiments_data',
-                                        then: results => results.data,
-                                        total: results => results.total,
-                                    },
-                                    search: {
-                                        enabled: true,
-                                        server: {
-                                            url: (prev, search) => {
-                                                return updateUrl(prev, {search});
-                                            },
-                                        },
-                                    },
-                                    sort: {
-                                        enabled: true,
-                                        multiColumn: true,
-                                        server: {
-                                            url: (prev, columns) => {
-                                                const columnIds = ['idexp', 'exp_name', 'platform_type', 'exp_descr', 'owner', 'web', 'running'];
-                                                const sort = columns.map(col => (col.direction === 1 ? '+' : '-') + columnIds[col.index]);
-                                                return updateUrl(prev, {sort});
-                                            },
-                                        },
-                                    },
-                                    pagination: {
-                                        enabled: true,
-                                        server: {
-                                            url: (prev, page, limit) => {
-                                                return updateUrl(prev, {start: page * limit, length: limit});
-                                            },
-                                        },
-                                    },
-                                }).render(tableDiv);
+    new gridjs.Grid({
+        columns: [
+            { id: 'idexp', hidden: true },
+            { id: 'exp_name', name: 'Name', attributes: editableCellAttributes },
+            { id: 'exp_descr', name: 'Description', sort: false },
+            { id: 'owner', name: 'Owner', sort: false },
+            { id: 'platform_type', name: 'Platform Type', sort: true },
+            { id: 'web', name: 'Web Interface', sort: true },
+            { id: 'running', name: 'YServer Status', sort: true },
+            {
+                id: 'details',
+                name: 'Details',
+                sort: false,
+                formatter: (cell, row) => {
+                    return gridjs.html(`
+                        <div style="display: flex; justify-content: center;">
+                            <a href="/admin/experiment_details/${row.cells[0].data}"
+                               style="background-color: #28a745; color: white; padding: 6px 12px; border-radius: 4px; text-decoration: none; font-size: 0.85rem;">
+                                Details
+                            </a>
+                        </div>
+                    `);
+                }
+            },
+        ],
+        server: {
+            url: '/admin/experiments_data',
+            then: results => results.data,
+            total: results => results.total,
+        },
+        search: {
+            enabled: true,
+            server: {
+                url: (prev, search) => {
+                    return updateUrl(prev, { search });
+                },
+            },
+        },
+        sort: {
+            enabled: true,
+            multiColumn: true,
+            server: {
+                url: (prev, columns) => {
+                    const columnIds = ['idexp', 'exp_name', 'platform_type', 'exp_descr', 'owner', 'web', 'running'];
+                    const sort = columns.map(col => (col.direction === 1 ? '+' : '-') + columnIds[col.index]);
+                    return updateUrl(prev, { sort });
+                },
+            },
+        },
+        pagination: {
+            enabled: true,
+            server: {
+                url: (prev, page, limit) => {
+                    return updateUrl(prev, { start: page * limit, length: limit });
+                },
+            },
+        },
+    }).render(tableDiv);
 
-                                let savedValue;
+    let savedValue;
 
-                                tableDiv.addEventListener('focusin', ev => {
-                                    if (ev.target.tagName === 'TD') {
-                                        savedValue = ev.target.textContent;
-                                    }
-                                });
+    tableDiv.addEventListener('focusin', ev => {
+        if (ev.target.tagName === 'TD') {
+            savedValue = ev.target.textContent;
+        }
+    });
 
-                                tableDiv.addEventListener('focusout', ev => {
-                                    if (ev.target.tagName === 'TD') {
-                                        if (savedValue !== ev.target.textContent) {
-                                            fetch('/admin/experiments_data', {
-                                                method: 'POST',
-                                                headers: {'Content-Type': 'application/json'},
-                                                body: JSON.stringify({
-                                                    id: ev.target.dataset.elementId,
-                                                    [ev.target.dataset.columnId]: ev.target.textContent
-                                                }),
-                                            });
-                                        }
-                                        savedValue = undefined;
-                                    }
-                                });
+    tableDiv.addEventListener('focusout', ev => {
+        if (ev.target.tagName === 'TD') {
+            if (savedValue !== ev.target.textContent) {
+                fetch('/admin/experiments_data', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        id: ev.target.dataset.elementId,
+                        [ev.target.dataset.columnId]: ev.target.textContent
+                    }),
+                });
+            }
+            savedValue = undefined;
+        }
+    });
 
-                                tableDiv.addEventListener('keydown', ev => {
-                                    if (ev.target.tagName === 'TD') {
-                                        if (ev.key === 'Escape') {
-                                            ev.target.textContent = savedValue;
-                                            ev.target.blur();
-                                        } else if (ev.key === 'Enter') {
-                                            ev.preventDefault();
-                                            ev.target.blur();
-                                        }
-                                    }
-                                });
-                            </script>
+    tableDiv.addEventListener('keydown', ev => {
+        if (ev.target.tagName === 'TD') {
+            if (ev.key === 'Escape') {
+                ev.target.textContent = savedValue;
+                ev.target.blur();
+            } else if (ev.key === 'Enter') {
+                ev.preventDefault();
+                ev.target.blur();
+            }
+        }
+    });
+</script>
+
 
                         </div>
                     </div>
@@ -139,6 +150,7 @@
                 <div class="column is-8">
                     <!--Dashboard box-->
 
+                    {%if dbtype=="sqlite" %}
                     <div class="dashboard-box">
                         <h3 class="title is-5 is-thin">Upload Experiment</h3>
                         <div class="box-content">
@@ -171,6 +183,7 @@
                             </form>
                         </div>
                     </div>
+                    {% endif %}
 
                     <div class="dashboard-box">
                         <h3 class="title is-5 is-thin">New Experiment</h3>

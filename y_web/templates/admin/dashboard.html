@@ -193,10 +193,11 @@
                 <div class="column is-4">
                     <!--Dashboard box-->
                     <div class="dashboard-box">
-                        <h3 class="title is-5 is-thin">Ollama Server Status</h3>
-
+                        <h3 class="title is-5 is-thin">Services</h3>
+                        <hr>
                         <div class="box-content">
                             <div class="box-lines">
+                                <h4 class="title is-6 is-thin">Self-hosted LLM instance</h4>
                                 <div class="box-line">
                                     <span class="left">Installed</span>
                                     <span class="right">  <i class="mdi mdi-checkbox-blank-circle {% if ollamas['installed'] %} active {% endif %}" style="font-size: 20px;"></i> </span>
@@ -219,6 +220,18 @@
 
 
                         </div>
+                        <hr>
+                        <div class="box-content">
+                            <div class="box-lines">
+                                <h4 class="title is-6 is-thin">Database Management System</h4>
+                                <div class="box-line">
+                                    <span class="left">{{ dbtype }} {%if db_server %} <small>({{ db_server }}:{{dbport}})</small> {% endif %}</span>
+                                    <span class="right">  <i class="mdi mdi-checkbox-blank-circle {% if db_conn %} active {% endif %}" style="font-size: 20px;"></i> </span>
+                                </div>
+                            </div>
+
+
+                        </div>
                     </div>
 
                     {% if ollamas["status"] and  ollamas["installed"] %}
@@ -226,7 +239,7 @@
 
                     {% if len(models) > 0 %}
                     <div class="dashboard-box">
-                        <h3 class="title is-5 is-thin">Available Models</h3>
+                        <h3 class="title is-5 is-thin">Available LLMs</h3>
 
                         <div class="box-content">
                             <div class="box-lines">

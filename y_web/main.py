@@ -16,21 +16,25 @@ def get_safe_profile_pic(username, is_page=0):
     if is_page == 1:
         try:
             pg = Page.query.filter_by(name=username).first()
-            if pg is not None and hasattr(pg, 'logo') and pg.logo:
+            if pg is not None and hasattr(pg, "logo") and pg.logo:
                 return pg.logo
         except:
             pass
     else:
         try:
             ag = Agent.query.filter_by(name=username).first()
-            if ag is not None and hasattr(ag, 'profile_pic') and ag.profile_pic:
+            if ag is not None and hasattr(ag, "profile_pic") and ag.profile_pic:
                 return ag.profile_pic
         except:
             pass
 
         try:
             admin_user = Admin_users.query.filter_by(username=username).first()
-            if admin_user is not None and hasattr(admin_user, 'profile_pic') and admin_user.profile_pic:
+            if (
+                admin_user is not None
+                and hasattr(admin_user, "profile_pic")
+                and admin_user.profile_pic
+            ):
                 return admin_user.profile_pic
         except:
             pass
@@ -74,143 +78,80 @@ def profile():
 @login_required
 def profile_logged(user_id, page=1, mode="recent"):
     user_id = int(user_id)
-    user = User_mgmt.query.filter_by(id=user_id).first()
+    user = User_mgmt.query.get(user_id)
 
-    # check if the logged user is following the user
-    is_following = (
-        Follow.query.filter_by(follower_id=user_id, user_id=current_user.id)
-        .group_by(Follow.follower_id)
-        .having(func.count(Follow.user_id) % 2 == 1)
-    ).all()
+    is_following = Follow.query.filter_by(follower_id=current_user.id, user_id=user_id).count() > 0
 
-    if len(is_following) == 0:
-        is_following = False
-    else:
-        is_following = True
+    total_posts = Post.query.filter_by(user_id=user_id, comment_to=-1).count()
+    total_comments = Post.query.filter(Post.user_id==user_id, Post.comment_to != -1).count()
+    total_likes = Reactions.query.filter_by(user_id=user_id, type="like").count()
+    total_dislikes = Reactions.query.filter_by(user_id=user_id, type="dislike").count()
+    total_articles = Post.query.filter(Post.user_id==user_id, Post.news_id.isnot(None)).count()
 
-    # get user total number of posts
-    total_posts = len(list(Post.query.filter_by(user_id=user_id, comment_to=-1)))
-
-    # get user total number of comments
-    total_comments = len(
-        list(Post.query.filter_by(user_id=user_id).filter(Post.comment_to != -1))
-    )
-
-    # get user total number of likes
-    total_likes = len(list(Reactions.query.filter_by(user_id=user_id, type="like")))
-
-    # get user total number of dislikes
-    total_dislikes = len(
-        list(Reactions.query.filter_by(user_id=user_id, type="dislike"))
-    )
-
-    # get user total number of articles shared
-    total_articles = len(
-        list(Post.query.filter_by(user_id=user_id).filter(Post.news_id.isnot(None)))
-    )
-
-    # get the hashtag used by the user
     hashtags = (
-        (
-            (
-                Post_hashtags.query.join(
-                    Hashtags, Post_hashtags.hashtag_id == Hashtags.id
-                )
-            )
-            .join(Post, Post_hashtags.post_id == Post.id)
-            .filter_by(user_id=user_id)
-            .add_columns(Hashtags.hashtag)
-        )
-        .add_columns(func.count(Post_hashtags.hashtag_id).label("count"))
-        .group_by(Hashtags.id)
-        .order_by(desc("count"))
-        .limit(10)
-    ).all()
-
-    most_used_hashtags = [(h[0].hashtag_id, h[1], h[2]) for h in hashtags]
-
-    emotions = (
-        (
-            (
-                Post_emotions.query.join(
-                    Emotions, Post_emotions.emotion_id == Emotions.id
-                )
-            )
-            .join(Post, Post_emotions.post_id == Post.id)
-            .filter_by(user_id=user_id)
-            .add_columns(Emotions.emotion)
-        )
-        .add_columns(func.count(Post_emotions.emotion_id).label("count"))
-        .group_by(Emotions.id)
+        db.session.query(Hashtags.id, Hashtags.hashtag, func.count(Post_hashtags.hashtag_id).label("count"))
+        .join(Post_hashtags, Post_hashtags.hashtag_id == Hashtags.id)
+        .join(Post, Post.id == Post_hashtags.post_id)
+        .filter(Post.user_id == user_id)
+        .group_by(Hashtags.id, Hashtags.hashtag)
         .order_by(desc("count"))
         .limit(10)
         .all()
     )
+    most_used_hashtags = [(h[0], h[1], h[2]) for h in hashtags]
 
-    most_used_emotions = [(h[0].emotion_id, h[1], h[2]) for h in emotions]
-
-    # get user total number of followers
-    total_followee = len(
-        list(
-            Follow.query.filter(
-                Follow.user_id == user_id, Follow.follower_id != user_id
-            )
-            .group_by(Follow.follower_id)
-            .having(func.count(Follow.follower_id) % 2 == 1)
-        )
+    emotions = (
+        db.session.query(Emotions.id, Emotions.emotion, func.count(Post_emotions.emotion_id).label("count"))
+        .join(Post_emotions, Post_emotions.emotion_id == Emotions.id)
+        .join(Post, Post.id == Post_emotions.post_id)
+        .filter(Post.user_id == user_id)
+        .group_by(Emotions.id, Emotions.emotion)
+        .order_by(desc("count"))
+        .limit(10)
+        .all()
     )
+    most_used_emotions = [(e[0], e[1], e[2]) for e in emotions]
 
-    # get user total followee
-    total_followers = len(
-        list(
-            Follow.query.filter(
-                Follow.follower_id == user_id, Follow.user_id != user_id
-            )
-            .group_by(Follow.user_id)
-            .having(func.count(Follow.user_id) % 2 == 1)
-        )
-    )
+    total_followers = Follow.query.filter(Follow.user_id == user_id, Follow.follower_id != user_id).count()
+    total_followee = Follow.query.filter(Follow.follower_id == user_id, Follow.user_id != user_id).count()
 
-    res = {
-        "user_data": user,
-        "total_posts": total_posts,
-        "total_comments": total_comments,
-        "total_likes": total_likes,
-        "total_dislikes": total_dislikes,
-        "total_articles": total_articles,
-        "most_used_hashtags": most_used_hashtags,
-        "most_used_emotions": most_used_emotions,
-        "total_followers": total_followers,
-        "total_followee": total_followee,
-    }
-
-    rp = get_user_recent_posts(user_id, page, 10, mode, current_user.id)
-    mutual_friends = get_mutual_friends(user_id, current_user.id)
-    hashtags = get_top_user_hashtags(user_id, 5)
-    interests = get_user_recent_interests(user_id, 5)
-
-    mentions = get_unanswered_mentions(current_user.id)
-
+    # Profile pic logic
     profile_pic = ""
-
-    # is the agent a page?
     if user.is_page == 1:
         pg = Page.query.filter_by(name=user.username).first()
-        if page is not None:
+        if pg:
             profile_pic = pg.logo
     else:
         ag = Agent.query.filter_by(name=user.username).first()
-        profile_pic = (
-            ag.profile_pic
-            if ag is not None and ag.profile_pic is not None
-            else Admin_users.query.filter_by(username=user.username).first().profile_pic
-        )
+        if ag and ag.profile_pic:
+            profile_pic = ag.profile_pic
+        else:
+            admin = Admin_users.query.filter_by(username=user.username).first()
+            profile_pic = admin.profile_pic if admin else ""
+
+    # Other functions as before
+    rp = get_user_recent_posts(user_id, page, 10, mode, current_user.id)
+    mutual_friends = get_mutual_friends(user_id, current_user.id)
+    hashtags_top = get_top_user_hashtags(user_id, 5)
+    interests = get_user_recent_interests(user_id, 5)
+    mentions = get_unanswered_mentions(current_user.id)
 
     return render_template(
         "profile.html",
         profile_pic=profile_pic,
         is_page=user.is_page,
-        user=res,
+        user={
+            "user_data": user,
+            "total_posts": total_posts,
+            "total_comments": total_comments,
+            "total_likes": total_likes,
+            "total_dislikes": total_dislikes,
+            "total_articles": total_articles,
+            "most_used_hashtags": most_used_hashtags,
+            "most_used_emotions": most_used_emotions,
+            "total_followers": total_followers,
+            "total_followee": total_followee,
+        },
         enumerate=enumerate,
         username=user.username,
         items=rp,
@@ -218,9 +159,9 @@ def profile_logged(user_id, page=1, mode="recent"):
         mutual=mutual_friends,
         page=page,
         mode=mode,
-        user_id=int(user_id),
+        user_id=user_id,
         logged_username=current_user.username,
-        hashtags=hashtags,
+        hashtags=hashtags_top,
         str=str,
         logged_id=current_user.id,
         is_following=is_following,
@@ -229,6 +170,7 @@ def profile_logged(user_id, page=1, mode="recent"):
         mentions=mentions,
         is_admin=is_admin(current_user.username),
     )
+
 
 
 @main.get("/edit_profile/<int:user_id>")
@@ -1064,6 +1006,7 @@ def __get_discussions(posts, username, page):
 
     return res
 
+
 #### Thread
 
 
@@ -1155,11 +1098,11 @@ def get_thread_reddit(post_id):
         "is_liked": Reactions.query.filter_by(
             post_id=posts[0].id, user_id=current_user.id, type="like"
         ).first()
-                    is not None,
+        is not None,
         "is_disliked": Reactions.query.filter_by(
             post_id=posts[0].id, user_id=current_user.id, type="dislike"
         ).first()
-                       is not None,
+        is not None,
         "is_shared": len(Post.query.filter_by(shared_from=posts[0].id).all()),
         "emotions": get_elicited_emotions(posts[0].id),
         "topics": get_topics(posts[0].id, posts[0].user_id),
@@ -1233,11 +1176,11 @@ def get_thread_reddit(post_id):
             "is_liked": Reactions.query.filter_by(
                 post_id=post.id, user_id=current_user.id, type="like"
             ).first()
-                        is None,
+            is None,
             "is_disliked": Reactions.query.filter_by(
                 post_id=post.id, user_id=current_user.id, type="dislike"
             ).first()
-                           is None,
+            is None,
             "is_shared": len(Post.query.filter_by(shared_from=post.id).all()),
             "emotions": get_elicited_emotions(post.id),
             "topics": get_topics(post.id, post.user_id),
@@ -1312,24 +1255,32 @@ def feed_reddit(user_id="all", timeline="timeline", mode="rf", page=1):
     username = ""
     posts, additional = None, None
 
-    feed_type = request.args.get('feed_type', 'new')
+    feed_type = request.args.get("feed_type", "new")
 
     print("HERE", feed_type)
 
     if user_id == "all":
-        if feed_type == 'top':
+        if feed_type == "top":
             # Top: all time, by upvotes - downvotes
             posts_query = (
                 Post.query.filter_by(comment_to=-1)
                 .outerjoin(Reactions, Post.id == Reactions.post_id)
-                .add_columns(Post, func.sum((Reactions.type == 'like').cast(db.Integer) - (Reactions.type == 'dislike').cast(db.Integer)).label('score'))
+                .add_columns(
+                    Post,
+                    func.sum(
+                        (Reactions.type == "like").cast(db.Integer)
+                        - (Reactions.type == "dislike").cast(db.Integer)
+                    ).label("score"),
+                )
                 .group_by(Post.id)
-                .order_by(desc('score'), desc(Post.id))
+                .order_by(desc("score"), desc(Post.id))
             )
-            posts = posts_query.paginate(page=page, per_page=max_post_per_page, error_out=False)
+            posts = posts_query.paginate(
+                page=page, per_page=max_post_per_page, error_out=False
+            )
 
             additional = None
-        elif feed_type == 'most_commented':
+        elif feed_type == "most_commented":
             # Fallback to slow subquery version or remove this option for now
             posts = (
                 Post.query.filter_by(comment_to=-1)
@@ -1349,26 +1300,34 @@ def feed_reddit(user_id="all", timeline="timeline", mode="rf", page=1):
     elif user_id != "all":
         user = User_mgmt.query.filter_by(id=int(user_id)).first()
         recsys = user.recsys_type
-        if feed_type == 'top':
+        if feed_type == "top":
             posts_query = (
                 Post.query.filter(Post.user_id != user_id, Post.comment_to == -1)
                 .outerjoin(Reactions, Post.id == Reactions.post_id)
-                .add_columns(Post, func.sum((Reactions.type == 'like').cast(db.Integer) - (Reactions.type == 'dislike').cast(db.Integer)).label('score'))
+                .add_columns(
+                    Post,
+                    func.sum(
+                        (Reactions.type == "like").cast(db.Integer)
+                        - (Reactions.type == "dislike").cast(db.Integer)
+                    ).label("score"),
+                )
                 .group_by(Post.id)
-                .order_by(desc('score'), desc(Post.id))
+                .order_by(desc("score"), desc(Post.id))
             )
-            posts = posts_query.paginate(page=page, per_page=max_post_per_page, error_out=False)
+            posts = posts_query.paginate(
+                page=page, per_page=max_post_per_page, error_out=False
+            )
             additional = None
-        elif feed_type == 'most_commented':
+        elif feed_type == "most_commented":
             posts = (
-                Post.query.filter( Post.comment_to == -1)
+                Post.query.filter(Post.comment_to == -1)
                 .order_by(desc(Post.id))
                 .paginate(page=page, per_page=max_post_per_page, error_out=False)
             )
             additional = None
         else:
             posts = (
-                Post.query.filter( Post.comment_to == -1)
+                Post.query.filter(Post.comment_to == -1)
                 .order_by(desc(Post.id))
                 .paginate(page=page, per_page=max_post_per_page, error_out=False)
             )

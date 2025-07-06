@@ -30,21 +30,25 @@ def get_safe_profile_pic(username, is_page=0):
     if is_page == 1:
         try:
             pg = Page.query.filter_by(name=username).first()
-            if pg is not None and hasattr(pg, 'logo') and pg.logo:
+            if pg is not None and hasattr(pg, "logo") and pg.logo:
                 return pg.logo
         except:
             pass
     else:
         try:
             ag = Agent.query.filter_by(name=username).first()
-            if ag is not None and hasattr(ag, 'profile_pic') and ag.profile_pic:
+            if ag is not None and hasattr(ag, "profile_pic") and ag.profile_pic:
                 return ag.profile_pic
         except:
             pass
 
         try:
             admin_user = Admin_users.query.filter_by(username=username).first()
-            if admin_user is not None and hasattr(admin_user, 'profile_pic') and admin_user.profile_pic:
+            if (
+                admin_user is not None
+                and hasattr(admin_user, "profile_pic")
+                and admin_user.profile_pic
+            ):
                 return admin_user.profile_pic
         except:
             pass
@@ -391,30 +395,19 @@ def get_mutual_friends(user_a, user_b, limit=10):
 
 
 def get_top_user_hashtags(user_id, limit=10):
-    """
-    Get the top hashtags used by the user.
-    :param user_id:
-    :param limit:
-    :return:
-    """
-
     ht = (
         Post.query.filter_by(user_id=user_id)
         .join(Post_hashtags, Post.id == Post_hashtags.post_id)
         .join(Hashtags, Post_hashtags.hashtag_id == Hashtags.id)
-        .add_columns(Hashtags.hashtag)
-        .group_by(Hashtags.hashtag)
-        .add_columns(func.count(Post_hashtags.hashtag_id))
-        .order_by(desc(func.count(Post_hashtags.hashtag_id)))
+        .with_entities(Hashtags.id, Hashtags.hashtag, func.count(Post_hashtags.hashtag_id).label("count"))
+        .group_by(Hashtags.id, Hashtags.hashtag)
+        .order_by(desc("count"))
         .limit(limit)
-    ).all()
+        .all()
+    )
 
     ht = [
-        {
-            "hashtag": h[1],
-            "count": h[2],
-            "id": Hashtags.query.filter_by(hashtag=h[1]).first().id,
-        }
+        {"id": h[0], "hashtag": h[1], "count": h[2]}
         for h in ht
     ]
 
@@ -423,128 +416,113 @@ def get_top_user_hashtags(user_id, limit=10):
 
 def get_user_friends(user_id, limit=12, page=1):
     """
-    Get the followers of the user.
-    :param user_id:
-    :param limit:
-    :param page:
-    :return:
-    """
+    Get the followers and followees of the user with pagination.
 
+    :param user_id: int
+    :param limit: int - items per page
+    :param page: int - current page number
+    :return: (followers_list, followee_list, total_followers, total_followees)
+    """
     if page < 1:
         page = 1
 
-    # get number
-    number_followees = len(
-        list(
-            Follow.query.filter(
-                Follow.user_id == user_id, Follow.follower_id != user_id
-            )
-            .group_by(Follow.follower_id)
-            .having(func.count(Follow.follower_id) % 2 == 1)
-        )
+    # Conta totale followees (user_id segue follower_id) con conteggio dispari
+    number_followees = (
+        db.session.query(Follow.follower_id)
+        .filter(Follow.user_id == user_id, Follow.follower_id != user_id)
+        .group_by(Follow.follower_id)
+        .having(func.count(Follow.follower_id) % 2 == 1)
+        .count()
     )
-    number_followers = len(
-        list(
-            Follow.query.filter(
-                Follow.follower_id == user_id, Follow.user_id != user_id
-            )
-            .group_by(Follow.user_id)
-            .having(func.count(Follow.user_id) % 2 == 1)
-        )
+
+    # Conta totale followers (follower_id segue user_id) con conteggio dispari
+    number_followers = (
+        db.session.query(Follow.user_id)
+        .filter(Follow.follower_id == user_id, Follow.user_id != user_id)
+        .group_by(Follow.user_id)
+        .having(func.count(Follow.user_id) % 2 == 1)
+        .count()
     )
 
     followee_list = []
     followers_list = []
 
-    if (
-        number_followers - page * limit < -limit
-        and number_followees - page * limit < -limit
-    ):
-        return get_user_friends(user_id, limit=12, page=page - 1)
+    # Controllo pagine per evitare out of range
+    if (number_followers - page * limit < -limit) and (number_followees - page * limit < -limit):
+        return get_user_friends(user_id, limit=limit, page=page - 1)
 
-    if page * limit - number_followees < limit:
-        followee = (
-            Follow.query.filter(
-                Follow.user_id == user_id, Follow.follower_id != user_id
-            )
-            .group_by(Follow.follower_id)
-            .having(func.count(Follow.follower_id) % 2 == 1)
+    # Recupera followees con join e group_by corretto
+    if page * limit <= number_followees + limit:
+        followee_query = (
+            db.session.query(Follow.follower_id, User_mgmt.username, User_mgmt.id)
+            .filter(Follow.user_id == user_id, Follow.follower_id != user_id)
             .join(User_mgmt, Follow.follower_id == User_mgmt.id)
-            .add_columns(User_mgmt.username, User_mgmt.id)
+            .group_by(Follow.follower_id, User_mgmt.username, User_mgmt.id)
+            .having(func.count(Follow.follower_id) % 2 == 1)
             .paginate(page=page, per_page=limit, error_out=False)
         )
 
-        for f in followee.items:
+        for f in followee_query.items:
+            uid_f = f.id
             followee_list.append(
                 {
-                    "id": f.id,
+                    "id": uid_f,
                     "username": f.username,
-                    "number_reactions": len(
-                        list(Reactions.query.filter_by(user_id=f.id))
+                    "number_reactions": Reactions.query.filter_by(user_id=uid_f).count(),
+                    "number_followers": (
+                        db.session.query(Follow.user_id)
+                        .filter(Follow.follower_id == uid_f, Follow.user_id != uid_f)
+                        .group_by(Follow.user_id)
+                        .having(func.count(Follow.user_id) % 2 == 1)
+                        .count()
                     ),
-                    "number_followers": len(
-                        list(
-                            Follow.query.filter(
-                                Follow.follower_id == f.id, Follow.user_id != f.id
-                            )
-                            .group_by(Follow.user_id)
-                            .having(func.count(Follow.user_id) % 2 == 1)
-                        )
-                    ),
-                    "number_followees": len(
-                        list(
-                            Follow.query.filter(
-                                Follow.user_id == f.id, Follow.follower_id != f.id
-                            )
-                            .group_by(Follow.follower_id)
-                            .having(func.count(Follow.follower_id) % 2 == 1)
-                        )
+                    "number_followees": (
+                        db.session.query(Follow.follower_id)
+                        .filter(Follow.user_id == uid_f, Follow.follower_id != uid_f)
+                        .group_by(Follow.follower_id)
+                        .having(func.count(Follow.follower_id) % 2 == 1)
+                        .count()
                     ),
                 }
             )
 
-    if number_followers - page * limit < limit:
-        followers = (
-            Follow.query.filter(
-                Follow.follower_id == user_id, Follow.user_id != user_id
-            )
-            .group_by(Follow.user_id)
-            .having(func.count(Follow.follower_id) % 2 == 1)
+    # Recupera followers con join e group_by corretto
+    if page * limit <= number_followers + limit:
+        followers_query = (
+            db.session.query(Follow.user_id, User_mgmt.username, User_mgmt.id)
+            .filter(Follow.follower_id == user_id, Follow.user_id != user_id)
             .join(User_mgmt, Follow.user_id == User_mgmt.id)
-            .add_columns(User_mgmt.username, User_mgmt.id)
+            .group_by(Follow.user_id, User_mgmt.username, User_mgmt.id)
+            .having(func.count(Follow.user_id) % 2 == 1)
             .paginate(page=page, per_page=limit, error_out=False)
         )
 
-        for f in followers.items:
+        for f in followers_query.items:
+            uid_f = f.id
             followers_list.append(
                 {
-                    "id": f.id,
+                    "id": uid_f,
                     "username": f.username,
-                    "number_reactions": len(
-                        list(Reactions.query.filter_by(user_id=f.id))
+                    "number_reactions": Reactions.query.filter_by(user_id=uid_f).count(),
+                    "number_followers": (
+                        db.session.query(Follow.user_id)
+                        .filter(Follow.follower_id == uid_f, Follow.user_id != uid_f)
+                        .group_by(Follow.user_id)
+                        .having(func.count(Follow.user_id) % 2 == 1)
+                        .count()
                     ),
-                    "number_followers": len(
-                        list(
-                            Follow.query.filter(
-                                Follow.follower_id == f.id, Follow.user_id != f.id
-                            )
-                            .group_by(Follow.user_id)
-                            .having(func.count(Follow.user_id) % 2 == 1)
-                        )
-                    ),
-                    "number_followees": len(
-                        list(
-                            Follow.query.filter(
-                                Follow.user_id == f.id, Follow.follower_id != f.id
-                            )
-                            .group_by(Follow.follower_id)
-                            .having(func.count(Follow.follower_id) % 2 == 1)
-                        )
+                    "number_followees": (
+                        db.session.query(Follow.follower_id)
+                        .filter(Follow.user_id == uid_f, Follow.follower_id != uid_f)
+                        .group_by(Follow.follower_id)
+                        .having(func.count(Follow.follower_id) % 2 == 1)
+                        .count()
                     ),
                 }
             )
 
     return followers_list, followee_list, number_followers, number_followees
+
 
 
 def get_trending_emotions(limit=10, window=120):
@@ -556,27 +534,26 @@ def get_trending_emotions(limit=10, window=120):
     """
 
     # get current round
-    last_round = Rounds.query.order_by(desc(Rounds.id)).first()
-
-    if last_round is not None:
-        last_round = last_round.id
-    else:
-        last_round = 0
+    last_round_obj = Rounds.query.order_by(desc(Rounds.id)).first()
+    last_round = last_round_obj.id if last_round_obj else 0
 
     # get the trending emotions
     em = (
-        Post.query.join(Post_emotions, Post.id == Post_emotions.post_id)
+        db.session.query(
+            Emotions.id,
+            Emotions.emotion,
+            func.count(Post_emotions.emotion_id).label("count")
+        )
+        .join(Post_emotions, Post_emotions.emotion_id == Emotions.id)
+        .join(Post, Post.id == Post_emotions.post_id)
         .filter(Post.round >= last_round - window)
-        .join(Emotions, Post_emotions.emotion_id == Emotions.id)
-        .add_columns(Emotions.emotion)
-        .group_by(Emotions.emotion)
-        .add_columns(func.count(Post_emotions.emotion_id))
-        .add_columns(Emotions.id)
-        .order_by(desc(func.count(Post_emotions.emotion_id)))
+        .group_by(Emotions.id, Emotions.emotion)
+        .order_by(desc("count"))
         .limit(limit)
     ).all()
 
-    em = [{"emotion": e[1], "count": e[2], "id": e[3]} for e in em]
+    # format result
+    em = [{"emotion": e[1], "count": e[2], "id": e[0]} for e in em]
 
     return em
 
@@ -590,28 +567,29 @@ def get_trending_hashtags(limit=10, window=120):
 
     # get current round
 
-    last_round = Rounds.query.order_by(desc(Rounds.id)).first()
-    if last_round is not None:
-        last_round = last_round.id
-    else:
-        last_round = 0
+    last_round_obj = Rounds.query.order_by(desc(Rounds.id)).first()
+    last_round = last_round_obj.id if last_round_obj else 0
 
     ht = (
-        Post.query.join(Post_hashtags, Post.id == Post_hashtags.post_id)
+        db.session.query(
+            Hashtags.id,
+            Hashtags.hashtag,
+            func.count(Post_hashtags.hashtag_id).label("count")
+        )
+        .join(Post_hashtags, Post_hashtags.hashtag_id == Hashtags.id)
+        .join(Post, Post.id == Post_hashtags.post_id)
         .filter(Post.round >= last_round - window)
-        .join(Hashtags, Post_hashtags.hashtag_id == Hashtags.id)
-        .add_columns(Hashtags.hashtag)
-        .group_by(Hashtags.hashtag)
-        .add_columns(func.count(Post_hashtags.hashtag_id))
-        .order_by(desc(func.count(Post_hashtags.hashtag_id)))
+        .group_by(Hashtags.id, Hashtags.hashtag)
+        .order_by(desc("count"))
         .limit(limit)
-    ).all()
+        .all()
+    )
 
     ht = [
         {
             "hashtag": h[1],
             "count": h[2],
-            "id": Hashtags.query.filter_by(hashtag=h[1]).first().id,
+            "id": h[0],
         }
         for h in ht
     ]
@@ -621,35 +599,26 @@ def get_trending_hashtags(limit=10, window=120):
 
 def get_trending_topics(limit=10, window=120):
     # get current round
-    last_round = Rounds.query.order_by(desc(Rounds.id)).first()
-    if last_round is not None:
-        last_round = last_round.id
-    else:
-        last_round = 0
+    last_round_obj = Rounds.query.order_by(desc(Rounds.id)).first()
+    last_round = last_round_obj.id if last_round_obj else 0
 
-    # get the trending topics
+    # query trending topics
     tp = (
-        Post.query.join(Post_topics, Post.id == Post_topics.post_id)
+        db.session.query(
+            Interests.iid,
+            Interests.interest,
+            func.count(Post_topics.topic_id).label("count")
+        )
+        .join(Post_topics, Post_topics.topic_id == Interests.iid)
+        .join(Post, Post.id == Post_topics.post_id)
         .filter(Post.round >= last_round - window)
-        .join(Interests, Post_topics.topic_id == Interests.iid)
-        .add_columns(Interests.interest)
-        .group_by(Interests.interest)
-        .add_columns(func.count(Post_topics.topic_id))
-        .order_by(desc(func.count(Post_topics.topic_id)))
+        .group_by(Interests.iid, Interests.interest)
+        .order_by(desc("count"))
         .limit(limit)
-    ).all()
+        .all()
+    )
 
-    tp = [
-        {
-            "topic": t[1],
-            "count": t[2],
-            "id": Interests.query.filter_by(interest=t[1]).first().iid,
-        }
-        for t in tp
-    ]
-
-    # ht = [{"hashtag": h[1], "count": h[2], "id": Hashtags.query.filter_by(hashtag=h[1]).first().id} for h in ht]
-    return tp
+    return [{"id": t[0], "topic": t[1], "count": t[2]} for t in tp]
 
 
 def get_posts_associated_to_hashtags(hashtag_id, page, per_page=10, current_user=None):
@@ -1218,35 +1187,29 @@ def get_posts_associated_to_emotion(emotion_id, page, per_page=10, current_user=
 
     return res
 
-
 def get_user_recent_interests(user_id, limit=5):
-    """
-    Get the recent interests of the user.
-    :param user_id:
-    :param limit:
-    :return:
-    """
-
     last_round = Rounds.query.order_by(desc(Rounds.id)).first()
-    if last_round is not None:
-        last_round = last_round.id
-    else:
-        last_round = 0
-    # get the most recent interests of the user by frequency
-    interests = (
-        User_interest.query.filter_by(user_id=user_id)
-        .join(User_interest, Interests.iid == User_interest.interest_id)
-        .add_columns(Interests.interest)
-        .filter(User_interest.round_id >= last_round - 36)
-        .group_by(Interests.interest)
-        .add_columns(func.count(User_interest.interest_id))
-        .order_by(desc(func.count(User_interest.interest_id)))
-        .limit(limit)
-    ).all()
+    last_round_id = last_round.id if last_round else 0
 
-    res = [
-        (interest[1], interest[0].interest_id, interest[2]) for interest in interests
-    ]
+    interests = (
+        db.session.query(
+            Interests.interest,
+            User_interest.interest_id,
+            func.count(User_interest.interest_id).label("count"),
+        )
+        .join(User_interest, Interests.iid == User_interest.interest_id)
+        .filter(
+            User_interest.user_id == user_id,
+            User_interest.round_id >= last_round_id - 36,
+        )
+        .group_by(Interests.interest, User_interest.interest_id)
+        .order_by(desc("count"))
+        .limit(limit)
+        .all()
+    )
+
+    # interests è lista di tuple (interest, interest_id, count)
+    res = [(interest, interest_id, count) for interest, interest_id, count in interests]
 
     return res
 

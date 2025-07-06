@@ -11,7 +11,7 @@ from y_web.utils import (
 
 from y_web.utils.miscellanea import ollama_status
 
-from .utils import check_privileges
+from .utils import check_privileges, get_db_type, get_db_port, check_connection, get_db_server
 
 
 admin = Blueprint("admin", __name__)
@@ -53,6 +53,11 @@ def dashboard():
     ollama_pulls = Ollama_Pull.query.all()
     ollama_pulls = [(pull.model_name, float(pull.status)) for pull in ollama_pulls]
 
+    dbtype = get_db_type()
+    dbport = get_db_port()
+    db_conn = check_connection()
+    db_server = get_db_server()
+
     return render_template(
         "admin/dashboard.html",
         experiments=res,
@@ -60,6 +65,10 @@ def dashboard():
         models=models,
         active_pulls=ollama_pulls,
         len=len,
+        dbtype=dbtype,
+        dbport=dbport,
+        db_conn=db_conn,
+        db_server=db_server,
     )
 
 

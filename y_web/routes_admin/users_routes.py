@@ -7,7 +7,9 @@ from y_web.models import Exps, Admin_users, User_mgmt, User_Experiment
 
 from y_web.utils import get_ollama_models
 
-from y_web import db, app
+from y_web import db#, app
+from flask import current_app
+
 from y_web.utils.miscellanea import check_privileges, ollama_status
 
 
@@ -186,7 +188,10 @@ def add_user_to_experiment():
     exp = Exps.query.filter_by(idexp=experiment_id).first()
 
     BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-    app.config["SQLALCHEMY_BINDS"]["db_exp"] = f"sqlite:///{BASE_DIR}/{exp.db_name}"
+
+    #app.config["SQLALCHEMY_BINDS"]["db_exp"] = f"sqlite:///{BASE_DIR}/{exp.db_name}"
+
+    current_app.config["SQLALCHEMY_BINDS"]["db_exp"] = f"sqlite:///{BASE_DIR}/{exp.db_name}"
 
     # check if the user is present in the User_mgmt table
     user_exp = db.session.query(User_mgmt).filter_by(username=user.username).first()

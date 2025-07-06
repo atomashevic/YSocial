@@ -10,13 +10,101 @@ from multiprocessing import Process
 import traceback
 from y_web.models import (
     Client_Execution,
-    Ollama_Pull, Exps,
+    Ollama_Pull
 )
+
+from flask import current_app
 from y_web import db, client_processes
 import requests
 from ollama import Client as oclient
 import concurrent
 import numpy as np
+
+import os
+import sys
+import subprocess
+from pathlib import Path
+import shutil
+
+
+import os
+import sys
+import shutil
+import subprocess
+from pathlib import Path
+
+
+def detect_env_handler():
+    python_exe = sys.executable
+    env_type = None
+    env_name = None
+    env_bin = None
+    conda_sh = None
+
+    # Check for conda
+    conda_prefix = os.environ.get("CONDA_PREFIX")
+    if conda_prefix:
+        env_type = "conda"
+        env_name = os.environ.get("CONDA_DEFAULT_ENV") or Path(conda_prefix).name
+        env_bin = Path(conda_prefix) / "bin"
+
+        # Use CONDA_PREFIX to locate the conda base
+        conda_base = Path(conda_prefix).resolve().parent  # this goes one up to base
+
+        # Handle cases like /Users/foo/miniforge3/envs/Y2
+        if (conda_base / "etc" / "profile.d" / "conda.sh").exists():
+            conda_sh = conda_base / "etc" / "profile.d" / "conda.sh"
+        else:
+            # fallback: check via `which conda`
+            conda_exe = shutil.which("conda")
+            if conda_exe:
+                conda_base = Path(conda_exe).resolve().parent.parent
+                maybe_sh = conda_base / "etc" / "profile.d" / "conda.sh"
+                if maybe_sh.exists():
+                    conda_sh = maybe_sh
+
+        print(f"Detected conda environment: {env_name} at {env_bin}")
+
+        return env_type, env_name, str(env_bin), str(conda_sh) if conda_sh else None
+
+    # Check for pipenv
+    if os.environ.get("PIPENV_ACTIVE"):
+        env_type = "pipenv"
+        env_name = os.path.basename(os.path.dirname(python_exe))
+        env_bin = Path(python_exe).parent
+        return env_type, env_name, str(env_bin), None
+
+    # Check for venv
+    venv_path = os.environ.get("VIRTUAL_ENV")
+    if venv_path:
+        env_type = "venv"
+        env_name = os.path.basename(venv_path)
+        env_bin = Path(venv_path) / "bin"
+        return env_type, env_name, str(env_bin), None
+
+    # System Python
+    return "system", None, str(Path(python_exe).parent), None
+
+
+def build_screen_command(script_path, config_path, screen_name=None):
+    env_type, env_name, env_bin, conda_sh = detect_env_handler()
+    screen_name = screen_name or env_name or "experiment"
+
+    if env_type == "conda" and conda_sh:
+        command = (
+            f"screen -dmS {screen_name} bash -c "
+            f"'source \"{conda_sh}\" && conda activate {env_name} && "
+            f"python \"{script_path}\" -c \"{config_path}\"'"
+        )
+    elif env_type in ("venv", "pipenv"):
+        command = (
+            f"screen -dmS {screen_name} bash -c "
+            f"'source \"{env_bin}/activate\" && python \"{script_path}\" -c \"{config_path}\"'"
+        )
+    else:  # system
+        command = f"screen -dmS {screen_name} python \"{script_path}\" -c \"{config_path}\""
+
+    return command
 
 
 def terminate_process_on_port(port):
@@ -51,24 +139,55 @@ def start_server(exp):
     yserver_path = os.path.dirname(os.path.abspath(__file__)).split("y_web")[0]
     sys.path.append(f"{yserver_path}{os.sep}external{os.sep}YServer{os.sep}")
     BASE_DIR = os.path.dirname(os.path.abspath(__file__)).split("utils")[0]
-    config = f"{yserver_path}y_web{os.sep}{exp.db_name.split('database_server.db')[0]}config_server.json"
-    exp_uid = exp.db_name.split(os.sep)[1]
+
+    if "database_server.db" in exp.db_name:
+        config = f"{yserver_path}y_web{os.sep}{exp.db_name.split('database_server.db')[0]}config_server.json"
+        exp_uid = exp.db_name.split(os.sep)[1]
+    else:
+        uid = exp.db_name.removeprefix('experiments_')
+        exp_uid = f"{uid}{os.sep}"
+        config = f"{yserver_path}y_web{os.sep}experiments{os.sep}{exp_uid}config_server.json"
 
     if exp.platform_type == "microblogging":
-        flask_command = f"python {yserver_path}external{os.sep}YServer{os.sep}y_server_run.py -c {config}"
+        screen_command = build_screen_command(
+            script_path=f"{yserver_path}external{os.sep}YServer{os.sep}y_server_run.py",
+            config_path=f"{config}",
+            screen_name=f"{exp_uid.replace(f'{os.sep}', '')}"
+        )
+
     elif exp.platform_type == "forum":
-        flask_command = f"python {yserver_path}external{os.sep}YServerReddit{os.sep}y_server_run.py -c {config}"
+        screen_command = build_screen_command(
+            script_path=f"{yserver_path}external{os.sep}YServerReddit{os.sep}y_server_run.py",
+            config_path=f"{config}",
+            screen_name=f"{exp_uid.replace(f'{os.sep}', '')}"
+        )
+        #subprocess.run(cmd, shell=True, check=True)
     else:
         raise NotImplementedError(f"Unsupported platform {exp.platform_type}")
 
     # Command to run in the detached screen
-    screen_command = f"screen -dmS {exp_uid} {flask_command}"
+    #screen_command = f"screen -dmS {exp_uid.replace(f'{os.sep}', '')} {flask_command}"
+    print(screen_command)
+
     print(f"Starting server for experiment {exp_uid}...")
     subprocess.run(screen_command, shell=True, check=True)
 
+    # identify the db to be set
+    db_uri_main = current_app.config["SQLALCHEMY_DATABASE_URI"]
+
+    db_type = "sqlite"
+    if db_uri_main.startswith("postgresql"):
+        db_type = "postgresql"
+
+    if db_type == "sqlite":
+        db_uri = f"{BASE_DIR[1:]}{exp.db_name}"  # change this to the postgres URI
+    elif db_type == "postgresql":
+        old_db_name = db_uri_main.split("/")[-1]
+        db_uri = db_uri_main.replace(old_db_name, exp.db_name)
+
     # Wait for the server to start
-    time.sleep(10)
-    data = {"path": f"{BASE_DIR[1:]}{exp.db_name}"}
+    time.sleep(15)
+    data = {"path": f"{db_uri}"}
     headers = {"Content-Type": "application/json"}
     ns = f"http://{exp.server}:{exp.port}/change_db"
     post(f"{ns}", headers=headers, data=json.dumps(data))
@@ -198,11 +317,11 @@ def terminate_client(cli, pause=False):
     process.join()
 
     # update client execution object
-    if not pause:
-        ce = Client_Execution.query.filter_by(client_id=cli.id).first()
-        ce.expected_duration_rounds = 0
-        ce.elapsed_time = 0
-        db.session.commit()
+    #if not pause:
+    #    ce = Client_Execution.query.filter_by(client_id=cli.id).first()
+    #    ce.expected_duration_rounds = 0
+    #    ce.elapsed_time = 0
+    #    db.session.commit()
 
 
 def start_client(exp, cli, population, resume=False):
@@ -220,84 +339,83 @@ def start_client(exp, cli, population, resume=False):
 
 
 def start_client_process(exp, cli, population, resume=False):
-    """
-    Start the y_client
+    from y_web import create_app, db
+    from y_web.models import Client_Execution
+    import os, sys, json
 
-    :param exp:
-    :param cli:
-    :param population:
-    :return:
-    """
+    app = create_app()  # create app instance for this subprocess
 
-    yclient_path = os.path.dirname(os.path.abspath(__file__)).split("y_web")[0]
+    with app.app_context():
+        yclient_path = os.path.dirname(os.path.abspath(__file__)).split("y_web")[0]
 
-    if exp.platform_type == "microblogging":
-        sys.path.append(f"{yclient_path}{os.sep}external{os.sep}YClient/")
-        from y_client.clients import YClientWeb
+        if exp.platform_type == "microblogging":
+            sys.path.append(f"{yclient_path}{os.sep}external{os.sep}YClient/")
+            from y_client.clients import YClientWeb
+        elif exp.platform_type == "forum":
+            sys.path.append(f"{yclient_path}{os.sep}external{os.sep}YClientReddit/")
+            from y_client.clients import YClientWeb
+        else:
+            raise NotImplementedError(f"Unsupported platform {exp.platform_type}")
 
-    elif exp.platform_type == "forum":
-        sys.path.append(f"{yclient_path}{os.sep}external{os.sep}YClientReddit/")
-        from y_client.clients import YClientWeb
-    else:
-        raise NotImplementedError(f"Unsupported platform {exp.platform_type}")
+        # get experiment base path
+        BASE_DIR = os.path.dirname(os.path.abspath(__file__)).split("utils")[0]
 
-    # get experiment base path
-    BASE_DIR = os.path.dirname(os.path.abspath(__file__)).split("utils")[0]
-    # get the experiment configuration
-    uid = exp.db_name.split(os.sep)[1]
-    data_base_path = f"{BASE_DIR}experiments{os.sep}{uid}{os.sep}"
-    config_file = json.load(
-        open(f"{data_base_path}client_{cli.name}-{population.name}.json")
-    )
+        # postgres
+        if "experiments_" in exp.db_name:
+            uid = exp.db_name.removeprefix('experiments_')
+            filename = f"{BASE_DIR}experiments{os.sep}{uid}{os.sep}{population.name.replace(' ', '')}.json".replace(
+                "utils/", ""
+            )
+            print(filename)
+        else:
+            uid = exp.db_name.split(os.sep)[1]
+            filename = f"{BASE_DIR}{os.sep}{exp.db_name.split('database_server.db')[0]}{population.name.replace(' ', '')}.json".replace(
+                "utils/", ""
+            )
 
-    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-    filename = f"{BASE_DIR}{os.sep}{exp.db_name.split('database_server.db')[0]}{population.name.replace(' ', '')}.json".replace(
-        "utils/", ""
-    )
-
-    # check if a Client_Execution object exists for client_id
-    ce = Client_Execution.query.filter_by(client_id=cli.id).first()
-    if ce:
-        if not resume:
-            ce.elapsed_time = 0
-            ce.expected_duration_rounds = cli.days * 24
-        first_run = False
-
-    else:
-        first_run = True
-
-        # create a client execution object
-        ce = Client_Execution(
-            client_id=cli.id,
-            elapsed_time=0,
-            expected_duration_rounds=cli.days * 24,
-            last_active_hour=-1,
-            last_active_day=-1,
+        data_base_path = f"{BASE_DIR}experiments{os.sep}{uid}{os.sep}"
+        config_file = json.load(
+            open(f"{data_base_path}client_{cli.name}-{population.name}.json")
         )
-        db.session.add(ce)
-        db.session.commit()
 
-    # add the network file if it is the first run (and the network is specified for the client)
-    if first_run and cli.network_type is not None and cli.network_type != "":
-        path = f"{cli.name}_network.csv"
-        cl = YClientWeb(config_file, data_base_path, first_run=first_run, network=path)
-    else:
-        cl = YClientWeb(config_file, data_base_path, first_run=first_run)
+        # DB query requires app context
+        ce = Client_Execution.query.filter_by(client_id=cli.id).first()
+        if ce:
+            if not resume:
+                ce.elapsed_time = 0
+                ce.expected_duration_rounds = cli.days * 24
+            first_run = False
+        else:
+            first_run = True
+            ce = Client_Execution(
+                client_id=cli.id,
+                elapsed_time=0,
+                expected_duration_rounds=cli.days * 24,
+                last_active_hour=-1,
+                last_active_day=-1,
+            )
+            db.session.add(ce)
+            db.session.commit()
 
-    if resume:
-        cl.days = int((ce.expected_duration_rounds - ce.elapsed_time) / 24)
+        if first_run and cli.network_type:
+            path = f"{cli.name}_network.csv"
+            cl = YClientWeb(config_file, data_base_path, first_run=first_run, network=path)
+        else:
+            cl = YClientWeb(config_file, data_base_path, first_run=first_run)
 
-    cl.read_agents()
-    cl.add_feeds()
+        if resume:
+            cl.days = int((ce.expected_duration_rounds - ce.elapsed_time) / 24)
 
-    if first_run and cli.network_type is not None and cli.network_type != "":
-        cl.add_network()
+        cl.read_agents()
+        cl.add_feeds()
 
-    # check if filename exists
-    if not os.path.exists(filename):
-        cl.save_agents(filename)
+        if first_run and cli.network_type:
+            cl.add_network()
 
-    run_simulation(cl, cli.id, filename, exp)
+        if not os.path.exists(filename):
+            cl.save_agents(filename)
+
+        run_simulation(cl, cli.id, filename, exp)
 
 
 def run_simulation(cl, cli_id, agent_file, exp):

@@ -1,58 +1,42 @@
-from y_web import app, db
+from y_web import create_app, db
+from argparse import ArgumentParser
 
 
-def start_app(debug=False, host="localhost", port=8080):
-    """
-    Start the app
-
-    :param debug: turn on debug mode
-    :param port: the port to run the app on
-    :param host: the host to run the app on
-    """
-
+def start_app(db_type="sqlite", debug=False, host="localhost", port=8080):
     import nltk
-
     nltk.download("vader_lexicon")
 
-    # unload all experiments
-    from y_web.models import Exps
+    app = create_app(db_type=db_type)
 
-    # select all loaded experiments
-    exps = Exps.query.filter_by(status=1).all()
-    # stop all the experiments
-    for exp in exps:
-        exp.status = 0
-    db.session.commit()
+    with app.app_context():
+        from y_web.models import Exps
+
+        exps = Exps.query.filter_by(status=1).all()
+        for exp in exps:
+            exp.status = 0
+        db.session.commit()
 
     app.run(debug=debug, host=host, port=port)
 
 
 if __name__ == "__main__":
-    from argparse import ArgumentParser
-
     parser = ArgumentParser()
 
     parser.add_argument(
-        "-x",
-        "--host",
-        default=f"localhost",
-        help="host address to run the app on",
+        "-x", "--host", default="localhost", help="host address to run the app on"
     )
-
+    parser.add_argument("-y", "--port", default="8080", help="port to run the app on")
     parser.add_argument(
-        "-y",
-        "--port",
-        default=f"8080",
-        help="port to run the app on",
+        "-d", "--debug", default=False, action="store_true", help="debug mode"
     )
-
     parser.add_argument(
-        "-d",
-        "--debug",
-        default=False,
-        help="whether to run the app in debug mode",
+        "-D",
+        "--db",
+        choices=["sqlite", "postgresql"],
+        default="sqlite",
+        help="Database type",
     )
 
     args = parser.parse_args()
 
-    start_app(debug=args.debug, host=args.host, port=args.port)
+    start_app(db_type=args.db, debug=args.debug, host=args.host, port=args.port)

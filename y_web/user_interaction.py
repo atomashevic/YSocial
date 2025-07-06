@@ -19,7 +19,7 @@ from .models import (
     Images,
     Post_Sentiment,
     Articles,
-    Websites
+    Websites,
 )
 from flask import request
 from .llm_annotations import ContentAnnotator, Annotator
@@ -282,7 +282,7 @@ def publish_post_reddit():
     img_id = None
     if url is not None and url != "":
         # Check if URL is likely an image based on extension
-        image_extensions = ('.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp', '.svg')
+        image_extensions = (".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp", ".svg")
         is_image_url = url.lower().endswith(image_extensions)
 
         if is_image_url:
@@ -312,8 +312,13 @@ def publish_post_reddit():
 
     # Handle article URL storage
     news_id = None
-    if url is not None and url != "" and not url.lower().endswith(
-            ('.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp', '.svg')):
+    if (
+        url is not None
+        and url != ""
+        and not url.lower().endswith(
+            (".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp", ".svg")
+        )
+    ):
         # Check if article already exists
         existing_article = Articles.query.filter_by(link=url).first()
         if existing_article:
@@ -321,30 +326,31 @@ def publish_post_reddit():
         else:
             # Extract article information from URL
             import time
+
             article_info = extract_article_info(url)
 
             # Get or create website entry
-            website = Websites.query.filter_by(name=article_info['source']).first()
+            website = Websites.query.filter_by(name=article_info["source"]).first()
             if not website:
                 website = Websites(
-                    name=article_info['source'],
+                    name=article_info["source"],
                     rss="",
                     leaning="neutral",
                     category="user_shared",
                     last_fetched=int(time.time()),
                     language="en",
-                    country="us"
+                    country="us",
                 )
                 db.session.add(website)
                 db.session.commit()
 
             # Create article entry with extracted information
             article = Articles(
-                title=article_info['title'],
-                summary=article_info['summary'],
+                title=article_info["title"],
+                summary=article_info["summary"],
                 website_id=website.id,
                 link=url,
-                fetched_on=int(time.time())
+                fetched_on=int(time.time()),
             )
             db.session.add(article)
             db.session.commit()
@@ -481,14 +487,16 @@ def publish_comment():
 
     # get sentiment of the post is responding to
     sentiment_root = Post_Sentiment.query.filter_by(post_id=pid).first()
-    values = {
-        "pos": sentiment_root.pos,
-        "neg": sentiment_root.neg,
-        "neu": sentiment_root.neu,
-    }
-    # get the key with the max value
-    sentiment_parent = max(values, key=values.get)
-    sentiment = vader_sentiment(text)
+
+    if sentiment_root is None:
+        values = {
+            "pos": sentiment_root.pos,
+            "neg": sentiment_root.neg,
+            "neu": sentiment_root.neu,
+        }
+        # get the key with the max value
+        sentiment_parent = max(values, key=values.get)
+        sentiment = vader_sentiment(text)
 
     toxicity(text, current_user.username, post.id, db)
 

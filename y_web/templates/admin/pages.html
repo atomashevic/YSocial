@@ -27,102 +27,112 @@
 
                             <script src="https://unpkg.com/gridjs/dist/gridjs.umd.js"></script>
                             <script>
-                                const tableDiv = document.getElementById('table');
+    const tableDiv = document.getElementById('table');
 
-                                const updateUrl = (prev, query) => {
-                                    return prev + (prev.indexOf('?') >= 0 ? '&' : '?') + new URLSearchParams(query).toString();
-                                };
+    const updateUrl = (prev, query) => {
+        return prev + (prev.indexOf('?') >= 0 ? '&' : '?') + new URLSearchParams(query).toString();
+    };
 
-                                const editableCellAttributes = (data, row, col) => {
-                                    if (row) {
-                                        return {contentEditable: 'true', 'data-element-id': row.cells[0].data};
-                                    } else {
-                                        return {};
-                                    }
-                                };
+    const editableCellAttributes = (data, row, col) => {
+        if (row) {
+            return { contentEditable: 'true', 'data-element-id': row.cells[0].data };
+        } else {
+            return {};
+        }
+    };
 
-                                new gridjs.Grid({
-                                    columns: [
-                                        {id: 'id', 'hidden': true},
-                                        {id: 'name', name: 'Name', 'attributes': editableCellAttributes},
-                                        {id: 'descr', name: 'Description'},
-                                        {id: 'page_type', name: 'Type'},
-                                        {
-                                            id: 'details', name: 'Details', formatter: (cell, row) => {
-                                                return gridjs.html(`<a href="/admin/page_details/${row.cells[0].data}">Details</a>`);
-                                            }
-                                        },
-                                    ],
-                                    server: {
-                                        url: '/admin/pages_data',
-                                        then: results => results.data,
-                                        total: results => results.total,
-                                    },
-                                    search: {
-                                        enabled: true,
-                                        server: {
-                                            url: (prev, search) => {
-                                                return updateUrl(prev, {search});
-                                            },
-                                        },
-                                    },
-                                    sort: {
-                                        enabled: true,
-                                        multiColumn: true,
-                                        server: {
-                                            url: (prev, columns) => {
-                                                const columnIds = ['id', 'name', 'type', 'description'];
-                                                const sort = columns.map(col => (col.direction === 1 ? '+' : '-') + columnIds[col.index]);
-                                                return updateUrl(prev, {sort});
-                                            },
-                                        },
-                                    },
-                                    pagination: {
-                                        enabled: true,
-                                        server: {
-                                            url: (prev, page, limit) => {
-                                                return updateUrl(prev, {start: page * limit, length: limit});
-                                            },
-                                        },
-                                    },
-                                }).render(tableDiv);
+    new gridjs.Grid({
+        columns: [
+            { id: 'id', hidden: true },
+            { id: 'name', name: 'Name', attributes: editableCellAttributes },
+            { id: 'descr', name: 'Description' },
+            { id: 'page_type', name: 'Type' },
+            {
+                id: 'details',
+                name: 'Details',
+                formatter: (cell, row) => {
+                    return gridjs.html(`
+                        <div style="display: flex; justify-content: center;">
+                            <a href="/admin/page_details/${row.cells[0].data}"
+                               style="background-color: #28a745; color: white; padding: 6px 12px; border-radius: 4px; text-decoration: none; font-size: 0.85rem;">
+                                Details
+                            </a>
+                        </div>
+                    `);
+                }
+            },
+        ],
+        server: {
+            url: '/admin/pages_data',
+            then: results => results.data,
+            total: results => results.total,
+        },
+        search: {
+            enabled: true,
+            server: {
+                url: (prev, search) => {
+                    return updateUrl(prev, { search });
+                },
+            },
+        },
+        sort: {
+            enabled: true,
+            multiColumn: true,
+            server: {
+                url: (prev, columns) => {
+                    const columnIds = ['id', 'name', 'type', 'description'];
+                    const sort = columns.map(col => (col.direction === 1 ? '+' : '-') + columnIds[col.index]);
+                    return updateUrl(prev, { sort });
+                },
+            },
+        },
+        pagination: {
+            enabled: true,
+            server: {
+                url: (prev, page, limit) => {
+                    return updateUrl(prev, { start: page * limit, length: limit });
+                },
+            },
+        },
+    }).render(tableDiv);
 
-                                let savedValue;
+    let savedValue;
 
-                                tableDiv.addEventListener('focusin', ev => {
-                                    if (ev.target.tagName === 'TD') {
-                                        savedValue = ev.target.textContent;
-                                    }
-                                });
+    tableDiv.addEventListener('focusin', ev => {
+        if (ev.target.tagName === 'TD') {
+            savedValue = ev.target.textContent;
+        }
+    });
 
-                                tableDiv.addEventListener('focusout', ev => {
-                                    if (ev.target.tagName === 'TD') {
-                                        if (savedValue !== ev.target.textContent) {
-                                            fetch('/admin/pages_data', {
-                                                method: 'POST',
-                                                headers: {'Content-Type': 'application/json'},
-                                                body: JSON.stringify({
-                                                    id: ev.target.dataset.elementId,
-                                                    [ev.target.dataset.columnId]: ev.target.textContent
-                                                }),
-                                            });
-                                        }
-                                        savedValue = undefined;
-                                    }
-                                });
+    tableDiv.addEventListener('focusout', ev => {
+        if (ev.target.tagName === 'TD') {
+            if (savedValue !== ev.target.textContent) {
+                fetch('/admin/pages_data', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        id: ev.target.dataset.elementId,
+                        [ev.target.dataset.columnId]: ev.target.textContent
+                    }),
+                });
+            }
+            savedValue = undefined;
+        }
+    });
 
-                                tableDiv.addEventListener('keydown', ev => {
-                                    if (ev.target.tagName === 'TD') {
-                                        if (ev.key === 'Escape') {
-                                            ev.target.textContent = savedValue;
-                                            ev.target.blur();
-                                        } else if (ev.key === 'Enter') {
-                                            ev.preventDefault();
-                                            ev.target.blur();
-                                        }
-                                    }
-                                });
-                            </script>
+    tableDiv.addEventListener('keydown', ev => {
+        if (ev.target.tagName === 'TD') {
+            if (ev.key === 'Escape') {
+                ev.target.textContent = savedValue;
+                ev.target.blur();
+            } else if (ev.key === 'Enter') {
+                ev.preventDefault();
+                ev.target.blur();
+            }
+        }
+    });
+</script>
+
 
                             <div class="box-lines">
 

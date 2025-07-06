@@ -38,7 +38,8 @@ from y_web.utils import terminate_process_on_port, start_server
 import json
 import pathlib, shutil
 import uuid
-from y_web import db, app
+from y_web import db#, app
+from flask import current_app
 from y_web.utils.miscellanea import check_privileges, reload_current_user, ollama_status
 
 experiments = Blueprint("experiments", __name__)
@@ -56,15 +57,17 @@ def settings():
     # check if current db is the same of the active experiment
     exp = Exps.query.filter_by(status=1).first()
     if exp:
-        active_db = app.config["SQLALCHEMY_BINDS"]["db_exp"]
-        if not exp.exp_name in active_db:
+        active_db = current_app.config["SQLALCHEMY_BINDS"]["db_exp"]
+        if exp.exp_name not in active_db:
             # change the active experiment
             db.session.query(Exps).filter_by(status=1).update({Exps.status: 0})
 
     ollamas = ollama_status()
 
+    dbtype = current_app.config["SQLALCHEMY_DATABASE_URI"].split(":")[0]
+
     return render_template(
-        "admin/settings.html", experiments=experiments, users=users, ollamas=ollamas
+        "admin/settings.html", experiments=experiments, users=users, ollamas=ollamas, dbtype=dbtype
     )
 
 
@@ -103,7 +106,17 @@ def change_active_experiment(exp_id):
     exp = Exps.query.filter_by(idexp=exp_id).first()
 
     BASE_DIR = os.path.dirname(os.path.abspath(__file__)).split("routes_admin")[0]
-    app.config["SQLALCHEMY_BINDS"]["db_exp"] = f"sqlite:///{BASE_DIR}/{exp.db_name}"
+    # check the database type in the URI
+    if current_app.config["SQLALCHEMY_DATABASE_URI"].startswith("postgresql"):
+        new_db = '/'.join(current_app.config['SQLALCHEMY_DATABASE_URI'].rsplit('/', 1)[:-1] + [exp.db_name])
+        # if postgresql, set the bind to the postgresql database
+        current_app.config["SQLALCHEMY_BINDS"]["db_exp"] = new_db
+    elif current_app.config["SQLALCHEMY_DATABASE_URI"].startswith("sqlite"):
+        current_app.config["SQLALCHEMY_BINDS"]["db_exp"] = f"sqlite:///{BASE_DIR}/{exp.db_name}"
+
+    else:
+        flash("Unsupported database type. Please use SQLite or PostgreSQL.")
+        return redirect(request.referrer)
 
     # check if the user is present in the User_mgmt table
     user = db.session.query(User_mgmt).filter_by(username=current_user.username).first()
@@ -452,17 +465,102 @@ def create_experiment():
     perspective_api = request.form.get("perspective_api")
     topics = request.form.get("tags").split(",")
 
-    uid = uuid.uuid4()
+    # identify db type
+    db_type = "sqlite"
+    if current_app.config["SQLALCHEMY_DATABASE_URI"].startswith("postgresql"):
+        db_type = "postgresql"
+
+    uid = str(uuid.uuid4()).replace("-", "_")
     pathlib.Path(f"y_web{os.sep}experiments{os.sep}{uid}").mkdir(
         parents=True, exist_ok=True
     )
 
     # copy the clean database to the experiments folder
     if platform_type == "microblogging" or platform_type == "forum":
-        shutil.copyfile(
-            f"data_schema{os.sep}database_clean_server.db",
-            f"y_web{os.sep}experiments{os.sep}{uid}{os.sep}database_server.db",
-        )
+
+        if db_type == "sqlite":
+
+            shutil.copyfile(
+                f"data_schema{os.sep}database_clean_server.db",
+                f"y_web{os.sep}experiments{os.sep}{uid}{os.sep}database_server.db",
+            )
+        elif db_type == "postgresql":
+            from sqlalchemy import text
+            from werkzeug.security import generate_password_hash
+            from urllib.parse import urlparse
+            from sqlalchemy import create_engine
+
+            # Get current URI and parse it
+            current_uri = current_app.config["SQLALCHEMY_DATABASE_URI"]
+            parsed_uri = urlparse(current_uri)
+
+            # Extract components
+            user = parsed_uri.username or "postgres"
+            password = parsed_uri.password or "password"
+            host = parsed_uri.hostname or "localhost"
+            port_db = parsed_uri.port or 5432
+
+            # New database name
+            dbname = f"experiments_{uid}".replace("-", "_")  # PostgreSQL-safe
+            db_uri = f"postgresql://{user}:{password}@{host}:{port_db}/{dbname}"
+
+            # Connect to the default 'postgres' DB to check/create the new one
+            admin_engine = create_engine(f"postgresql://{user}:{password}@{host}:{port_db}/postgres")
+
+            # --- Check and create dummy DB if needed ---
+            with admin_engine.connect() as conn:
+                result = conn.execute(text(f"SELECT 1 FROM pg_database WHERE datname = :dbname"), {"dbname": dbname})
+                db_exists = result.scalar() is not None
+
+            if not db_exists:
+                # CREATE DATABASE must run in AUTOCOMMIT mode
+                with admin_engine.connect().execution_options(isolation_level="AUTOCOMMIT") as conn:
+                    conn.execute(text(f'CREATE DATABASE "{dbname}"'))  # quoted for safety
+
+                # ✅ Now connect to the *newly created* database
+                experiment_engine = create_engine(db_uri)
+                with experiment_engine.connect() as dummy_conn:
+                    # Load schema
+                    schema_path = os.path.join("data_schema", "postgre_server.sql")
+                    with open(schema_path, "r") as schema_file:
+                        schema_sql = schema_file.read()
+                        dummy_conn.execute(text(schema_sql))
+
+                    # Insert initial admin user
+                    hashed_pw = generate_password_hash("test", method="pbkdf2:sha256")
+
+                    stmt = text("""
+                                INSERT INTO user_mgmt (username, email, password, user_type, leaning, age,
+                                                       language, owner, joined_on, frecsys_type,
+                                                       round_actions, toxicity, is_page, daily_activity_level)
+                                VALUES (:username, :email, :password, :user_type, :leaning, :age,
+                                        :language, :owner, :joined_on, :frecsys_type,
+                                        :round_actions, :toxicity, :is_page, :daily_activity_level)
+                                """)
+
+                    dummy_conn.execute(stmt, {
+                        "username": "admin",
+                        "email": "admin@ysocial.com",
+                        "password": hashed_pw,
+                        "user_type": "user",
+                        "leaning": "none",
+                        "age": 0,
+                        "language": "en",
+                        "owner": "admin",
+                        "joined_on": 0,
+                        "frecsys_type": "default",
+                        "round_actions": 3,
+                        "toxicity": "none",
+                        "is_page": 0,
+                        "daily_activity_level": 1,
+                    })
+
+                experiment_engine.dispose()
+
+            admin_engine.dispose()
+
+        else:
+            raise NotImplementedError(f"Unsupported dbms {db_type}")
     else:
         raise NotImplementedError(f"Unsupported platform {platform_type}")
 
@@ -487,7 +585,7 @@ def create_experiment():
     exp = Exps(
         exp_name=exp_name,
         platform_type=platform_type,
-        db_name=f"experiments{os.sep}{uid}{os.sep}database_server.db",
+        db_name=f"experiments{os.sep}{uid}{os.sep}database_server.db" if db_type=="sqlite" else f"experiments_{uid}",
         owner=db.session.query(Admin_users).filter_by(id=owner).first().username,
         exp_descr=exp_descr,
         status=0,
@@ -536,20 +634,36 @@ def delete_simulation(exp_id):
     exp = Exps.query.filter_by(idexp=exp_id).first()
     if exp:
         # remove the experiment folder
-        shutil.rmtree(
-            f"y_web{os.sep}experiments{os.sep}{exp.db_name.split(os.sep)[1]}",
-            ignore_errors=True,
-        )
+        # check database type
+        if current_app.config["SQLALCHEMY_BINDS"]["db_exp"].startswith("sqlite"):
+
+            shutil.rmtree(
+                f"y_web{os.sep}experiments{os.sep}{exp.db_name.split(os.sep)[1]}",
+                ignore_errors=True,
+            )
+        elif current_app.config["SQLALCHEMY_BINDS"]["db_exp"].startswith("postgresql"):
+            shutil.rmtree(
+                f"y_web{os.sep}experiments{os.sep}{exp.db_name.removeprefix('experiments_')}",
+                ignore_errors=True,
+            )
 
         # delete the experiment
         db.session.delete(exp)
         db.session.commit()
 
-        # remove the experiment folder
-        shutil.rmtree(
-            f"y_web{os.sep}experiments{os.sep}{exp.db_name.split(os.sep)[0]}{os.sep}{exp.db_name.split(os.sep)[1]}",
-            ignore_errors=True,
-        )
+        # check database type
+        if current_app.config["SQLALCHEMY_BINDS"]["db_exp"].startswith("sqlite"):
+            # remove the experiment folder
+            shutil.rmtree(
+                f"y_web{os.sep}experiments{os.sep}{exp.db_name.split(os.sep)[0]}{os.sep}{exp.db_name.split(os.sep)[1]}",
+                ignore_errors=True,
+            )
+        elif current_app.config["SQLALCHEMY_BINDS"]["db_exp"].startswith("postgresql"):
+            # remove the experiment folder
+            shutil.rmtree(
+                f"y_web{os.sep}experiments{os.sep}{exp.db_name.removeprefix('experiments_')}",
+                ignore_errors=True,
+            )
 
         # remove populaiton_experiment
         db.session.query(Population_Experiment).filter_by(id_exp=exp_id).delete()
@@ -664,6 +778,13 @@ def experiment_details(uid):
 
     ollamas = ollama_status()
 
+    # check database type
+    dbtype = None
+    if current_app.config["SQLALCHEMY_BINDS"]["db_exp"].startswith("sqlite"):
+        dbtype = "sqlite"
+    elif current_app.config["SQLALCHEMY_BINDS"]["db_exp"].startswith("postgresql"):
+        dbtype = "postgresql"
+
     return render_template(
         "admin/experiment_details.html",
         experiment=experiment,
@@ -671,6 +792,7 @@ def experiment_details(uid):
         users=users,
         len=len,
         ollamas=ollamas,
+        dbtype=dbtype
     )
 
 
@@ -725,7 +847,7 @@ def stop_experiment(uid):
     db.session.query(Exps).filter_by(idexp=uid).update({Exps.running: 0})
     db.session.commit()
 
-    return redirect(request.referrer)  # experiment_details(uid)
+    return experiment_details(uid)
 
 
 @experiments.route("/admin/prompts/<int:uid>")
@@ -1197,7 +1319,7 @@ def topic_data():
     }
 
 
-@app.route('/admin/delete_topic/<int:topic_id>', methods=['DELETE'])
+@experiments.route('/admin/delete_topic/<int:topic_id>', methods=['DELETE'])
 @login_required
 def delete_topic(topic_id):
     check_privileges(current_user.username)
@@ -1211,7 +1333,7 @@ def delete_topic(topic_id):
     return miscellanea()
 
 
-@app.route('/admin/delete_language/<int:language_id>', methods=['DELETE'])
+@experiments.route('/admin/delete_language/<int:language_id>', methods=['DELETE'])
 @login_required
 def delete_language(language_id):
     check_privileges(current_user.username)
@@ -1225,7 +1347,7 @@ def delete_language(language_id):
     return miscellanea()
 
 
-@app.route('/admin/delete_leaning/<int:leaning_id>', methods=['DELETE'])
+@experiments.route('/admin/delete_leaning/<int:leaning_id>', methods=['DELETE'])
 @login_required
 def delete_leaning(leaning_id):
     check_privileges(current_user.username)
@@ -1239,7 +1361,7 @@ def delete_leaning(leaning_id):
     return miscellanea()
 
 
-@app.route('/admin/delete_nationality/<int:nationality_id>', methods=['DELETE'])
+@experiments.route('/admin/delete_nationality/<int:nationality_id>', methods=['DELETE'])
 @login_required
 def delete_nationality(nationality_id):
     check_privileges(current_user.username)
@@ -1253,7 +1375,7 @@ def delete_nationality(nationality_id):
     return miscellanea()
 
 
-@app.route('/admin/delete_education/<int:education_level_id>', methods=['DELETE'])
+@experiments.route('/admin/delete_education/<int:education_level_id>', methods=['DELETE'])
 @login_required
 def delete_education_level(education_level_id):
     check_privileges(current_user.username)
@@ -1267,7 +1389,7 @@ def delete_education_level(education_level_id):
     return miscellanea()
 
 
-@app.route('/admin/delete_profession/<int:profession_id>', methods=['DELETE'])
+@experiments.route('/admin/delete_profession/<int:profession_id>', methods=['DELETE'])
 @login_required
 def delete_profession(profession_id):
     check_privileges(current_user.username)

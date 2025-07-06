@@ -128,7 +128,7 @@ def run_client(uid, idexp):
     db.session.query(Client).filter_by(id=uid).update({Client.status: 1})
     db.session.commit()
 
-    return redirect(request.referrer)
+    return experiment_details(idexp)
 
 
 @clientsr.route("/admin/resume_client/<int:uid>/<int:idexp>")
@@ -468,13 +468,11 @@ def create_client():
     config["agents"]["round_actions"] = {"min": 1, "max": 3}
     config["agents"]["n_interests"] = {"min": 1, "max": 5}
 
-    # get a random element of a list
-    ag = random.choice(agents)
-    # get agent interests
-    interests = Agent.query.filter_by(id=ag.agent_id).first().interests
-    config["agents"]["interests"] = interests.split(",")
-
-    uid = exp.db_name.split(os.sep)[1]
+    # check db type
+    if "database_server.db" in exp.db_name: # sqlite
+        uid = exp.db_name.split(os.sep)[1]
+    else:
+        uid = exp.db_name.removeprefix("experiments_")
 
     BASE_DIR = os.path.dirname(os.path.abspath(__file__)).split("y_web")[0]
 
@@ -504,7 +502,11 @@ def create_client():
 
     # Create agent population file
     BASE_DIR = os.path.dirname(os.path.abspath(__file__)).split("routes_admin")[0]
-    filename = f"{BASE_DIR}{os.sep}{exp.db_name.split('database_server.db')[0]}{population.name.replace(' ', '')}.json"
+
+    if "database_server.db" in exp.db_name:
+        filename = f"{BASE_DIR}{os.sep}{exp.db_name.split('database_server.db')[0]}{population.name.replace(' ', '')}.json"
+    else:
+        filename = f"{BASE_DIR}experiments{os.sep}{exp.db_name.replace('experiments_', '')}{os.sep}{population.name.replace(' ', '')}.json"
 
     agents = Agent_Population.query.filter_by(population_id=population.id).all()
     # get the agent details
@@ -604,6 +606,7 @@ def create_client():
             }
         )
 
+    print(f"Saving agents to {filename}")
     json.dump(res, open(filename, "w"), indent=4)
 
     # load experiment_details page
