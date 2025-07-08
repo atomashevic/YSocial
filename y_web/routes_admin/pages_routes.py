@@ -90,7 +90,7 @@ def pages_data():
         for s in sort.split(","):
             direction = s[0]
             name = s[1:]
-            if name not in ["name", "descr", "keywords", "page_type", "logo"]:
+            if name not in ["name", "descr", "keywords", "page_type", "logo", "leaning"]:
                 name = "name"
             col = getattr(Page, name)
             if direction == "-":
@@ -117,6 +117,7 @@ def pages_data():
                 "keywords": page.keywords,
                 "page_type": page.page_type,
                 "logo": page.logo,
+                "leaning": page.leaning,
             }
             for page in res
         ],
