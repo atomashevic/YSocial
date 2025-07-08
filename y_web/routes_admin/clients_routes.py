@@ -28,7 +28,7 @@ from y_web.models import (
     Follow_Recsys,
     Content_Recsys, Exp_Topic, Topic_List
 )
-from y_web.utils import start_client, terminate_client, get_ollama_models
+from y_web.utils import start_client, terminate_client, get_ollama_models, get_db_type
 import json
 import shutil
 from . import db, experiment_details
@@ -619,6 +619,8 @@ def delete_client(uid):
     check_privileges(current_user.username)
 
     client = Client.query.filter_by(id=uid).first()
+
+    exp_id = client.id_exp
     db.session.delete(client)
     db.session.commit()
 
@@ -632,7 +634,7 @@ def delete_client(uid):
     else:
         print(f"File {path} does not exist.")
 
-    return redirect(request.referrer)
+    return experiment_details(exp_id)
 
 
 @clientsr.route("/admin/client_details/<int:uid>")
@@ -656,7 +658,13 @@ def client_details(uid):
 
     # get the client configuration file
     BASE = os.path.dirname(os.path.abspath(__file__))
-    exp_folder = experiment.db_name.split(os.sep)[1]
+
+    dbtypte = get_db_type()
+
+    if dbtypte == "sqlite":
+        exp_folder = experiment.db_name.split(os.sep)[1]
+    else:
+        exp_folder = experiment.db_name.removeprefix("experiments_")
 
     path = f"{BASE}{os.sep}experiments{os.sep}{exp_folder}{os.sep}client_{client.name}-{population.name}.json".replace(
         f"routes_admin{os.sep}", ""
@@ -895,8 +903,14 @@ def download_agent_list(uid):
     # get the experiment
     exp = Exps.query.filter_by(idexp=client.id_exp).first()
     # get the experiment folder
-    BASE = os.path.dirname(os.path.abspath(__file__))
-    exp_folder = exp.db_name.split(os.sep)[1]
+    BASE = os.path.dirname(os.path.abspath(__file__)).replace(f"{os.sep}routes_admin", "")
+
+    dbtypte = get_db_type()
+
+    if dbtypte == "sqlite":
+        exp_folder = exp.db_name.split(os.sep)[1]
+    else:
+        exp_folder = exp.db_name.removeprefix("experiments_")
 
     with open(
         f"{BASE}{os.sep}experiments{os.sep}{exp_folder}{os.sep}{client.name}_agent_list.csv",
