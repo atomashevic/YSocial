@@ -27,114 +27,176 @@
                             <div id="table"></div>
 
                             <script src="https://unpkg.com/gridjs/dist/gridjs.umd.js"></script>
+
+                            <style>
+
+                              #table td {
+                                vertical-align: middle !important;
+                              }
+                            </style>
                             <script>
-    const tableDiv = document.getElementById('table');
+  const tableDiv = document.getElementById('table');
 
-    const updateUrl = (prev, query) => {
-        return prev + (prev.indexOf('?') >= 0 ? '&' : '?') + new URLSearchParams(query).toString();
-    };
+  const updateUrl = (prev, query) => {
+    return prev + (prev.indexOf('?') >= 0 ? '&' : '?') + new URLSearchParams(query).toString();
+  };
 
-    const editableCellAttributes = (data, row, col) => {
-        if (row) {
-            return { contentEditable: 'true', 'data-element-id': row.cells[0].data };
-        } else {
-            return {};
+  const editableCellAttributes = (data, row, col) => {
+    if (row) {
+      return {
+        contentEditable: 'true',
+        'data-element-id': row.cells[0].data,
+        'data-column-id': col.id
+      };
+    } else {
+      return {};
+    }
+  };
+
+  const getStarRatingHtml = (level) => {
+    const filled = Math.max(0, Math.min(5, parseInt(level)));
+    const empty = 5 - filled;
+    const colors = ['#ccc', '#aaa', '#f0ad4e', '#f0ad4e', '#f39c12', '#d9534f'];
+    const color = colors[filled] || '#ccc';
+
+    return `
+      <div style="text-align: center; color: ${color}; font-size: 1.1rem;">
+        ${'★'.repeat(filled)}${'☆'.repeat(empty)}
+      </div>
+    `;
+  };
+
+  new gridjs.Grid({
+    columns: [
+      { id: 'id', hidden: true },
+      { id: 'name', name: 'Name', attributes: editableCellAttributes },
+      { id: 'age', name: 'Age', sort: true },             // <-- sortable
+      { id: 'profession', name: 'Profession', sort: true },       // <-- sortable
+      {
+        id: 'daily_activity_level',
+        name: 'Activity Level',
+        sort: true,                                        // <-- sortable
+        formatter: (cell) => {
+          return gridjs.html(getStarRatingHtml(cell));
         }
-    };
-
-    new gridjs.Grid({
-        columns: [
-            { id: 'id', hidden: true },
-            { id: 'name', name: 'Name', attributes: editableCellAttributes },
-            { id: 'age', name: 'Age', sort: false },
-            { id: 'gender', name: 'Gender', sort: false },
-            { id: 'nationality', name: 'Nationality', sort: false },
-            {
-                id: 'details',
-                name: 'Details',
-                sort: false,
-                formatter: (cell, row) => {
-                    return gridjs.html(`
-                        <div style="display: flex; justify-content: center;">
-                            <a href="/admin/agent_details/${row.cells[0].data}"
-                               style="background-color: #28a745; color: white; padding: 6px 12px; border-radius: 4px; text-decoration: none; font-size: 0.85rem;">
-                                Details
-                            </a>
-                        </div>
-                    `);
-                }
-            },
-        ],
-        server: {
-            url: '/admin/agents_data',
-            then: results => results.data,
-            total: results => results.total,
-        },
-        search: {
-            enabled: true,
-            server: {
-                url: (prev, search) => {
-                    return updateUrl(prev, { search });
-                },
-            },
-        },
-        sort: {
-            enabled: true,
-            multiColumn: true,
-            server: {
-                url: (prev, columns) => {
-                    const columnIds = ['id', 'name', 'age', 'gender', 'nationality'];
-                    const sort = columns.map(col => (col.direction === 1 ? '+' : '-') + columnIds[col.index]);
-                    return updateUrl(prev, { sort });
-                },
-            },
-        },
-        pagination: {
-            enabled: true,
-            server: {
-                url: (prev, page, limit) => {
-                    return updateUrl(prev, { start: page * limit, length: limit });
-                },
-            },
-        },
-    }).render(tableDiv);
-
-    let savedValue;
-
-    tableDiv.addEventListener('focusin', ev => {
-        if (ev.target.tagName === 'TD') {
-            savedValue = ev.target.textContent;
+      },
+      {
+        id: 'actions',
+        name: 'Actions',
+        sort: false,
+        formatter: (cell, row) => {
+          const id = row.cells[0].data;
+          return gridjs.html(`
+            <div style="display: flex; gap: 8px; justify-content: center;">
+              <a href="/admin/agent_details/${id}"
+                style="background-color: #28a745; color: white; padding: 6px 12px; border-radius: 4px; text-decoration: none; font-size: 0.85rem;">
+                Details
+              </a>
+              <button class="delete-button" data-id="${id}"
+                style="background-color: #dc3545; color: white; padding: 6px 12px; border: none; border-radius: 4px; font-size: 0.85rem; cursor: pointer;">
+                Delete
+              </button>
+            </div>
+          `);
         }
-    });
+      },
+    ],
+    server: {
+      url: '/admin/agents_data',
+      then: results => results.data,
+      total: results => results.total,
+    },
+    search: {
+      enabled: true,
+      server: {
+        url: (prev, search) => {
+          return updateUrl(prev, { search });
+        },
+      },
+    },
+    sort: {
+      enabled: true,
+      multiColumn: true,
+      server: {
+        url: (prev, columns) => {
+          // Ensure these column ids match your backend's sort fields exactly
+          const columnIds = ['id', 'name', 'age', 'profession', 'daily_activity_level'];
+          const sort = columns.map(col => (col.direction === 1 ? '+' : '-') + columnIds[col.index]);
+          return updateUrl(prev, { sort });
+        },
+      },
+    },
+    pagination: {
+      enabled: true,
+      server: {
+        url: (prev, page, limit) => {
+          return updateUrl(prev, { start: page * limit, length: limit });
+        },
+      },
+    },
+  }).render(tableDiv);
 
-    tableDiv.addEventListener('focusout', ev => {
-        if (ev.target.tagName === 'TD') {
-            if (savedValue !== ev.target.textContent) {
-                fetch('/admin/agents_data', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        id: ev.target.dataset.elementId,
-                        [ev.target.dataset.columnId]: ev.target.textContent
-                    }),
-                });
-            }
-            savedValue = undefined;
-        }
-    });
+  let savedValue;
 
-    tableDiv.addEventListener('keydown', ev => {
-        if (ev.target.tagName === 'TD') {
-            if (ev.key === 'Escape') {
-                ev.target.textContent = savedValue;
-                ev.target.blur();
-            } else if (ev.key === 'Enter') {
-                ev.preventDefault();
-                ev.target.blur();
-            }
-        }
-    });
+  // Inline editing handlers (unchanged)
+  tableDiv.addEventListener('focusin', ev => {
+    if (ev.target.tagName === 'TD') {
+      savedValue = ev.target.textContent;
+    }
+  });
+
+  tableDiv.addEventListener('focusout', ev => {
+    if (ev.target.tagName === 'TD') {
+      if (savedValue !== ev.target.textContent) {
+        fetch('/admin/agents_data', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            id: ev.target.dataset.elementId,
+            [ev.target.dataset.columnId]: ev.target.textContent
+          }),
+        });
+      }
+      savedValue = undefined;
+    }
+  });
+
+  tableDiv.addEventListener('keydown', ev => {
+    if (ev.target.tagName === 'TD') {
+      if (ev.key === 'Escape') {
+        ev.target.textContent = savedValue;
+        ev.target.blur();
+      } else if (ev.key === 'Enter') {
+        ev.preventDefault();
+        ev.target.blur();
+      }
+    }
+  });
+
+  // Delete button handler (unchanged)
+  tableDiv.addEventListener('click', function (event) {
+    const target = event.target;
+    if (target.classList.contains('delete-button')) {
+      const id = target.getAttribute('data-id');
+      if (confirm('Are you sure you want to delete this agent?')) {
+        fetch(`/admin/delete_agent/${id}`, {
+          method: 'DELETE',
+        })
+        .then(response => {
+          if (!response.ok) throw new Error('Failed to delete');
+          location.reload();
+        })
+        .catch(err => {
+          alert('Error deleting agent.');
+          console.error(err);
+        });
+      }
+    }
+  });
 </script>
+
+
+
 
 
                         </div>

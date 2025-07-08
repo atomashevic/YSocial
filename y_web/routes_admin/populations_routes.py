@@ -129,7 +129,7 @@ def populations_data():
         for s in sort.split(","):
             direction = s[0]
             name = s[1:]
-            if name not in ["name", "descr"]:
+            if name not in ["name", "descr", "size"]:
                 name = "name"
             col = getattr(Population, name)
             if direction == "-":
@@ -147,8 +147,9 @@ def populations_data():
     # response
     res = query.all()
 
+
     return {
-        "data": [{"id": pop.id, "name": pop.name, "descr": pop.descr} for pop in res],
+        "data": [{"id": pop.id, "name": pop.name, "descr": pop.descr, "size": pop.size} for pop in res],
         "total": total,
     }
 

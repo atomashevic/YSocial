@@ -82,7 +82,7 @@ def agents_data():
         for s in sort.split(","):
             direction = s[0]
             name = s[1:]
-            if name not in ["name", "gender", "age", "nationality"]:
+            if name not in ["name", "profession", "age", "daily_activity_level"]:
                 name = "name"
             col = getattr(Agent, name)
             if direction == "-":
@@ -106,8 +106,8 @@ def agents_data():
                 "id": agent.id,
                 "name": " ".join(re.findall("[A-Z][^A-Z]*", agent.name)),
                 "age": agent.age,
-                "gender": agent.gender,
-                "nationality": agent.nationality,
+                "profession": agent.profession,
+                "daily_activity_level": agent.daily_activity_level,
             }
             for agent in res
         ],

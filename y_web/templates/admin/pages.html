@@ -26,7 +26,19 @@
                             <div id="table"></div>
 
                             <script src="https://unpkg.com/gridjs/dist/gridjs.umd.js"></script>
-                            <script>
+<style>
+  td[data-column-id="logo"] {
+    padding: 0 !important;       /* Remove padding */
+    text-align: center;          /* Center horizontally */
+    vertical-align: middle;      /* Center vertically */
+  }
+
+  #table td {
+    vertical-align: middle !important;
+  }
+</style>
+
+<script>
     const tableDiv = document.getElementById('table');
 
     const updateUrl = (prev, query) => {
@@ -35,7 +47,11 @@
 
     const editableCellAttributes = (data, row, col) => {
         if (row) {
-            return { contentEditable: 'true', 'data-element-id': row.cells[0].data };
+            return {
+                contentEditable: 'true',
+                'data-element-id': row.cells[1].data, // id now at index 1 because of logo column
+                'data-column-id': col.id
+            };
         } else {
             return {};
         }
@@ -43,20 +59,40 @@
 
     new gridjs.Grid({
         columns: [
+            {
+                id: 'logo',
+                name: '',
+                formatter: (cell, row) => {
+                    return gridjs.html(`
+                        <div style="display: flex; justify-content: center; align-items: center; height: 100%; width: 100%;">
+                            <img src="${cell}" alt="logo" style="height: 25px; object-fit: contain; margin: 0; padding: 0; display: block;">
+                        </div>
+                    `);
+                },
+                sort: false,
+                searchable: false,
+                width: '60px',
+            },
             { id: 'id', hidden: true },
             { id: 'name', name: 'Name', attributes: editableCellAttributes },
             { id: 'descr', name: 'Description' },
             { id: 'page_type', name: 'Type' },
+            { id: 'leaning', name: 'Political Leaning' },
             {
-                id: 'details',
-                name: 'Details',
+                id: 'actions',
+                name: 'Actions',
                 formatter: (cell, row) => {
+                    const id = row.cells[1].data; // id at index 1
                     return gridjs.html(`
-                        <div style="display: flex; justify-content: center;">
-                            <a href="/admin/page_details/${row.cells[0].data}"
+                        <div style="display: flex; gap: 8px; justify-content: center;">
+                            <a href="/admin/page_details/${id}"
                                style="background-color: #28a745; color: white; padding: 6px 12px; border-radius: 4px; text-decoration: none; font-size: 0.85rem;">
                                 Details
                             </a>
+                            <button class="delete-button" data-id="${id}"
+                                style="background-color: #dc3545; color: white; padding: 6px 12px; border: none; border-radius: 4px; font-size: 0.85rem; cursor: pointer;">
+                                Delete
+                            </button>
                         </div>
                     `);
                 }
@@ -80,7 +116,7 @@
             multiColumn: true,
             server: {
                 url: (prev, columns) => {
-                    const columnIds = ['id', 'name', 'type', 'description'];
+                    const columnIds = ['id', 'name', 'page_type', 'descr', 'leaning'];
                     const sort = columns.map(col => (col.direction === 1 ? '+' : '-') + columnIds[col.index]);
                     return updateUrl(prev, { sort });
                 },
@@ -98,6 +134,7 @@
 
     let savedValue;
 
+    // Inline editing
     tableDiv.addEventListener('focusin', ev => {
         if (ev.target.tagName === 'TD') {
             savedValue = ev.target.textContent;
@@ -131,7 +168,30 @@
             }
         }
     });
+
+    // Delete button handler
+    tableDiv.addEventListener('click', function (event) {
+        const target = event.target;
+        if (target.classList.contains('delete-button')) {
+            const id = target.getAttribute('data-id');
+            if (confirm('Are you sure you want to delete this page?')) {
+                fetch(`/admin/delete_page/${id}`, {
+                    method: 'DELETE',
+                })
+                .then(response => {
+                    if (!response.ok) throw new Error('Failed to delete');
+                    location.reload();
+                })
+                .catch(err => {
+                    alert('Error deleting page.');
+                    console.error(err);
+                });
+            }
+        }
+    });
 </script>
+
+
 
 
                             <div class="box-lines">
