@@ -1,6 +1,5 @@
 import os
 import networkx as nx
-import random
 import faker
 
 from flask import (
@@ -760,7 +759,13 @@ def set_network(uid):
     exp = Exps.query.filter_by(idexp=client.id_exp).first()
     # get the experiment folder
     BASE = os.path.dirname(os.path.abspath(__file__))
-    exp_folder = exp.db_name.split(os.sep)[1]
+
+    dbtypte = get_db_type()
+
+    if dbtypte == "sqlite":
+        exp_folder = exp.db_name.split(os.sep)[1]
+    else:
+        exp_folder = exp.db_name.removeprefix("experiments_")
 
     path = f"{BASE}{os.sep}experiments{os.sep}{exp_folder}{os.sep}{client.name}_network.csv".replace(
         f"routes_admin{os.sep}", ""
@@ -791,7 +796,13 @@ def upload_network(uid):
     exp = Exps.query.filter_by(idexp=client.id_exp).first()
     # get the experiment folder
     BASE = os.path.dirname(os.path.abspath(__file__)).split("routes_admin")[0][:-1]
-    exp_folder = exp.db_name.split(os.sep)[1]
+
+    dbtypte = get_db_type()
+
+    if dbtypte == "sqlite":
+        exp_folder = exp.db_name.split(os.sep)[1]
+    else:
+        exp_folder = exp.db_name.removeprefix("experiments_")
 
     network = request.files["network_file"]
     network.save(

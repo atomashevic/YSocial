@@ -7,7 +7,7 @@ class User_mgmt(UserMixin, db.Model):
     __bind_key__ = "db_exp"
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(15), nullable=False, unique=True)
-    email = db.Column(db.String(50), nullable=False, unique=True)
+    email = db.Column(db.String(50), nullable=True, default="")
     password = db.Column(db.String(80), nullable=False)
     leaning = db.Column(db.String(10), default="neutral")
     user_type = db.Column(db.String(10), nullable=False, default="user")

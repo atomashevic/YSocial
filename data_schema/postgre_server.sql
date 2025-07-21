@@ -22,8 +22,8 @@ CREATE TABLE rounds (
 
 CREATE TABLE user_mgmt (
     id SERIAL PRIMARY KEY,
-    username VARCHAR(15) NOT NULL UNIQUE,
-    email VARCHAR(50) NOT NULL UNIQUE,
+    username VARCHAR(50) NOT NULL UNIQUE,
+    email VARCHAR(50),
     password  VARCHAR(400) NOT NULL,
     user_type TEXT,
     leaning TEXT,

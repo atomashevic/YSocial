@@ -45,6 +45,7 @@ def detect_env_handler():
     conda_prefix = os.environ.get("CONDA_PREFIX")
     if conda_prefix:
         env_type = "conda"
+
         env_name = os.environ.get("CONDA_DEFAULT_ENV") or Path(conda_prefix).name
         env_bin = Path(conda_prefix) / "bin"
 
@@ -93,16 +94,16 @@ def build_screen_command(script_path, config_path, screen_name=None):
     if env_type == "conda" and conda_sh:
         command = (
             f"screen -dmS {screen_name} bash -c "
-            f"'source \"{conda_sh}\" && conda activate {env_name} && "
-            f"python \"{script_path}\" -c \"{config_path}\"'"
+            f"'source {conda_sh} && conda activate {env_name} && "
+            f"python {script_path} -c {config_path}'"
         )
     elif env_type in ("venv", "pipenv"):
         command = (
             f"screen -dmS {screen_name} bash -c "
-            f"'source \"{env_bin}/activate\" && python \"{script_path}\" -c \"{config_path}\"'"
+            f"'source {env_bin}/activate && python {script_path} -c {config_path}'"
         )
     else:  # system
-        command = f"screen -dmS {screen_name} python \"{script_path}\" -c \"{config_path}\""
+        command = f"screen -dmS {screen_name} python {script_path} -c {config_path}"
 
     return command
 
@@ -169,7 +170,7 @@ def start_server(exp):
     #screen_command = f"screen -dmS {exp_uid.replace(f'{os.sep}', '')} {flask_command}"
     print(screen_command)
 
-    print(f"Starting server for experiment {exp_uid}...")
+    print(f"Starting server for experiment {exp_uid} ...")
     subprocess.run(screen_command, shell=True, check=True)
 
     # identify the db to be set
@@ -185,8 +186,10 @@ def start_server(exp):
         old_db_name = db_uri_main.split("/")[-1]
         db_uri = db_uri_main.replace(old_db_name, exp.db_name)
 
+    print(f"Database URI: {db_uri}")
+
     # Wait for the server to start
-    time.sleep(15)
+    time.sleep(20)
     data = {"path": f"{db_uri}"}
     headers = {"Content-Type": "application/json"}
     ns = f"http://{exp.server}:{exp.port}/change_db"
@@ -366,7 +369,6 @@ def start_client_process(exp, cli, population, resume=False):
             filename = f"{BASE_DIR}experiments{os.sep}{uid}{os.sep}{population.name.replace(' ', '')}.json".replace(
                 "utils/", ""
             )
-            print(filename)
         else:
             uid = exp.db_name.split(os.sep)[1]
             filename = f"{BASE_DIR}{os.sep}{exp.db_name.split('database_server.db')[0]}{population.name.replace(' ', '')}.json".replace(
