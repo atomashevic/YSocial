@@ -1,0 +1,1 @@
+{"platform_type": "forum", "name": "Reddit AI", "host": "localhost", "port": 5030, "debug": "False", "reset_db": "False", "modules": ["news", "voting", "image"], "perspective_api": null}

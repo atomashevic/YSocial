@@ -67,6 +67,33 @@ def detect_env_handler():
         print(f"Detected conda environment: {env_name} at {env_bin}")
 
         return env_type, env_name, str(env_bin), str(conda_sh) if conda_sh else None
+    # Check for pyenv
+    pyenv_version = os.environ.get("PYENV_VERSION")
+    pyenv_root_env = os.environ.get("PYENV_ROOT")
+    if pyenv_version or pyenv_root_env or ".pyenv" in python_exe:
+        env_type = "pyenv"
+        # Determine pyenv root directory
+        if pyenv_root_env:
+            pyenv_root = Path(pyenv_root_env)
+        else:
+            parts = Path(python_exe).parts
+            try:
+                idx = parts.index(".pyenv")
+                pyenv_root = Path(*parts[: idx + 1])
+            except ValueError:
+                pyenv_root = Path.home() / ".pyenv"
+        # Determine environment/version name
+        if pyenv_version:
+            env_name = pyenv_version
+        else:
+            try:
+                idx_vers = parts.index("versions")
+                env_name = parts[idx_vers + 1] if len(parts) > idx_vers + 1 else None
+            except (ValueError, NameError):
+                env_name = None
+        env_bin = pyenv_root
+        print(f"Detected pyenv environment: {env_name} at {env_bin}")
+        return env_type, env_name, str(env_bin), str(pyenv_root)
 
     # Check for pipenv
     if os.environ.get("PIPENV_ACTIVE"):
@@ -88,19 +115,31 @@ def detect_env_handler():
 
 
 def build_screen_command(script_path, config_path, screen_name=None):
-    env_type, env_name, env_bin, conda_sh = detect_env_handler()
+    env_type, env_name, env_bin, conda_sh_or_pyenv_root = detect_env_handler()
     screen_name = screen_name or env_name or "experiment"
 
-    if env_type == "conda" and conda_sh:
+    if env_type == "conda" and conda_sh_or_pyenv_root:
         command = (
             f"screen -dmS {screen_name} bash -c "
-            f"'source {conda_sh} && conda activate {env_name} && "
+            f"'source {conda_sh_or_pyenv_root} && conda activate {env_name} && "
             f"python {script_path} -c {config_path}'"
         )
     elif env_type in ("venv", "pipenv"):
         command = (
             f"screen -dmS {screen_name} bash -c "
             f"'source {env_bin}/activate && python {script_path} -c {config_path}'"
+        )
+    elif env_type == "pyenv":
+        # env_bin is the pyenv root directory, conda_sh_or_pyenv_root is also pyenv_root
+        pyenv_root = conda_sh_or_pyenv_root
+        version_python = f"{pyenv_root}/versions/{env_name}/bin/python"
+        command = (
+            f"screen -dmS {screen_name} bash -lc "
+            f"\"export PYENV_ROOT={pyenv_root} && "
+            f"export PATH='{pyenv_root}/shims:$PATH' && "
+            f"eval \\\"\\$(pyenv init -)\\\" && "
+            f"pyenv shell {env_name} && "
+            f"{version_python} {script_path} -c {config_path}\""
         )
     else:  # system
         command = f"screen -dmS {screen_name} python {script_path} -c {config_path}"
