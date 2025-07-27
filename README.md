@@ -166,6 +166,12 @@ docker-compose up --gpus all
 
 ---
 
+## 📚 Documentation
+
+- **[Topics and Interests Database Guide](docs/TOPICS_DATABASE_GUIDE.md)**: Comprehensive guide explaining how topics assigned to experiments are stored in the database and how client applications can access these values.
+
+---
+
 ## 📄 Further Information
 - **Project Website:** [YSocialTwin.github.io](https://ysocialtwin.github.io/)
 - **Research Paper:** [Y Social: A Digital Twin for Social Simulations](https://arxiv.org/abs/2408.00818)
