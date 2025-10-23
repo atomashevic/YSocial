@@ -80,10 +80,10 @@ def detect_env_handler_old():
         env_bin = Path(python_exe).parent
         return env_type, env_name, str(env_bin), None
 
-    # Check for pyenv 
+    # Check for pyenv
     if (".pyenv" in python_exe) or ("PYENV_VERSION" in os.environ):
         env_type = "pyenv"
-        env_name = os.path.dirname(python_exe).split('/')[-2]
+        env_name = os.path.dirname(python_exe).split("/")[-2]
         env_bin = os.path.dirname(python_exe)
         return env_type, env_name, str(env_bin), None
 
