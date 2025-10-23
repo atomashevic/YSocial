@@ -173,3 +173,18 @@ cython_debug/
 
 # PyPI configuration file
 .pypirc
+
+# AI agent config files
+
+CLAUDE.md
+CRUSH.md
+AGENTS.md 
+
+# Misc markdown stuff
+
+todo.md
+EXPERIMENT_TOPICS_IMPLEMENTATION.md 
+EXPERIMENT_TOPICS_USAGE.md
+test_topics/
+
+
