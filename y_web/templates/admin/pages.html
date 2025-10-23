@@ -25,7 +25,7 @@
 
                             <div id="table"></div>
 
-                            <script src="https://unpkg.com/gridjs/dist/gridjs.umd.js"></script>
+                            <script src="{{ url_for('static', filename='assets/vendor/js/gridjs.umd.js') }}"></script>
 <style>
   td[data-column-id="logo"] {
     padding: 0 !important;       /* Remove padding */
@@ -89,10 +89,10 @@
                                style="background-color: #28a745; color: white; padding: 6px 12px; border-radius: 4px; text-decoration: none; font-size: 0.85rem;">
                                 Details
                             </a>
-                            <button class="delete-button" data-id="${id}"
-                                style="background-color: #dc3545; color: white; padding: 6px 12px; border: none; border-radius: 4px; font-size: 0.85rem; cursor: pointer;">
+                            <a href="/admin/delete_page/${id}"
+                                style="background-color: #dc3545; color: white; padding: 6px 12px; border-radius: 4px; text-decoration: none; font-size: 0.85rem;">
                                 Delete
-                            </button>
+                              </a>
                         </div>
                     `);
                 }
@@ -257,17 +257,7 @@
                                             </select>
                                         </div>
                                     </div>
-                                    <div class="box-line">
-                                        <span class="left">LLM</span>
-                                        <div class="select">
-                                            <select name="pg_type">
-                                                <option value=""></option>
-                                                    {% for model in models %}
-                                                    <option value="{{ model }}">{{ model }}</option>
-                                                    {% endfor %}
-                                            </select>
-                                        </div>
-                                    </div>
+
                                     <div class="box-line">
                                         <span class="left">Political Leaning</span>
                                         <div class="select">
@@ -334,6 +324,43 @@
                                                                                        class="input"></span>
                                     </div>
 
+                                    <hr>
+                                    <style>
+                                        .form-section-header-page {
+                                            font-size: 0.95em;
+                                            font-weight: 600;
+                                            color: #333;
+                                            margin: 15px 0 8px 0;
+                                        }
+                                        .form-section-description-page {
+                                            font-size: 0.85em;
+                                            color: #666;
+                                            margin-bottom: 15px;
+                                            line-height: 1.4;
+                                        }
+                                    </style>
+
+                                    <div class="form-section-header-page">Activity Profile</div>
+                                    <div class="form-section-description-page">
+                                        Select when this page will be active for posting content. The default "Always On" profile keeps the page active 24/7.
+                                    </div>
+                                    <div class="box-line">
+                                        <span class="left">Activity Pattern</span>
+                                        
+                                            <div class="select">
+                                                <select name="activity_profile" id="activity_profile_select">
+                                                    {% if activity_profiles %}
+                                                        {% for profile in activity_profiles %}
+                                                        <option value="{{ profile.id }}" {% if profile.name == 'Always On' %}selected{% endif %}>
+                                                            {{ profile.name }}
+                                                        </option>
+                                                        {% endfor %}
+                                                    {% endif %}
+                                                </select>
+                                            </div>
+
+                                    </div>
+
                                 </div>
                                 <div class="button-wrap">
                                     <button class="button is-solid primary-button is-fullwidth">
@@ -378,5 +405,7 @@
     </div>
 
 </div>
+
+
 
 {% include "admin/footer.html" %}

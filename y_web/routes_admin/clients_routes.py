@@ -1,37 +1,55 @@
-import os
-import networkx as nx
-import faker
+"""
+Client simulation management routes.
 
+Administrative routes for configuring and managing simulation clients,
+including behavior parameters, LLM settings, network topology, and
+client execution control (start/pause/resume/terminate).
+"""
+
+import json
+import os
+import shutil
+
+import faker
+import networkx as nx
 from flask import (
     Blueprint,
-    render_template,
-    redirect,
-    request,
     flash,
+    redirect,
+    render_template,
+    request,
     send_file,
 )
-from flask_login import login_required, current_user
+from flask_login import current_user, login_required
 
+from y_web import db
 from y_web.models import (
-    Exps,
-    Population,
+    ActivityProfile,
     Agent,
     Agent_Population,
-    Page,
-    Population_Experiment,
-    Page_Population,
+    Agent_Profile,
     Client,
     Client_Execution,
-    User_mgmt,
-    Agent_Profile,
+    Content_Recsys,
+    Exp_Topic,
+    Exps,
     Follow_Recsys,
-    Content_Recsys, Exp_Topic, Topic_List
+    Page,
+    Page_Population,
+    Population,
+    Population_Experiment,
+    PopulationActivityProfile,
+    Topic_List,
+    User_mgmt,
 )
-from y_web.utils import start_client, terminate_client, get_ollama_models, get_db_type
-import json
-import shutil
-from . import db, experiment_details
-from y_web.utils.miscellanea import check_privileges, ollama_status
+from y_web.utils import (
+    get_db_type,
+    get_llm_models,
+    get_ollama_models,
+    start_client,
+    terminate_client,
+)
+from y_web.utils.miscellanea import check_privileges, llm_backend_status, ollama_status
 
 clientsr = Blueprint("clientsr", __name__)
 
@@ -39,6 +57,7 @@ clientsr = Blueprint("clientsr", __name__)
 @clientsr.route("/admin/reset_client/<int:uid>")
 @login_required
 def reset_client(uid):
+    """Handle reset client operation."""
     check_privileges(current_user.username)
 
     # delete experiment json files
@@ -78,6 +97,7 @@ def reset_client(uid):
 @clientsr.route("/admin/extend_simulation/<int:id_client>", methods=["POST", "GET"])
 @login_required
 def extend_simulation(id_client):
+    """Handle extend simulation operation."""
     check_privileges(current_user.username)
 
     # check if the client exists
@@ -108,6 +128,9 @@ def extend_simulation(id_client):
 @clientsr.route("/admin/run_client/<int:uid>/<int:idexp>")
 @login_required
 def run_client(uid, idexp):
+    """Handle run client operation."""
+    from .experiments_routes import experiment_details
+
     check_privileges(current_user.username)
 
     # get experiment
@@ -133,6 +156,7 @@ def run_client(uid, idexp):
 @clientsr.route("/admin/resume_client/<int:uid>/<int:idexp>")
 @login_required
 def resume_client(uid, idexp):
+    """Handle resume client operation."""
     check_privileges(current_user.username)
 
     # get experiment
@@ -158,6 +182,9 @@ def resume_client(uid, idexp):
 @clientsr.route("/admin/pause_client/<int:uid>/<int:idexp>")
 @login_required
 def pause_client(uid, idexp):
+    """Handle pause client operation."""
+    from .experiments_routes import experiment_details
+
     check_privileges(current_user.username)
 
     # get population_experiment and update the client_running status
@@ -168,12 +195,15 @@ def pause_client(uid, idexp):
     client = Client.query.filter_by(id=uid).first()
     terminate_client(client, pause=True)
 
-    return redirect(request.referrer)
+    return experiment_details(idexp)  # redirect(request.referrer)
 
 
 @clientsr.route("/admin/stop_client/<int:uid>/<int:idexp>")
 @login_required
 def stop_client(uid, idexp):
+    """Handle stop client operation."""
+    from .experiments_routes import experiment_details
+
     check_privileges(current_user.username)
 
     # get population_experiment and update the client_running status
@@ -184,20 +214,19 @@ def stop_client(uid, idexp):
     client = Client.query.filter_by(id=uid).first()
     terminate_client(client, pause=False)
 
-    return redirect(request.referrer)  # experiment_details(idexp)
+    return experiment_details(idexp)  # redirect(request.referrer)
 
 
 @clientsr.route("/admin/clients/<idexp>")
 @login_required
 def clients(idexp):
+    """Handle clients operation."""
     check_privileges(current_user.username)
 
     # get experiment
     exp = Exps.query.filter_by(idexp=idexp).first()
-    # get population assigned to the experiment
-    populations = Population_Experiment.query.filter_by(id_exp=idexp).all()
-    # get the populations details
-    pops = [Population.query.filter_by(id=p.id_population).first() for p in populations]
+    # get all available populations from the database
+    pops = Population.query.all()
 
     ollamas = ollama_status()
 
@@ -209,6 +238,7 @@ def clients(idexp):
 @clientsr.route("/admin/create_client", methods=["POST"])
 @login_required
 def create_client():
+    """Create client."""
     check_privileges(current_user.username)
 
     name = request.form.get("name")
@@ -248,16 +278,13 @@ def create_client():
     llm_v_api_key = request.form.get("llm_v_api_key")
     llm_v_max_tokens = request.form.get("llm_v_max_tokens")
     llm_v_temperature = request.form.get("llm_v_temperature")
+    user_type = request.form.get("user_type")
 
     # get experiment topics
     topics = Exp_Topic.query.filter_by(exp_id=exp_id).all()
     topics_ids = [t.topic_id for t in topics]
     # get the topics names from the Topic_list table
-    topics = (
-        db.session.query(Topic_List)
-        .filter(Topic_List.id.in_(topics_ids))
-        .all()
-    )
+    topics = db.session.query(Topic_List).filter(Topic_List.id.in_(topics_ids)).all()
     topics = [t.name for t in topics]
 
     # if name already exists, return to the previous page
@@ -273,6 +300,16 @@ def create_client():
     if population is None:
         flash("Population not found.", "error")
         return redirect(request.referrer)
+
+    # check if the population is already assigned to the experiment
+    # if not, add it
+    pop_exp = Population_Experiment.query.filter_by(
+        id_population=population_id, id_exp=exp_id
+    ).first()
+    if not pop_exp:
+        pop_exp = Population_Experiment(id_population=population_id, id_exp=exp_id)
+        db.session.add(pop_exp)
+        db.session.commit()
 
     # create the Client object
     client = Client(
@@ -313,9 +350,31 @@ def create_client():
     db.session.add(client)
     db.session.commit()
 
+    # Get LLM URL from environment (set by y_social.py)
+    import os
+
+    # get population activity profiles
+    activity_profiles = (
+        db.session.query(PopulationActivityProfile)
+        .filter(PopulationActivityProfile.population == population_id)
+        .all()
+    )
+
+    activity_profiles = [a.activity_profile for a in activity_profiles]
+
+    # get all activity profiles from the db where id in activity_profiles
+    activity_profiles = (
+        db.session.query(ActivityProfile)
+        .filter(ActivityProfile.id.in_([a for a in activity_profiles]))
+        .all()
+    )
+
+    profiles = {ap.name: ap.hours for ap in activity_profiles}
+
     config = {
         "servers": {
             "llm": llm,
+            #    "llm_url": llm_url,
             "llm_api_key": llm_api_key,
             "llm_max_tokens": int(llm_max_tokens),
             "llm_temperature": float(llm_temperature),
@@ -335,6 +394,7 @@ def create_client():
             "percentage_removed_agents_iteration": float(
                 percentage_removed_agents_iteration
             ),
+            "activity_profiles": profiles,
             "hourly_activity": {
                 "10": 0.021,
                 "16": 0.032,
@@ -468,7 +528,7 @@ def create_client():
     config["agents"]["n_interests"] = {"min": 1, "max": 5}
 
     # check db type
-    if "database_server.db" in exp.db_name: # sqlite
+    if "database_server.db" in exp.db_name:  # sqlite
         uid = exp.db_name.split(os.sep)[1]
     else:
         uid = exp.db_name.removeprefix("experiments_")
@@ -479,7 +539,7 @@ def create_client():
         f"{BASE_DIR}y_web{os.sep}experiments{os.sep}{uid}{os.sep}client_{name}-{population.name}.json",
         "w",
     ) as f:
-        json.dump(config, f)
+        json.dump(config, f, indent=4)
 
     data_base_path = f"{BASE_DIR}y_web{os.sep}experiments{os.sep}{uid}{os.sep}"
     # copy prompts.json into the experiment folder
@@ -493,7 +553,9 @@ def create_client():
 
     elif exp.platform_type == "forum":
         shutil.copyfile(
-            f"{BASE_DIR}data_schema{os.sep}prompts_forum.json".replace("/y_web/utils", ""),
+            f"{BASE_DIR}data_schema{os.sep}prompts_forum.json".replace(
+                "/y_web/utils", ""
+            ),
             f"{data_base_path}prompts.json",
         )
     else:
@@ -521,13 +583,17 @@ def create_client():
         # randomly select from 1 to 5 topics without replacement and save as interests
         fake = faker.Faker()
 
-        interests = list(set(fake.random_elements(
-            elements=set(topics),
-            length=fake.random_int(
-                min=1,
-                max=5,
-            ),
-        )))
+        interests = list(
+            set(
+                fake.random_elements(
+                    elements=set(topics),
+                    length=fake.random_int(
+                        min=1,
+                        max=5,
+                    ),
+                )
+            )
+        )
 
         ints = [interests, len(interests)]
 
@@ -537,7 +603,7 @@ def create_client():
                 "email": f"{a.name}@ysocial.it",
                 "password": f"{a.name}",
                 "age": a.age,
-                "type": a.ag_type,
+                "type": user_type,  # ,a.ag_type,
                 "leaning": a.leaning,
                 "interests": ints,
                 "oe": a.oe,
@@ -558,6 +624,10 @@ def create_client():
                 "prompts": custom_prompt if custom_prompt else None,
                 "daily_activity_level": a.daily_activity_level,
                 "profession": a.profession,
+                "activity_profile": db.session.query(ActivityProfile)
+                .filter_by(id=a.activity_profile)
+                .first()
+                .name,
             }
         )
 
@@ -583,7 +653,7 @@ def create_client():
                 "email": f"{p.name}@ysocial.it",
                 "password": f"{p.name}",
                 "age": 0,
-                "type": p.pg_type,
+                "type": user_type,
                 "leaning": p.leaning,
                 "interests": [page_topics, len(page_topics)],
                 "oe": "",
@@ -609,12 +679,15 @@ def create_client():
     json.dump(res, open(filename, "w"), indent=4)
 
     # load experiment_details page
+    from .experiments_routes import experiment_details
+
     return experiment_details(int(exp_id))
 
 
 @clientsr.route("/admin/delete_client/<int:uid>")
 @login_required
 def delete_client(uid):
+    """Delete client."""
     check_privileges(current_user.username)
 
     client = Client.query.filter_by(id=uid).first()
@@ -633,12 +706,15 @@ def delete_client(uid):
     else:
         print(f"File {path} does not exist.")
 
+    from .experiments_routes import experiment_details
+
     return experiment_details(exp_id)
 
 
 @clientsr.route("/admin/client_details/<int:uid>")
 @login_required
 def client_details(uid):
+    """Handle client details operation."""
     check_privileges(current_user.username)
 
     # get client details
@@ -675,6 +751,24 @@ def client_details(uid):
     else:
         config = None
 
+    # open the agent population file to get the number of agents
+    path_agents = f"{BASE}{os.sep}experiments{os.sep}{exp_folder}{os.sep}{population.name}.json".replace(
+        f"routes_admin{os.sep}", ""
+    )
+
+    if os.path.exists(path_agents):
+        with open(path_agents, "r") as f:
+            agents = json.load(f)
+    else:
+        agents = None
+
+    llms = []
+    if agents is not None:
+        for agent in agents["agents"]:
+            llms.append(agent["type"])
+
+    llms = ",".join(list(set(llms)))
+
     activity = config["simulation"]["hourly_activity"]
 
     data = []
@@ -684,9 +778,10 @@ def client_details(uid):
         idx.append(str(x))
         data.append(activity[str(x)])
 
-    models = get_ollama_models()
+    models = get_llm_models()  # Use generic function for any LLM server
 
     ollamas = ollama_status()
+    llm_backend = llm_backend_status()
 
     frecsys = Follow_Recsys.query.all()
     crecsys = Content_Recsys.query.all()
@@ -702,8 +797,10 @@ def client_details(uid):
         pages=pages,
         models=models,
         ollamas=ollamas,
+        llm_backend=llm_backend,
         frecsys=frecsys,
         crecsys=crecsys,
+        llms=llms,
     )
 
 
@@ -730,6 +827,7 @@ def get_progress(client_id):
 @clientsr.route("/admin/set_network/<int:uid>", methods=["POST"])
 @login_required
 def set_network(uid):
+    """Handle set network operation."""
     check_privileges(current_user.username)
 
     # get client
@@ -787,6 +885,7 @@ def set_network(uid):
 @clientsr.route("/admin/upload_network/<int:uid>", methods=["POST"])
 @login_required
 def upload_network(uid):
+    """Upload network."""
     check_privileges(current_user.username)
 
     # get client
@@ -898,6 +997,7 @@ def upload_network(uid):
 @clientsr.route("/admin/download_agent_list/<int:uid>")
 @login_required
 def download_agent_list(uid):
+    """Download agent list."""
     check_privileges(current_user.username)
 
     # get client
@@ -914,7 +1014,9 @@ def download_agent_list(uid):
     # get the experiment
     exp = Exps.query.filter_by(idexp=client.id_exp).first()
     # get the experiment folder
-    BASE = os.path.dirname(os.path.abspath(__file__)).replace(f"{os.sep}routes_admin", "")
+    BASE = os.path.dirname(os.path.abspath(__file__)).replace(
+        f"{os.sep}routes_admin", ""
+    )
 
     dbtypte = get_db_type()
 
@@ -941,6 +1043,7 @@ def download_agent_list(uid):
 @clientsr.route("/admin/update_agents_activity/<int:uid>", methods=["POST"])
 @login_required
 def update_agents_activity(uid):
+    """Update agents activity."""
     check_privileges(current_user.username)
 
     # get data from form
@@ -975,6 +1078,7 @@ def update_agents_activity(uid):
 @clientsr.route("/admin/reset_agents_activity/<int:uid>")
 @login_required
 def reset_agents_activity(uid):
+    """Handle reset agents activity operation."""
     check_privileges(current_user.username)
 
     # get client details
@@ -1029,6 +1133,7 @@ def reset_agents_activity(uid):
 @clientsr.route("/admin/update_recsys/<int:uid>", methods=["POST"])
 @login_required
 def update_recsys(uid):
+    """Update recsys."""
     check_privileges(current_user.username)
 
     recsys_type = request.form.get("recsys_type")
@@ -1063,6 +1168,7 @@ def update_recsys(uid):
 @clientsr.route("/admin/update_client_llm/<int:uid>", methods=["POST"])
 @login_required
 def update_llm(uid):
+    """Update llm."""
     check_privileges(current_user.username)
 
     user_type = request.form.get("user_type")

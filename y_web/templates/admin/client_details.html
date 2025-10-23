@@ -29,10 +29,15 @@
 
                     <!--Dashboard box-->
                     <div class="dashboard-box">
-                        <h3 class="title is-5 is-thin">Client</h3>
+                        <h3 class="title is-5 is-thin">Client Overview</h3>
+                        <p style="font-size: 0.9em; color: #666; margin-bottom: 1em;">
+                            Information about this simulation client, including assigned population and content sources.
+                        </p>
 
                         <div class="box-content">
                             <div class="box-lines">
+                                <b>Basic Information</b>
+                                <p style="font-size: 0.85em; color: #777; margin-bottom: 0.5em;">Client identification and configuration.</p>
                                 <div class="box-line">
                                     <span class="left">Name</span>
                                     <span class="right">{{ client.name }}</span>
@@ -41,19 +46,26 @@
                                     <span class="left">Description</span>
                                     <span class="right">{{ client.descr }}</span>
                                 </div>
+                                <hr>
+                                <b>Assigned Resources</b>
+                                <p style="font-size: 0.85em; color: #777; margin-bottom: 0.5em;">Population and content pages used in this simulation.</p>
                                 <div class="box-line">
                                     <span class="left">Population</span>
                                     <span class="right"><a href="/admin/population_details/{{ population.id }}">{{ population.name }}</a></span>
                                 </div>
                                 <div class="box-line">
-                                    <span class="left">Pages</span>
+                                    <span class="left">Content Pages</span>
 
                                     <span class="right">
+                                        {% if pages %}
                                         <ul>
                                         {% for page in pages %}
                                             <li><a href="/admin/page_details/{{ page[0].id }}">{{ page[0].name }}</a></li>
                                         {% endfor %}
                                         </ul>
+                                        {% else %}
+                                        No pages assigned
+                                        {% endif %}
                                     </span>
                                 </div>
 
@@ -69,8 +81,13 @@
 
                     <div class="dashboard-box">
                         <h3 class="title is-5 is-thin">Simulation Parameters</h3>
+                        <p style="font-size: 0.9em; color: #666; margin-bottom: 1em;">
+                            Configuration settings controlling simulation behavior and dynamics.
+                        </p>
                         <div class="box-content">
                             <div class="box-lines">
+                                <b>Duration & Growth</b>
+                                <p style="font-size: 0.85em; color: #777; margin-bottom: 0.5em;">Simulation length and population dynamics.</p>
                                 <div class="box-line">
                                     <span class="left">Simulation Length (days)</span>
                                     <span class="right">{{ client.days }}</span>
@@ -83,6 +100,9 @@
                                     <span class="left">% Daily Churn</span>
                                     <span class="right">{{ client.percentage_removed_agents_iteration }}</span>
                                 </div>
+                                <hr>
+                                <b>Behavioral Settings</b>
+                                <p style="font-size: 0.85em; color: #777; margin-bottom: 0.5em;">Agent interaction and engagement parameters.</p>
                                 <div class="box-line">
                                     <span class="left">Thread Context Length</span>
                                     <span class="right">{{ client.max_length_thread_reading }}</span>
@@ -169,7 +189,11 @@
                         <div class="box-content">
                             <div class="box-lines">
                                 <div class="box-line">
-                                    <span class="left">LLM Server</span>
+                                    <span class="left">LLM Model</span>
+                                    <span class="right">{{ llms }}</span>
+                                </div>
+                                <div class="box-line">
+                                    <span class="left">LLM Server URL</span>
                                     <span class="right">{{ client.llm }}</span>
                                 </div>
                                 <div class="box-line">
@@ -282,7 +306,7 @@
                         <hr>
                         <div class="box-line">
                                     <span class="left">Current LLM</span>
-                                    <span class="right">{{ population.llm }}</span>
+                                    <span class="right">{{ llms }}</span>
                                 </div>
 
                         <hr>
@@ -291,10 +315,23 @@
                                     <h4 class="title is-5 is-thin">Set LLM</h4>
 
                                     <div class="box-line">
+                                        <span class="left">Custom LLM URL (optional)</span>
+                                        <span class="right" style="width: 70%;">
+                                            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 5px;">
+                                                <input type="text" id="custom_llm_url_client" class="input" placeholder="e.g., localhost:8000" value="{{ client.llm }}" style="flex: 1;">
+                                                <button type="button" class="button is-solid primary-button" onclick="fetchModelsForClient()">
+                                                    Fetch Models
+                                                </button>
+                                            </div>
+                                            <div id="llm_url_status_client" style="min-height: 24px; font-size: 0.9rem;"></div>
+                                        </span>
+                                    </div>
+
+                                    <div class="box-line">
                                         <span class="left">Available Models</span>
                                         <span class="right">
                                             <div class="select">
-                                            <select name="user_type">
+                                            <select name="user_type" id="models_select_client">
                                                 <option value=""></option>
                                                     {% for model in models %}
                                                     <option value="{{ model }}">{{ model }}</option>
@@ -305,6 +342,44 @@
                                     </div>
 
                                 </div>
+                                <script>
+                                function fetchModelsForClient() {
+                                    const urlInput = document.getElementById('custom_llm_url_client');
+                                    const select = document.getElementById('models_select_client');
+                                    const status = document.getElementById('llm_url_status_client');
+                                    const llmUrl = urlInput.value.trim();
+
+                                    if (!llmUrl) {
+                                        alert('Please enter an LLM server URL');
+                                        return;
+                                    }
+
+                                    status.innerHTML = '<i class="mdi mdi-loading mdi-spin"></i> Fetching...';
+
+                                    fetch(`/admin/api/fetch_models?llm_url=${encodeURIComponent(llmUrl)}`)
+                                        .then(response => response.json())
+                                        .then(data => {
+                                            if (data.error) {
+                                                status.innerHTML = '<span style="color: red;"><i class="mdi mdi-alert"></i> ' + data.error + '</span>';
+                                                setTimeout(() => { status.innerHTML = ''; }, 5000);
+                                            } else {
+                                                select.innerHTML = '<option value="">Select a model</option>';
+                                                data.models.forEach(model => {
+                                                    const option = document.createElement('option');
+                                                    option.value = model;
+                                                    option.textContent = model;
+                                                    select.appendChild(option);
+                                                });
+                                                status.innerHTML = '<span style="color: green;"><i class="mdi mdi-check"></i> ' + data.models.length + ' models loaded</span>';
+                                                setTimeout(() => { status.innerHTML = ''; }, 3000);
+                                            }
+                                        })
+                                        .catch(error => {
+                                            status.innerHTML = '<span style="color: red;"><i class="mdi mdi-alert"></i> Connection failed</span>';
+                                            setTimeout(() => { status.innerHTML = ''; }, 5000);
+                                        });
+                                }
+                                </script>
                                 <div class="button-wrap">
                                         <button class="button is-solid primary-button is-fullwidth">
                                             Save

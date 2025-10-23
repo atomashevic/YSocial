@@ -1,31 +1,35 @@
+"""
+Agent management routes.
+
+Administrative routes for creating, editing, and managing individual AI agents
+including their profiles, demographics, personality traits, and behavioral
+settings.
+"""
+
 import random
+import re
 
-from flask import (
-    Blueprint,
-    render_template,
-    request,
-)
-from flask_login import login_required, current_user
+from flask import Blueprint, flash, render_template, request
+from flask_login import current_user, login_required
 
+from y_web import db
 from y_web.models import (
-    Population,
+    ActivityProfile,
     Agent,
     Agent_Population,
     Agent_Profile,
-    Profession,
-    Nationalities,
-    Education,
-    Leanings,
-    Languages,
     Content_Recsys,
+    Education,
     Follow_Recsys,
+    Languages,
+    Leanings,
+    Nationalities,
+    Population,
+    Profession,
+    Toxicity_Levels,
 )
-from y_web.utils import get_ollama_models
-from y_web.utils.miscellanea import ollama_status
-
-from y_web import db
-from y_web.utils.miscellanea import check_privileges
-import re
+from y_web.utils import get_llm_models, get_ollama_models
+from y_web.utils.miscellanea import check_privileges, llm_backend_status, ollama_status
 
 agents = Blueprint("agents", __name__)
 
@@ -33,12 +37,19 @@ agents = Blueprint("agents", __name__)
 @agents.route("/admin/agents")
 @login_required
 def agent_data():
+    """
+    Display agent management page.
+
+    Returns:
+        Rendered agent data template with available models
+    """
     check_privileges(current_user.username)
 
-    models = get_ollama_models()
+    models = get_llm_models()  # Use generic function for any LLM server
 
     populations = Population.query.all()
     ollamas = ollama_status()
+    llm_backend = llm_backend_status()
 
     # get professions
     professions = Profession.query.all()
@@ -46,27 +57,33 @@ def agent_data():
     educations = Education.query.all()
     leanings = Leanings.query.all()
     languages = Languages.query.all()
+    toxicity_levels = Toxicity_Levels.query.all()
     crecsys = Content_Recsys.query.all()
     frecsys = Follow_Recsys.query.all()
+    activity_profiles = ActivityProfile.query.all()
 
     return render_template(
         "admin/agents.html",
         populations=populations,
         models=models,
         ollamas=ollamas,
+        llm_backend=llm_backend,
         professions=professions,
         nationalities=nationalities,
         education_levels=educations,
         leanings=leanings,
         languages=languages,
+        toxicity_levels=toxicity_levels,
         crecsys=crecsys,
         frecsys=frecsys,
+        activity_profiles=activity_profiles,
     )
 
 
 @agents.route("/admin/agents_data")
 @login_required
 def agents_data():
+    """Display agents data page."""
     query = Agent.query
 
     # search filter
@@ -82,13 +99,31 @@ def agents_data():
         for s in sort.split(","):
             direction = s[0]
             name = s[1:]
-            if name not in ["name", "profession", "age", "daily_activity_level"]:
+            if name not in [
+                "name",
+                "profession",
+                "age",
+                "daily_activity_level",
+                "activity_profile",
+            ]:
                 name = "name"
-            col = getattr(Agent, name)
-            if direction == "-":
-                col = col.desc()
-            order.append(col)
+            # Handle activity_profile sorting by joining with ActivityProfile table
+            if name == "activity_profile":
+                col = ActivityProfile.name
+                if direction == "-":
+                    col = col.desc()
+                order.append(col)
+            else:
+                col = getattr(Agent, name)
+                if direction == "-":
+                    col = col.desc()
+                order.append(col)
         if order:
+            # Join with ActivityProfile if sorting by activity_profile
+            if any("activity_profile" in str(o) for o in order):
+                query = query.outerjoin(
+                    ActivityProfile, Agent.activity_profile == ActivityProfile.id
+                )
             query = query.order_by(*order)
 
     # pagination
@@ -100,17 +135,27 @@ def agents_data():
     # response
     res = query.all()
 
-    return {
-        "data": [
+    data = []
+    for agent in res:
+        activity_profile_data = None
+        if agent.activity_profile:
+            profile = ActivityProfile.query.get(agent.activity_profile)
+            if profile:
+                activity_profile_data = {"name": profile.name, "hours": profile.hours}
+
+        data.append(
             {
                 "id": agent.id,
                 "name": " ".join(re.findall("[A-Z][^A-Z]*", agent.name)),
                 "age": agent.age,
                 "profession": agent.profession,
                 "daily_activity_level": agent.daily_activity_level,
+                "activity_profile": activity_profile_data,
             }
-            for agent in res
-        ],
+        )
+
+    return {
+        "data": data,
         "total": total,
     }
 
@@ -118,6 +163,12 @@ def agents_data():
 @agents.route("/admin/create_agent", methods=["POST"])
 @login_required
 def create_agent():
+    """
+    Create a new AI agent from form data.
+
+    Returns:
+        Redirect to agent data page
+    """
     check_privileges(current_user.username)
 
     user_type = request.form.get("user_type")
@@ -184,6 +235,7 @@ def create_agent():
 @agents.route("/admin/agent_details/<int:uid>")
 @login_required
 def agent_details(uid):
+    """Handle agent details operation."""
     check_privileges(current_user.username)
     # get agent details
     agent = Agent.query.filter_by(id=uid).first()
@@ -204,7 +256,15 @@ def agent_details(uid):
     # get all populations
     populations = Population.query.all()
 
+    # Get agent's activity profile
+    activity_profile = None
+    if agent.activity_profile:
+        activity_profile = ActivityProfile.query.filter_by(
+            id=agent.activity_profile
+        ).first()
+
     ollamas = ollama_status()
+    llm_backend = llm_backend_status()
 
     return render_template(
         "admin/agent_details.html",
@@ -212,13 +272,21 @@ def agent_details(uid):
         agent_populations=pops,
         profile=agent_profiles,
         populations=populations,
+        activity_profile=activity_profile,
         ollamas=ollamas,
+        llm_backend=llm_backend,
     )
 
 
 @agents.route("/admin/add_to_population", methods=["POST"])
 @login_required
 def add_to_population():
+    """
+    Add an agent to a population from form data.
+
+    Returns:
+        Redirect to agent details page
+    """
     check_privileges(current_user.username)
 
     agent_id = request.form.get("agent_id")
@@ -242,9 +310,18 @@ def add_to_population():
 @agents.route("/admin/delete_agent/<int:uid>")
 @login_required
 def delete_agent(uid):
+    """Delete agent."""
     check_privileges(current_user.username)
 
     agent = Agent.query.filter_by(id=uid).first()
+
+    # check if the agent is assigned to any population
+    agent_pop = Agent_Population.query.filter_by(agent_id=uid).first()
+    if agent_pop:
+        # if the agent is assigned to any population, do not delete raise a warning
+        flash("Agent is assigned to a population. Cannot delete.")
+        return agent_data()
+
     db.session.delete(agent)
     db.session.commit()
 

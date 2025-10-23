@@ -25,7 +25,7 @@
 
                             <div id="table"></div>
 
-                            <script src="https://unpkg.com/gridjs/dist/gridjs.umd.js"></script>
+                            <script src="{{ url_for('static', filename='assets/vendor/js/gridjs.umd.js') }}"></script>
 
                             <style>
 
@@ -74,10 +74,14 @@
                                style="background-color: #28a745; color: white; padding: 6px 12px; border-radius: 4px; text-decoration: none; font-size: 0.85rem;">
                                 Details
                             </a>
-                            <button class="delete-button" data-id="${id}"
+                            <a href="/admin/delete_simulation/${id}"
+                               style="background-color: #dc3545; color: white; padding: 6px 12px; border-radius: 4px; text-decoration: none; font-size: 0.85rem;">
+                                Delete
+                            </a>
+                         <!--   <button class="delete-button" data-id="${id}"
                                 style="background-color: #dc3545; color: white; padding: 6px 12px; border: none; border-radius: 4px; font-size: 0.85rem; cursor: pointer;">
                                 Delete
-                            </button>
+                            </button> -->
                         </div>
                     `);
                 }
@@ -276,7 +280,7 @@
                                         <span class="left">Port</span>
                                         <span class="right" style="width: 70%;"><input type="text" name="port"
                                                                                        class="input"
-                                                                                       value="5000"></span>
+                                                                                       value="5010"></span>
                                     </div>
 
                                        <div class="box-line">
@@ -290,11 +294,21 @@
                                         </div>
 
                                         <script>
-
                                             const tags = document.getElementById('tags');
     const input = document.getElementById('input-tag');
     const hiddenInput = document.getElementById('tags-hidden');
     const tagList = [];
+
+    function updateButtonState() {
+        const createBtn = document.getElementById('create-experiment-btn');
+        if (createBtn) {
+            if (tagList.length > 0) {
+                createBtn.disabled = false;
+            } else {
+                createBtn.disabled = true;
+            }
+        }
+    }
 
     input.addEventListener('keydown', function (event) {
         if (event.key === 'Enter') {
@@ -307,6 +321,7 @@
                 tags.appendChild(tag);
                 hiddenInput.value = tagList.join(',');
                 input.value = '';
+                updateButtonState();
             }
         }
     });
@@ -317,6 +332,7 @@
             tagList.splice(tagList.indexOf(tagText), 1);
             hiddenInput.value = tagList.join(',');
             event.target.parentNode.remove();
+            updateButtonState();
         }
     });
                                         </script>
@@ -331,7 +347,7 @@
                                     </div>
                                 </div>
                                 <div class="button-wrap">
-                                    <button class="button is-solid primary-button is-fullwidth">
+                                    <button id="create-experiment-btn" class="button is-solid primary-button is-fullwidth" disabled>
                                         Create
                                     </button>
                                 </div>
@@ -415,6 +431,8 @@
                                 To create a new experiment, provide a name, description, owner, host, and port.
                                 <br><br>
                                 Once created the experiment it will be possible to: (i) configure it, (ii) allocate synthetic agents to it and, (ii) create clients to interact with it.
+                                <br><br>
+                                <b>Note:</b> Specify at least two simulation topics and to enable agent content generation.
                             </p>
                         </div>
                     </div>

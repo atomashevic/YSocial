@@ -1,17 +1,19 @@
+"""
+User management routes.
+
+Administrative routes for managing admin users including viewing user lists,
+creating new users, and updating user permissions and settings.
+"""
+
 import os
 
-from flask import Blueprint, render_template, request, abort
-from flask_login import login_required, current_user
+from flask import Blueprint, abort, current_app, render_template, request
+from flask_login import current_user, login_required
 
-from y_web.models import Exps, Admin_users, User_mgmt, User_Experiment
-
-from y_web.utils import get_ollama_models
-
-from y_web import db#, app
-from flask import current_app
-
-from y_web.utils.miscellanea import check_privileges, ollama_status
-
+from y_web import db  # , app
+from y_web.models import Admin_users, Exps, User_Experiment, User_mgmt
+from y_web.utils.external_processes import get_llm_models
+from y_web.utils.miscellanea import check_privileges, llm_backend_status, ollama_status
 
 users = Blueprint("users", __name__)
 
@@ -19,18 +21,34 @@ users = Blueprint("users", __name__)
 @users.route("/admin/users")
 @login_required
 def user_data():
+    """
+    Display user management page.
+
+    Returns:
+        Rendered user data template with available models and ollama status
+    """
     check_privileges(current_user.username)
+    llm_backend = llm_backend_status()
+    models = (
+        get_llm_models(llm_backend["url"])
+        if llm_backend and llm_backend.get("url")
+        else []
+    )
     ollamas = ollama_status()
-    if ollamas["status"]:
-        models = get_ollama_models()
-    else:
-        models = []
-    return render_template("admin/users.html", m=models, ollamas=ollamas)
+    return render_template(
+        "admin/users.html", m=models, ollamas=ollamas, llm_backend=llm_backend
+    )
 
 
 @users.route("/admin/user_data")
 @login_required
 def users_data():
+    """
+    Display list of all admin users.
+
+    Returns:
+        Rendered users list template
+    """
     query = Admin_users.query
 
     # search filter
@@ -88,6 +106,12 @@ def users_data():
 @users.route("/admin/user_data", methods=["POST"])
 @login_required
 def update():
+    """
+    Update user information from form data.
+
+    Returns:
+        Redirect to users page
+    """
     data = request.get_json()
     if "id" not in data:
         abort(400)
@@ -102,6 +126,7 @@ def update():
 @users.route("/admin/user_details/<int:uid>")
 @login_required
 def user_details(uid):
+    """Handle user details operation."""
     check_privileges(current_user.username)
 
     # get user details
@@ -122,6 +147,8 @@ def user_details(uid):
         for j in joined_exp
     ]
 
+    llm_backend = llm_backend_status()
+    models = get_llm_models(llm_backend["url"]) if llm_backend["url"] else []
     ollamas = ollama_status()
 
     return render_template(
@@ -131,6 +158,8 @@ def user_details(uid):
         all_experiments=all_experiments,
         user_experiments_joined=joined_exp,
         none=None,
+        llm_backend=llm_backend,
+        models=models,
         ollamas=ollamas,
     )
 
@@ -138,6 +167,12 @@ def user_details(uid):
 @users.route("/admin/add_user", methods=["POST"])
 @login_required
 def add_user():
+    """
+    Create a new admin user from form data.
+
+    Returns:
+        Redirect to users page
+    """
     check_privileges(current_user.username)
 
     username = request.form.get("username")
@@ -165,6 +200,7 @@ def add_user():
 @users.route("/admin/delete_user/<int:uid>")
 @login_required
 def delete_user(uid):
+    """Delete user."""
     check_privileges(current_user.username)
 
     user = Admin_users.query.filter_by(id=uid).first()
@@ -177,6 +213,12 @@ def delete_user(uid):
 @users.route("/admin/add_user_to_experiment", methods=["POST"])
 @login_required
 def add_user_to_experiment():
+    """
+    Associate a user with an experiment.
+
+    Returns:
+        Redirect to user details
+    """
     check_privileges(current_user.username)
 
     user_id = request.form.get("user_id")
@@ -189,9 +231,11 @@ def add_user_to_experiment():
 
     BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
-    #app.config["SQLALCHEMY_BINDS"]["db_exp"] = f"sqlite:///{BASE_DIR}/{exp.db_name}"
+    # app.config["SQLALCHEMY_BINDS"]["db_exp"] = f"sqlite:///{BASE_DIR}/{exp.db_name}"
 
-    current_app.config["SQLALCHEMY_BINDS"]["db_exp"] = f"sqlite:///{BASE_DIR}/{exp.db_name}"
+    current_app.config["SQLALCHEMY_BINDS"][
+        "db_exp"
+    ] = f"sqlite:///{BASE_DIR}/{exp.db_name}"
 
     # check if the user is present in the User_mgmt table
     user_exp = db.session.query(User_mgmt).filter_by(username=user.username).first()
@@ -232,9 +276,38 @@ def add_user_to_experiment():
     return user_details(user_id)
 
 
+@users.route("/admin/update_user_llm", methods=["POST"])
+@login_required
+def update_user_llm():
+    """
+    Update user's LLM configuration including model and server URL.
+
+    Returns:
+        Redirect to user details
+    """
+    check_privileges(current_user.username)
+
+    user_id = request.form.get("user_id")
+    llm = request.form.get("llm")
+    llm_url = request.form.get("custom_llm_url", "").strip()
+
+    user = Admin_users.query.filter_by(id=user_id).first()
+    user.llm = llm
+    user.llm_url = llm_url
+    db.session.commit()
+
+    return user_details(user_id)
+
+
 @users.route("/admin/set_perspective_api_user", methods=["POST"])
 @login_required
 def set_perspective_api_user():
+    """
+    Set Perspective API key for a user.
+
+    Returns:
+        Redirect to user details
+    """
     check_privileges(current_user.username)
 
     user_id = request.form.get("user_id")

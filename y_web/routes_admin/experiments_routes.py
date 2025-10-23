@@ -1,46 +1,57 @@
+"""
+Experiment management routes.
+
+Administrative routes for creating, configuring, launching, and managing
+social media simulation experiments including database setup, population
+assignment, and experiment lifecycle control.
+"""
+
+import json
 import os
+import pathlib
+import shutil
+import uuid
 
 from flask import (
     Blueprint,
-    render_template,
-    redirect,
-    request,
+    current_app,
     flash,
+    redirect,
+    render_template,
+    request,
     send_file,
 )
-from flask_login import login_required, current_user
+from flask_login import current_user, login_required
 
+from y_web import db  # , app
 from y_web.models import (
-    Exps,
+    ActivityProfile,
     Admin_users,
-    Exp_stats,
-    User_mgmt,
-    Rounds,
-    Population,
-    Population_Experiment,
-    User_Experiment,
-    Client,
-    Client_Execution,
     Agent,
     Agent_Population,
     Agent_Profile,
-    Page,
-    Page_Population,
+    Client,
+    Client_Execution,
+    Education,
+    Exp_stats,
+    Exp_Topic,
+    Exps,
     Languages,
     Leanings,
     Nationalities,
+    Page,
+    Page_Population,
+    Population,
+    Population_Experiment,
     Profession,
-    Education,
+    Rounds,
     Topic_List,
-    Exp_Topic
+    Toxicity_Levels,
+    User_Experiment,
+    User_mgmt,
 )
-from y_web.utils import terminate_process_on_port, start_server
-import json
-import pathlib, shutil
-import uuid
-from y_web import db#, app
-from flask import current_app
-from y_web.utils.miscellanea import check_privileges, reload_current_user, ollama_status
+from y_web.utils import start_server, terminate_process_on_port
+from y_web.utils.miscellanea import check_privileges, ollama_status, reload_current_user
 
 experiments = Blueprint("experiments", __name__)
 
@@ -48,6 +59,11 @@ experiments = Blueprint("experiments", __name__)
 @experiments.route("/admin/experiments")
 @login_required
 def settings():
+    """
+    Display experiments settings and management page.
+
+    Shows list of experiments, users, and database configuration.
+    """
     check_privileges(current_user.username)
 
     # load all experiments
@@ -67,7 +83,11 @@ def settings():
     dbtype = current_app.config["SQLALCHEMY_DATABASE_URI"].split(":")[0]
 
     return render_template(
-        "admin/settings.html", experiments=experiments, users=users, ollamas=ollamas, dbtype=dbtype
+        "admin/settings.html",
+        experiments=experiments,
+        users=users,
+        ollamas=ollamas,
+        dbtype=dbtype,
     )
 
 
@@ -75,6 +95,7 @@ def settings():
 @login_required
 def join_simulation():
     # get user id for the current user logged in
+    """Handle join simulation operation."""
     user_id = (
         db.session.query(User_mgmt).filter_by(username=current_user.username).first().id
     )
@@ -100,6 +121,15 @@ def join_simulation():
 @experiments.route("/admin/select_experiment/<int:exp_id>")
 @login_required
 def change_active_experiment(exp_id):
+    """
+    Change the currently active experiment.
+
+    Args:
+        exp_id: ID of experiment to activate
+
+    Returns:
+        Redirect to settings page
+    """
     check_privileges(current_user.username)
     uname = current_user.username
 
@@ -108,11 +138,16 @@ def change_active_experiment(exp_id):
     BASE_DIR = os.path.dirname(os.path.abspath(__file__)).split("routes_admin")[0]
     # check the database type in the URI
     if current_app.config["SQLALCHEMY_DATABASE_URI"].startswith("postgresql"):
-        new_db = '/'.join(current_app.config['SQLALCHEMY_DATABASE_URI'].rsplit('/', 1)[:-1] + [exp.db_name])
+        new_db = "/".join(
+            current_app.config["SQLALCHEMY_DATABASE_URI"].rsplit("/", 1)[:-1]
+            + [exp.db_name]
+        )
         # if postgresql, set the bind to the postgresql database
         current_app.config["SQLALCHEMY_BINDS"]["db_exp"] = new_db
     elif current_app.config["SQLALCHEMY_DATABASE_URI"].startswith("sqlite"):
-        current_app.config["SQLALCHEMY_BINDS"]["db_exp"] = f"sqlite:///{BASE_DIR}/{exp.db_name}"
+        current_app.config["SQLALCHEMY_BINDS"][
+            "db_exp"
+        ] = f"sqlite:///{BASE_DIR}/{exp.db_name}"
 
     else:
         flash("Unsupported database type. Please use SQLite or PostgreSQL.")
@@ -161,6 +196,7 @@ def change_active_experiment(exp_id):
 @experiments.route("/admin/upload_experiment", methods=["POST"])
 @login_required
 def upload_experiment():
+    """Upload experiment."""
     check_privileges(current_user.username)
 
     experiment = request.files["experiment"]
@@ -205,7 +241,7 @@ def upload_experiment():
             status=0,
             port=experiment["port"],
             server=experiment["host"],
-            platform_type= experiment["platform_type"],
+            platform_type=experiment["platform_type"],
         )
 
         db.session.add(exp)
@@ -395,6 +431,7 @@ def upload_experiment():
 @experiments.route("/admin/upload_database", methods=["POST"])
 @login_required
 def upload_database():
+    """Upload database."""
     check_privileges(current_user.username)
 
     database = request.files["sqlite_filename"]
@@ -454,6 +491,7 @@ def upload_database():
 @experiments.route("/admin/create_experiment", methods=["POST", "GET"])
 @login_required
 def create_experiment():
+    """Create experiment."""
     check_privileges(current_user.username)
 
     exp_name = request.form.get("exp_name")
@@ -485,10 +523,10 @@ def create_experiment():
                 f"y_web{os.sep}experiments{os.sep}{uid}{os.sep}database_server.db",
             )
         elif db_type == "postgresql":
-            from sqlalchemy import text
-            from werkzeug.security import generate_password_hash
             from urllib.parse import urlparse
-            from sqlalchemy import create_engine
+
+            from sqlalchemy import create_engine, text
+            from werkzeug.security import generate_password_hash
 
             # Get current URI and parse it
             current_uri = current_app.config["SQLALCHEMY_DATABASE_URI"]
@@ -505,17 +543,26 @@ def create_experiment():
             db_uri = f"postgresql://{user}:{password}@{host}:{port_db}/{dbname}"
 
             # Connect to the default 'postgres' DB to check/create the new one
-            admin_engine = create_engine(f"postgresql://{user}:{password}@{host}:{port_db}/postgres")
+            admin_engine = create_engine(
+                f"postgresql://{user}:{password}@{host}:{port_db}/postgres"
+            )
 
             # --- Check and create dummy DB if needed ---
             with admin_engine.connect() as conn:
-                result = conn.execute(text(f"SELECT 1 FROM pg_database WHERE datname = :dbname"), {"dbname": dbname})
+                result = conn.execute(
+                    text(f"SELECT 1 FROM pg_database WHERE datname = :dbname"),
+                    {"dbname": dbname},
+                )
                 db_exists = result.scalar() is not None
 
             if not db_exists:
                 # CREATE DATABASE must run in AUTOCOMMIT mode
-                with admin_engine.connect().execution_options(isolation_level="AUTOCOMMIT") as conn:
-                    conn.execute(text(f'CREATE DATABASE "{dbname}"'))  # quoted for safety
+                with admin_engine.connect().execution_options(
+                    isolation_level="AUTOCOMMIT"
+                ) as conn:
+                    conn.execute(
+                        text(f'CREATE DATABASE "{dbname}"')
+                    )  # quoted for safety
 
                 # ✅ Now connect to the *newly created* database
                 experiment_engine = create_engine(db_uri)
@@ -529,31 +576,36 @@ def create_experiment():
                     # Insert initial admin user
                     hashed_pw = generate_password_hash("test", method="pbkdf2:sha256")
 
-                    stmt = text("""
+                    stmt = text(
+                        """
                                 INSERT INTO user_mgmt (username, email, password, user_type, leaning, age,
                                                        language, owner, joined_on, frecsys_type,
                                                        round_actions, toxicity, is_page, daily_activity_level)
                                 VALUES (:username, :email, :password, :user_type, :leaning, :age,
                                         :language, :owner, :joined_on, :frecsys_type,
                                         :round_actions, :toxicity, :is_page, :daily_activity_level)
-                                """)
+                                """
+                    )
 
-                    dummy_conn.execute(stmt, {
-                        "username": "admin",
-                        "email": "admin@ysocial.com",
-                        "password": hashed_pw,
-                        "user_type": "user",
-                        "leaning": "none",
-                        "age": 0,
-                        "language": "en",
-                        "owner": "admin",
-                        "joined_on": 0,
-                        "frecsys_type": "default",
-                        "round_actions": 3,
-                        "toxicity": "none",
-                        "is_page": 0,
-                        "daily_activity_level": 1,
-                    })
+                    dummy_conn.execute(
+                        stmt,
+                        {
+                            "username": "admin",
+                            "email": "admin@ysocial.com",
+                            "password": hashed_pw,
+                            "user_type": "user",
+                            "leaning": "none",
+                            "age": 0,
+                            "language": "en",
+                            "owner": "admin",
+                            "joined_on": 0,
+                            "frecsys_type": "default",
+                            "round_actions": 3,
+                            "toxicity": "none",
+                            "is_page": 0,
+                            "daily_activity_level": 1,
+                        },
+                    )
 
                 experiment_engine.dispose()
 
@@ -578,14 +630,18 @@ def create_experiment():
     with open(
         f"y_web{os.sep}experiments{os.sep}{uid}{os.sep}config_server.json", "w"
     ) as f:
-        json.dump(config, f)
+        json.dump(config, f, indent=4)
 
     # add the experiment to the database
 
     exp = Exps(
         exp_name=exp_name,
         platform_type=platform_type,
-        db_name=f"experiments{os.sep}{uid}{os.sep}database_server.db" if db_type=="sqlite" else f"experiments_{uid}",
+        db_name=(
+            f"experiments{os.sep}{uid}{os.sep}database_server.db"
+            if db_type == "sqlite"
+            else f"experiments_{uid}"
+        ),
         owner=db.session.query(Admin_users).filter_by(id=owner).first().username,
         exp_descr=exp_descr,
         status=0,
@@ -631,6 +687,7 @@ def create_experiment():
 @login_required
 def delete_simulation(exp_id):
     # get the experiment
+    """Delete simulation."""
     exp = Exps.query.filter_by(idexp=exp_id).first()
     if exp:
         # remove the experiment folder
@@ -700,6 +757,12 @@ def delete_simulation(exp_id):
 @experiments.route("/admin/experiments_data")
 @login_required
 def experiments_data():
+    """
+    Display paginated list of experiments.
+
+    Returns:
+        Rendered experiments list template
+    """
     query = Exps.query
 
     # search filter
@@ -753,6 +816,7 @@ def experiments_data():
 @experiments.route("/admin/experiment_details/<int:uid>")
 @login_required
 def experiment_details(uid):
+    """Handle experiment details operation."""
     check_privileges(current_user.username)
 
     # get experiment details
@@ -792,13 +856,14 @@ def experiment_details(uid):
         users=users,
         len=len,
         ollamas=ollamas,
-        dbtype=dbtype
+        dbtype=dbtype,
     )
 
 
 @experiments.route("/admin/start_experiment/<int:uid>")
 @login_required
 def start_experiment(uid):
+    """Handle start experiment operation."""
     check_privileges(current_user.username)
 
     # get experiment
@@ -815,12 +880,13 @@ def start_experiment(uid):
     # start the yserver
     start_server(exp)
 
-    return redirect(request.referrer)  # experiment_details(uid)
+    return experiment_details(uid)
 
 
 @experiments.route("/admin/stop_experiment/<int:uid>")
 @login_required
 def stop_experiment(uid):
+    """Handle stop experiment operation."""
     check_privileges(current_user.username)
 
     # get experiment
@@ -853,6 +919,7 @@ def stop_experiment(uid):
 @experiments.route("/admin/prompts/<int:uid>")
 @login_required
 def prompts(uid):
+    """Handle prompts operation."""
     check_privileges(current_user.username)
 
     # get experiment details
@@ -873,6 +940,7 @@ def prompts(uid):
 @experiments.route("/admin/update_prompts/<int:uid>", methods=["POST"])
 @login_required
 def update_prompts(uid):
+    """Update prompts."""
     check_privileges(current_user.username)
 
     # get experiment details
@@ -896,6 +964,7 @@ def update_prompts(uid):
 @experiments.route("/admin/download_experiment/<int:eid>", methods=["POST", "GET"])
 @login_required
 def download_experiment_file(eid):
+    """Download experiment file."""
     check_privileges(current_user.username)
 
     # get experiment details
@@ -919,6 +988,12 @@ def download_experiment_file(eid):
 @experiments.route("/admin/miscellanea/", methods=["GET"])
 @login_required
 def miscellanea():
+    """
+    Display miscellaneous settings page (languages, leanings, etc.).
+
+    Returns:
+        Rendered miscellaneous settings template
+    """
     check_privileges(current_user.username)
 
     ollamas = ollama_status()
@@ -929,6 +1004,7 @@ def miscellanea():
 @experiments.route("/admin/languages_data")
 @login_required
 def languages_data():
+    """Display languages data page."""
     query = Languages.query
 
     # search filter
@@ -979,6 +1055,7 @@ def languages_data():
 @experiments.route("/admin/leanings_data")
 @login_required
 def leanings_data():
+    """Display leanings data page."""
     query = Leanings.query
 
     # search filter
@@ -1029,6 +1106,7 @@ def leanings_data():
 @experiments.route("/admin/nationalities_data")
 @login_required
 def nationalities_data():
+    """Display nationalities data page."""
     query = Nationalities.query
 
     # search filter
@@ -1084,6 +1162,7 @@ def nationalities_data():
 @experiments.route("/admin/professions_data")
 @login_required
 def professions_data():
+    """Display professions data page."""
     query = Profession.query
 
     search = request.args.get("search")
@@ -1134,6 +1213,7 @@ def professions_data():
 @experiments.route("/admin/educations_data")
 @login_required
 def educations_data():
+    """Display educations data page."""
     query = Education.query
 
     search = request.args.get("search")
@@ -1183,6 +1263,7 @@ def educations_data():
 @experiments.route("/admin/create_language", methods=["POST"])
 @login_required
 def create_language():
+    """Create language."""
     check_privileges(current_user.username)
 
     language = request.form.get("language")
@@ -1197,6 +1278,7 @@ def create_language():
 @experiments.route("/admin/create_leaning", methods=["POST"])
 @login_required
 def create_leaning():
+    """Create leaning."""
     check_privileges(current_user.username)
 
     leaning = request.form.get("leaning")
@@ -1211,6 +1293,7 @@ def create_leaning():
 @experiments.route("/admin/create_nationality", methods=["POST"])
 @login_required
 def create_nationality():
+    """Create nationality."""
     check_privileges(current_user.username)
 
     nationality = request.form.get("nationality")
@@ -1225,6 +1308,7 @@ def create_nationality():
 @experiments.route("/admin/create_profession", methods=["POST"])
 @login_required
 def create_profession():
+    """Create profession."""
     check_privileges(current_user.username)
 
     profession = request.form.get("profession")
@@ -1240,6 +1324,7 @@ def create_profession():
 @experiments.route("/admin/create_education", methods=["POST"])
 @login_required
 def create_education():
+    """Create education."""
     check_privileges(current_user.username)
 
     education_level = request.form.get("education_level")
@@ -1254,6 +1339,7 @@ def create_education():
 @experiments.route("/admin/create_topic", methods=["POST"])
 @login_required
 def create_topic():
+    """Create topic."""
     check_privileges(current_user.username)
 
     topic = request.form.get("topic")
@@ -1274,6 +1360,7 @@ def create_topic():
 @experiments.route("/admin/topic_data")
 @login_required
 def topic_data():
+    """Display topic data page."""
     query = Topic_List.query
 
     # search filter
@@ -1319,9 +1406,10 @@ def topic_data():
     }
 
 
-@experiments.route('/admin/delete_topic/<int:topic_id>', methods=['DELETE'])
+@experiments.route("/admin/delete_topic/<int:topic_id>", methods=["DELETE"])
 @login_required
 def delete_topic(topic_id):
+    """Delete topic."""
     check_privileges(current_user.username)
 
     topic = Topic_List.query.filter_by(id=topic_id).first()
@@ -1333,9 +1421,10 @@ def delete_topic(topic_id):
     return miscellanea()
 
 
-@experiments.route('/admin/delete_language/<int:language_id>', methods=['DELETE'])
+@experiments.route("/admin/delete_language/<int:language_id>", methods=["DELETE"])
 @login_required
 def delete_language(language_id):
+    """Delete language."""
     check_privileges(current_user.username)
 
     language = Languages.query.filter_by(id=language_id).first()
@@ -1347,9 +1436,10 @@ def delete_language(language_id):
     return miscellanea()
 
 
-@experiments.route('/admin/delete_leaning/<int:leaning_id>', methods=['DELETE'])
+@experiments.route("/admin/delete_leaning/<int:leaning_id>", methods=["DELETE"])
 @login_required
 def delete_leaning(leaning_id):
+    """Delete leaning."""
     check_privileges(current_user.username)
 
     leaning = Leanings.query.filter_by(id=leaning_id).first()
@@ -1361,9 +1451,10 @@ def delete_leaning(leaning_id):
     return miscellanea()
 
 
-@experiments.route('/admin/delete_nationality/<int:nationality_id>', methods=['DELETE'])
+@experiments.route("/admin/delete_nationality/<int:nationality_id>", methods=["DELETE"])
 @login_required
 def delete_nationality(nationality_id):
+    """Delete nationality."""
     check_privileges(current_user.username)
 
     nationality = Nationalities.query.filter_by(id=nationality_id).first()
@@ -1375,9 +1466,12 @@ def delete_nationality(nationality_id):
     return miscellanea()
 
 
-@experiments.route('/admin/delete_education/<int:education_level_id>', methods=['DELETE'])
+@experiments.route(
+    "/admin/delete_education/<int:education_level_id>", methods=["DELETE"]
+)
 @login_required
 def delete_education_level(education_level_id):
+    """Delete education level."""
     check_privileges(current_user.username)
 
     education_level = Education.query.filter_by(id=education_level_id).first()
@@ -1389,9 +1483,10 @@ def delete_education_level(education_level_id):
     return miscellanea()
 
 
-@experiments.route('/admin/delete_profession/<int:profession_id>', methods=['DELETE'])
+@experiments.route("/admin/delete_profession/<int:profession_id>", methods=["DELETE"])
 @login_required
 def delete_profession(profession_id):
+    """Delete profession."""
     check_privileges(current_user.username)
 
     profession = Profession.query.filter_by(id=profession_id).first()
@@ -1399,5 +1494,192 @@ def delete_profession(profession_id):
         flash("Profession not found.")
         return miscellanea()
     db.session.delete(profession)
+    db.session.commit()
+    return miscellanea()
+
+
+@experiments.route("/admin/toxicity_levels_data")
+@login_required
+def toxicity_levels_data():
+    """Display toxicity levels data page."""
+    query = Toxicity_Levels.query
+
+    search = request.args.get("search")
+    if search:
+        query = query.filter(db.or_(Toxicity_Levels.toxicity_level.like(f"%{search}%")))
+    total = query.count()
+
+    # sorting
+    sort = request.args.get("sort")
+    if sort:
+        order = []
+        for s in sort.split(","):
+            direction = s[0]
+            name = s[1:]
+            if name not in ["toxicity_level"]:
+                name = "name"
+            col = getattr(Exps, name)
+            if direction == "-":
+                col = col.desc()
+            order.append(col)
+        if order:
+            query = query.order_by(*order)
+
+    # pagination
+    start = request.args.get("start", type=int, default=-1)
+    length = request.args.get("length", type=int, default=-1)
+    if start != -1 and length != -1:
+        query = query.offset(start).limit(length)
+
+    # response
+    res = query.all()
+
+    res = {
+        "data": [
+            {
+                "id": exp.id,
+                "toxicity_level": exp.toxicity_level,
+            }
+            for exp in res
+        ],
+        "total": total,
+    }
+
+    return res
+
+
+@experiments.route("/admin/create_toxicity_level", methods=["POST"])
+@login_required
+def create_toxicity_level():
+    """Create toxicity level."""
+    check_privileges(current_user.username)
+
+    toxicity_level = request.form.get("toxicity_level")
+
+    tox = Toxicity_Levels(toxicity_level=toxicity_level)
+    db.session.add(tox)
+    db.session.commit()
+
+    return redirect(request.referrer)
+
+
+@experiments.route(
+    "/admin/delete_toxicity_level/<int:toxicity_level_id>", methods=["DELETE"]
+)
+@login_required
+def delete_toxicity_level(toxicity_level_id):
+    """Delete toxicity level."""
+    check_privileges(current_user.username)
+
+    toxicity_level = Toxicity_Levels.query.filter_by(id=toxicity_level_id).first()
+    if not toxicity_level:
+        flash("Toxicity level not found.")
+        return miscellanea()
+    db.session.delete(toxicity_level)
+    db.session.commit()
+    return miscellanea()
+
+
+@experiments.route("/admin/activity_profiles_data", methods=["GET", "POST"])
+@login_required
+def activity_profiles_data():
+    """Display activity profiles data page and handle inline edits."""
+    if request.method == "POST":
+        # Handle inline edit
+        data = request.get_json()
+        profile_id = data.get("id")
+        profile = ActivityProfile.query.filter_by(id=profile_id).first()
+        if profile:
+            if "name" in data:
+                profile.name = data["name"]
+            db.session.commit()
+        return {"success": True}
+
+    query = ActivityProfile.query
+
+    search = request.args.get("search")
+    if search:
+        query = query.filter(db.or_(ActivityProfile.name.like(f"%{search}%")))
+    total = query.count()
+
+    # sorting
+    sort = request.args.get("sort")
+    if sort:
+        order = []
+        for s in sort.split(","):
+            direction = s[0]
+            name = s[1:]
+            if name not in ["name"]:
+                name = "name"
+            col = getattr(ActivityProfile, name)
+            if direction == "-":
+                col = col.desc()
+            order.append(col)
+        if order:
+            query = query.order_by(*order)
+
+    # pagination
+    start = request.args.get("start", type=int, default=-1)
+    length = request.args.get("length", type=int, default=-1)
+    if start != -1 and length != -1:
+        query = query.offset(start).limit(length)
+
+    # response
+    res = query.all()
+
+    res = {
+        "data": [
+            {
+                "id": profile.id,
+                "name": profile.name,
+                "hours": profile.hours,
+            }
+            for profile in res
+        ],
+        "total": total,
+    }
+
+    return res
+
+
+@experiments.route("/admin/create_activity_profile", methods=["POST"])
+@login_required
+def create_activity_profile():
+    """Create activity profile."""
+    check_privileges(current_user.username)
+
+    name = request.form.get("name")
+    hours = request.form.get("hours")
+
+    if not name or not hours:
+        flash("Name and hours are required.")
+        return redirect(request.referrer)
+
+    # Check if the profile already exists
+    existing_profile = ActivityProfile.query.filter_by(name=name).first()
+    if existing_profile:
+        flash("An activity profile with this name already exists.")
+        return redirect(request.referrer)
+
+    profile = ActivityProfile(name=name, hours=hours)
+    db.session.add(profile)
+    db.session.commit()
+
+    return redirect(request.referrer)
+
+
+@experiments.route(
+    "/admin/delete_activity_profile/<int:profile_id>", methods=["DELETE"]
+)
+@login_required
+def delete_activity_profile(profile_id):
+    """Delete activity profile."""
+    check_privileges(current_user.username)
+
+    profile = ActivityProfile.query.filter_by(id=profile_id).first()
+    if not profile:
+        flash("Activity profile not found.")
+        return miscellanea()
+    db.session.delete(profile)
     db.session.commit()
     return miscellanea()

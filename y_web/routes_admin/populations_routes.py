@@ -1,40 +1,52 @@
+"""
+Population management routes.
+
+Administrative routes for creating, configuring, and managing agent populations
+including demographics, personality traits, recommendation systems, and
+association with experiments and pages.
+"""
+
 import json
 import os
 
 from flask import (
     Blueprint,
+    flash,
+    redirect,
     render_template,
     request,
     send_file,
-    redirect,
-    flash,
 )
-from flask_login import login_required, current_user
+from flask_login import current_user, login_required
 
+from y_web import db
 from y_web.models import (
-    Exps,
-    Population,
+    ActivityProfile,
     Agent,
     Agent_Population,
-    Population_Experiment,
-    Page_Population,
-    Page,
     Agent_Profile,
+    Content_Recsys,
     Education,
+    Exp_Topic,
+    Exps,
+    Follow_Recsys,
+    Languages,
     Leanings,
     Nationalities,
-    Languages,
-    Content_Recsys,
-    Follow_Recsys, Exp_Topic, Topic_List,
+    Page,
+    Page_Population,
+    Population,
+    Population_Experiment,
+    PopulationActivityProfile,
+    Topic_List,
+    Toxicity_Levels,
 )
 from y_web.utils import (
     generate_population,
+    get_llm_models,
     get_ollama_models,
 )
-
-from y_web import db
-from y_web.utils.miscellanea import check_privileges, ollama_status
-
+from y_web.utils.miscellanea import check_privileges, llm_backend_status, ollama_status
 
 population = Blueprint("population", __name__)
 
@@ -42,6 +54,16 @@ population = Blueprint("population", __name__)
 @population.route("/admin/create_population_empty", methods=["POST", "GET"])
 @login_required
 def create_population_empty():
+    """
+    Create a new empty population with just name and description.
+
+    Form data:
+        empty_population_name: Name for the population
+        empty_population_descr: Description of the population
+
+    Returns:
+        Redirect to populations list
+    """
     check_privileges(current_user.username)
 
     name = request.form.get("empty_population_name")
@@ -59,6 +81,21 @@ def create_population_empty():
 @population.route("/admin/create_population", methods=["POST"])
 @login_required
 def create_population():
+    """
+    Create a new population with full configuration.
+
+    Creates population with demographics, personality traits, interests,
+    toxicity levels, and recommendation system settings. Generates agents
+    based on the configuration.
+
+    Form data:
+        pop_name, pop_descr, n_agents, user_type, age_min, age_max,
+        education_levels, political_leanings, toxicity_levels,
+        nationalities, languages, tags (interests), crecsys, frecsys
+
+    Returns:
+        Redirect to populations list
+    """
     check_privileges(current_user.username)
     name = request.form.get("pop_name")
     descr = request.form.get("pop_descr")
@@ -66,6 +103,8 @@ def create_population():
     user_type = request.form.get("user_type")
     age_min = int(request.form.get("age_min"))
     age_max = int(request.form.get("age_max"))
+
+    llm = request.form.get("host_llm")
 
     education_levels = request.form.getlist("education_levels")
     education_levels = ",".join(education_levels)
@@ -82,6 +121,13 @@ def create_population():
     frecsys = request.form.get("frecsys_type")
     crecsys = request.form.get("recsys_type")
 
+    # Get activity profiles data from the hidden field
+    activity_profiles_data = request.form.get("activity_profiles_data", "[]")
+    try:
+        activity_profiles_json = json.loads(activity_profiles_data)
+    except:
+        activity_profiles_json = []
+
     population = Population(
         name=name,
         descr=descr,
@@ -97,9 +143,20 @@ def create_population():
         toxicity=toxicity_levels,
         frecsys=frecsys,
         crecsys=crecsys,
+        llm_url=llm,
     )
 
     db.session.add(population)
+    db.session.commit()
+
+    # Store population-activity profile associations
+    for profile_data in activity_profiles_json:
+        profile_assoc = PopulationActivityProfile(
+            population=population.id,
+            activity_profile=int(profile_data["id"]),
+            percentage=float(profile_data["percentage"]),
+        )
+        db.session.add(profile_assoc)
     db.session.commit()
 
     generate_population(name)
@@ -110,6 +167,12 @@ def create_population():
 @population.route("/admin/populations_data")
 @login_required
 def populations_data():
+    """
+    Display populations management page.
+
+    Returns:
+        Rendered populations data template
+    """
     query = Population.query
 
     # search filter
@@ -147,9 +210,11 @@ def populations_data():
     # response
     res = query.all()
 
-
     return {
-        "data": [{"id": pop.id, "name": pop.name, "descr": pop.descr, "size": pop.size} for pop in res],
+        "data": [
+            {"id": pop.id, "name": pop.name, "descr": pop.descr, "size": pop.size}
+            for pop in res
+        ],
         "total": total,
     }
 
@@ -157,41 +222,51 @@ def populations_data():
 @population.route("/admin/populations")
 @login_required
 def populations():
+    """
+    Display main populations overview page.
+
+    Returns:
+        Rendered populations template with all populations
+    """
     check_privileges(current_user.username)
 
     # Regular expression to match model values
 
-    models = get_ollama_models()
+    models = get_llm_models()  # Use generic function for any LLM server
     ollamas = ollama_status()
+    llm_backend = llm_backend_status()
     leanings = Leanings.query.all()
     education_levels = Education.query.all()
     nationalities = Nationalities.query.all()
     languages = Languages.query.all()
+    toxicity_levels = Toxicity_Levels.query.all()
     crecsys = Content_Recsys.query.all()
     frecsys = Follow_Recsys.query.all()
+    activity_profiles = ActivityProfile.query.all()
 
     return render_template(
         "admin/populations.html",
         models=models,
         ollamas=ollamas,
+        llm_backend=llm_backend,
         leanings=leanings,
         education_levels=education_levels,
         nationalities=nationalities,
         languages=languages,
+        toxicity_levels=toxicity_levels,
         crecsys=crecsys,
         frecsys=frecsys,
+        activity_profiles=activity_profiles,
     )
 
 
 @population.route("/admin/population_details/<int:uid>")
 @login_required
 def population_details(uid):
+    """Handle population details operation."""
     check_privileges(current_user.username)
     # get population details
     population = Population.query.filter_by(id=uid).first()
-
-    # get all experiments
-    experiments = Exps.query.all()
 
     # get experiment populations along with experiment names and ids
     experiment_populations = (
@@ -324,6 +399,17 @@ def population_details(uid):
             else:
                 llm[a[0].ag_type] = 1
 
+    # get topics associated to the experiments this population is part of
+    exp_topics = (
+        db.session.query(Exp_Topic, Topic_List)
+        .join(Topic_List)
+        .join(Exps, Exp_Topic.exp_id == Exps.idexp)
+        .join(Population_Experiment, Population_Experiment.id_exp == Exps.idexp)
+        .filter(Population_Experiment.id_population == uid)
+        .all()
+    )
+    topics = [t[1].name for t in exp_topics]
+
     try:
         population_updated_details = {
             "id": population.id,
@@ -346,8 +432,26 @@ def population_details(uid):
     except:
         pass
 
-    models = get_ollama_models()
+    # Get activity profile distribution for this population
+    activity_profile_dist = (
+        db.session.query(PopulationActivityProfile, ActivityProfile)
+        .join(ActivityProfile)
+        .filter(PopulationActivityProfile.population == uid)
+        .all()
+    )
+
+    # Calculate actual agent distribution across activity profiles
+    agent_profiles = {"profiles": [], "assigned_count": [], "expected_pct": []}
+    for dist, profile in activity_profile_dist:
+        agent_profiles["profiles"].append(profile.name)
+        agent_profiles["expected_pct"].append(dist.percentage)
+        # Count actual agents with this profile
+        actual_count = sum(1 for a in agents if a[0].activity_profile == profile.id)
+        agent_profiles["assigned_count"].append(actual_count)
+
+    models = get_llm_models()  # Use generic function for any LLM server
     ollamas = ollama_status()
+    llm_backend = llm_backend_status()
 
     crecsys = Content_Recsys.query.all()
     frecsys = Follow_Recsys.query.all()
@@ -355,12 +459,13 @@ def population_details(uid):
     return render_template(
         "admin/population_details.html",
         population=population,
-        experiments=experiments,
         population_experiments=exps,
         agents=agents,
         data=dd,
+        activity_profiles=agent_profiles,
         models=models,
         ollamas=ollamas,
+        llm_backend=llm_backend,
         crecsys=crecsys,
         frecsys=frecsys,
     )
@@ -369,6 +474,12 @@ def population_details(uid):
 @population.route("/admin/add_to_experiment", methods=["POST"])
 @login_required
 def add_to_experiment():
+    """
+    Associate a population with an experiment.
+
+    Returns:
+        Redirect to population details
+    """
     check_privileges(current_user.username)
 
     population_id = request.form.get("population_id")
@@ -392,9 +503,18 @@ def add_to_experiment():
 @population.route("/admin/delete_population/<int:uid>")
 @login_required
 def delete_population(uid):
+    """Delete population."""
     check_privileges(current_user.username)
 
     population = Population.query.filter_by(id=uid).first()
+
+    # check if the population is assigned to any experiment
+    pop_exp = Population_Experiment.query.filter_by(id_population=uid).first()
+    if pop_exp:
+        # if the population is assigned to any experiment, do not delete raise a warning
+        flash("Population is assigned to an experiment. Cannot delete.")
+        return populations()
+
     db.session.delete(population)
     db.session.commit()
 
@@ -418,6 +538,7 @@ def delete_population(uid):
 @population.route("/admin/download_population/<int:uid>")
 @login_required
 def download_population(uid):
+    """Download population."""
     check_privileges(current_user.username)
 
     # get all agents in the population
@@ -470,11 +591,12 @@ def download_population(uid):
                 "frecsys": a[0].frecsys,
                 "profile_pic": a[0].profile_pic,
                 "daily_activity_level": a[0].daily_activity_level,
-                "profile": Agent_Profile.query.filter_by(agent_id=a[0].id)
-                .first()
-                .profile
-                if Agent_Profile.query.filter_by(agent_id=a[0].id).first() is not None
-                else None,
+                "profile": (
+                    Agent_Profile.query.filter_by(agent_id=a[0].id).first().profile
+                    if Agent_Profile.query.filter_by(agent_id=a[0].id).first()
+                    is not None
+                    else None
+                ),
             }
         )
 
@@ -503,6 +625,12 @@ def download_population(uid):
 @population.route("/admin/upload_population", methods=["POST"])
 @login_required
 def upload_population():
+    """
+    Upload population data from JSON file.
+
+    Returns:
+        Redirect to populations page
+    """
     check_privileges(current_user.username)
 
     population_file = request.files["population_file"]
@@ -554,9 +682,9 @@ def upload_population():
                 crecsys=a["crecsys"],
                 frecsys=a["frecsys"],
                 profile_pic=a["profile_pic"],
-                daily_activity_level=a["daily_activity_level"]
-                if "daily_activity_level" in a
-                else 1,
+                daily_activity_level=(
+                    a["daily_activity_level"] if "daily_activity_level" in a else 1
+                ),
             )
             db.session.add(agent)
             db.session.commit()
@@ -600,6 +728,7 @@ def upload_population():
 @population.route("/admin/update_population_recsys/<int:uid>", methods=["POST"])
 @login_required
 def update_recsys(uid):
+    """Update recsys."""
     check_privileges(current_user.username)
 
     recsys_type = request.form.get("recsys_type")
@@ -627,6 +756,7 @@ def update_recsys(uid):
 @population.route("/admin/update_population_llm/<int:uid>", methods=["POST"])
 @login_required
 def update_llm(uid):
+    """Update llm."""
     check_privileges(current_user.username)
 
     user_type = request.form.get("user_type")
@@ -645,3 +775,167 @@ def update_llm(uid):
 
     db.session.commit()
     return redirect(request.referrer)
+
+
+@population.route("/admin/merge_populations", methods=["POST"])
+@login_required
+def merge_populations():
+    """
+    Merge multiple populations into a new one.
+
+    Creates a new population and assigns agents and pages from selected populations,
+    avoiding duplicates.
+
+    Form data:
+        merged_population_name: Name for the new merged population
+        selected_population_ids: Comma-separated list of population IDs to merge
+
+    Returns:
+        Redirect to populations page
+    """
+    check_privileges(current_user.username)
+
+    merged_name = request.form.get("merged_population_name")
+    selected_ids = request.form.get("selected_population_ids")
+
+    if not merged_name or not selected_ids:
+        flash(
+            "Please provide a population name and select at least 2 populations to merge."
+        )
+        return redirect(request.referrer)
+
+    # Parse the selected population IDs
+    try:
+        population_ids = [
+            int(pid.strip()) for pid in selected_ids.split(",") if pid.strip()
+        ]
+    except ValueError:
+        flash("Invalid population IDs provided.")
+        return redirect(request.referrer)
+
+    if len(population_ids) < 2:
+        flash("Please select at least 2 populations to merge.")
+        return redirect(request.referrer)
+
+    # Check if merged population name already exists
+    existing_pop = Population.query.filter_by(name=merged_name).first()
+    if existing_pop:
+        flash(f"Population with name '{merged_name}' already exists.")
+        return redirect(request.referrer)
+
+    # Verify all selected populations exist
+    source_populations = []
+    for pop_id in population_ids:
+        pop = Population.query.filter_by(id=pop_id).first()
+        if not pop:
+            flash(f"Population with ID {pop_id} not found.")
+            return redirect(request.referrer)
+        source_populations.append(pop)
+
+    # Collect unique agent IDs from all selected populations (optimized query)
+    agent_populations = Agent_Population.query.filter(
+        Agent_Population.population_id.in_(population_ids)
+    ).all()
+    unique_agent_ids = set(ap.agent_id for ap in agent_populations)
+
+    # Collect unique page IDs from all selected populations (optimized query)
+    page_populations = Page_Population.query.filter(
+        Page_Population.population_id.in_(population_ids)
+    ).all()
+    unique_page_ids = set(pp.page_id for pp in page_populations)
+
+    # Fetch all unique agents to aggregate their properties
+    agents = (
+        Agent.query.filter(Agent.id.in_(unique_agent_ids)).all()
+        if unique_agent_ids
+        else []
+    )
+
+    # Aggregate properties from all agents
+    ages = [a.age for a in agents if a.age is not None]
+    age_min = min(ages) if ages else None
+    age_max = max(ages) if ages else None
+
+    education_set = set(a.education_level for a in agents if a.education_level)
+    education_levels = ",".join(sorted(education_set)) if education_set else None
+
+    leanings_set = set(a.leaning for a in agents if a.leaning)
+    leanings = ",".join(sorted(leanings_set)) if leanings_set else None
+
+    nationalities_set = set(a.nationality for a in agents if a.nationality)
+    nationalities = ",".join(sorted(nationalities_set)) if nationalities_set else None
+
+    languages_set = set(a.language for a in agents if a.language)
+    languages = ",".join(sorted(languages_set)) if languages_set else None
+
+    toxicity_set = set(a.toxicity for a in agents if a.toxicity)
+    toxicity = ",".join(sorted(toxicity_set)) if toxicity_set else None
+
+    # Get most common LLM type
+    llm_types = [a.ag_type for a in agents if a.ag_type]
+    llm = max(set(llm_types), key=llm_types.count) if llm_types else None
+
+    # Get most common recommendation systems
+    crecsys_list = [a.crecsys for a in agents if a.crecsys]
+    crecsys = max(set(crecsys_list), key=crecsys_list.count) if crecsys_list else None
+
+    frecsys_list = [a.frecsys for a in agents if a.frecsys]
+    frecsys = max(set(frecsys_list), key=frecsys_list.count) if frecsys_list else None
+
+    # Aggregate interests from source populations
+    interests_set = set()
+    for pop in source_populations:
+        if pop.interests:
+            interests_set.update(pop.interests.split(","))
+    interests = ",".join(sorted(interests_set)) if interests_set else None
+
+    # Get LLM URL from first population that has it
+    llm_url = None
+    for pop in source_populations:
+        if pop.llm_url:
+            llm_url = pop.llm_url
+            break
+
+    # Create the new merged population with detailed description and all aggregated properties
+    source_names = ", ".join([pop.name for pop in source_populations])
+    merged_population = Population(
+        name=merged_name,
+        descr=f"Merged from: {source_names}",
+        size=len(unique_agent_ids),
+        llm=llm,
+        age_min=age_min,
+        age_max=age_max,
+        education=education_levels,
+        leanings=leanings,
+        nationalities=nationalities,
+        languages=languages,
+        interests=interests,
+        toxicity=toxicity,
+        crecsys=crecsys,
+        frecsys=frecsys,
+        llm_url=llm_url,
+    )
+    db.session.add(merged_population)
+    db.session.flush()  # Flush to get the ID without committing
+
+    # Add unique agents to the new population
+    for agent_id in unique_agent_ids:
+        agent_population = Agent_Population(
+            agent_id=agent_id, population_id=merged_population.id
+        )
+        db.session.add(agent_population)
+
+    # Add unique pages to the new population
+    for page_id in unique_page_ids:
+        page_population = Page_Population(
+            page_id=page_id, population_id=merged_population.id
+        )
+        db.session.add(page_population)
+
+    # Single commit for all operations to ensure atomicity
+    db.session.commit()
+
+    flash(
+        f"Successfully created merged population '{merged_name}' with {len(unique_agent_ids)} agents and {len(unique_page_ids)} pages."
+    )
+    return populations()

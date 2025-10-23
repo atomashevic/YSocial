@@ -1,18 +1,49 @@
+"""
+Text processing utilities for social media content.
+
+Provides functions for sentiment analysis, toxicity detection, text augmentation
+with hyperlinks, component extraction (hashtags, mentions), HTML tag stripping,
+and Reddit-style post formatting.
+"""
+
 import re
 from html.parser import HTMLParser
-from y_web.models import User_mgmt, Hashtags, Post_Toxicity, Admin_users
 from io import StringIO
-from nltk.sentiment import SentimentIntensityAnalyzer
-from perspective import PerspectiveAPI
+
+from y_web.models import Admin_users, Hashtags, Post_Toxicity, User_mgmt
+
+# Optional imports
+try:
+    from nltk.sentiment import SentimentIntensityAnalyzer
+
+    NLTK_AVAILABLE = True
+except ImportError:
+    NLTK_AVAILABLE = False
+
+try:
+    from perspective import PerspectiveAPI
+
+    PERSPECTIVE_AVAILABLE = True
+except ImportError:
+    PERSPECTIVE_AVAILABLE = False
 
 
 def vader_sentiment(text):
     """
-    Calculate the sentiment of the text using the VADER sentiment analysis tool.
+    Calculate sentiment scores using VADER sentiment analysis.
 
-    :param text:
-    :return:
+    VADER (Valence Aware Dictionary and sEntiment Reasoner) is specifically
+    tuned for social media text sentiment analysis.
+
+    Args:
+        text: Text content to analyze
+
+    Returns:
+        Dictionary with sentiment scores: {'neg', 'neu', 'pos', 'compound'}
     """
+    if not NLTK_AVAILABLE:
+        # Return mock sentiment if NLTK is not available
+        return {"neg": 0.0, "neu": 1.0, "pos": 0.0, "compound": 0.0}
 
     sia = SentimentIntensityAnalyzer()
     sentiment = sia.polarity_scores(text)
@@ -21,14 +52,24 @@ def vader_sentiment(text):
 
 def toxicity(text, username, post_id, db):
     """
-    Calculate the toxicity of the text using the Perspective API.
+    Calculate toxicity scores using Google's Perspective API.
 
-    :param text:
-    :param username:
-    :param post_id:
-    :param db:
-    :return:
+    Analyzes text for various dimensions of toxicity including general toxicity,
+    severe toxicity, identity attacks, insults, profanity, threats, sexually
+    explicit content, and flirtation. Results are stored in the database.
+
+    Args:
+        text: Text content to analyze
+        username: Username of the admin user (for API key lookup)
+        post_id: ID of the post being analyzed
+        db: Database session for storing results
+
+    Returns:
+        None (stores results in Post_Toxicity table)
     """
+    if not PERSPECTIVE_AVAILABLE:
+        # Return None if Perspective API is not available
+        return None
 
     user = Admin_users.query.filter_by(username=username).first()
 
@@ -72,10 +113,16 @@ def toxicity(text, username, post_id, db):
 
 def augment_text(text):
     """
-    Augment the text by adding links to the mentions and hashtags.
+    Augment text by converting mentions and hashtags to clickable links.
 
-    :param text: the text to augment
-    :return: the augmented text
+    Replaces @username mentions with links to user profiles and #hashtag
+    with links to hashtag pages. Also capitalizes the first letter.
+
+    Args:
+        text: Raw text with mentions and hashtags
+
+    Returns:
+        HTML string with hyperlinked mentions and hashtags
     """
     # text = text.split("(")[0]
 
@@ -120,11 +167,14 @@ def augment_text(text):
 
 def extract_components(text, c_type="hashtags"):
     """
-    Extract the components from the text.
+    Extract hashtags or mentions from text using regex patterns.
 
-    :param text: the text to extract the components from
-    :param c_type: the component type
-    :return: the extracted components
+    Args:
+        text: Text to extract components from
+        c_type: Component type - "hashtags" for #tags or "mentions" for @users
+
+    Returns:
+        List of extracted components (including # or @ prefix)
     """
     # Define the regex pattern
     if c_type == "hashtags":
@@ -139,7 +189,10 @@ def extract_components(text, c_type="hashtags"):
 
 
 class MLStripper(HTMLParser):
+    """HTML parser subclass that strips all HTML tags from text."""
+
     def __init__(self):
+        """Handle   init   operation."""
         super().__init__()
         self.reset()
         self.strict = False
@@ -147,13 +200,29 @@ class MLStripper(HTMLParser):
         self.text = StringIO()
 
     def handle_data(self, d):
+        """Display handle data page."""
         self.text.write(d)
 
     def get_data(self):
+        """
+        Get extracted text data.
+
+        Returns:
+            String containing extracted text
+        """
         return self.text.getvalue()
 
 
 def strip_tags(html):
+    """
+    Remove all HTML tags from text content.
+
+    Args:
+        html: HTML string to strip tags from
+
+    Returns:
+        Plain text with all HTML tags removed
+    """
     s = MLStripper()
     s.feed(html)
     return s.get_data()
@@ -161,15 +230,20 @@ def strip_tags(html):
 
 def process_reddit_post(text):
     """
-    Process post text for Reddit-style display.
-    Handles TITLE: prefix and formats properly.
+    Process and format Reddit-style post text.
 
-    :param text: the raw post text
-    :return: tuple of (title, content) or (None, text) if no title
+    Handles posts with "TITLE: " prefix by splitting into title and content,
+    and removes leading whitespace from content.
+
+    Args:
+        text: Raw post text to process
+
+    Returns:
+        Tuple of (title, content) where title is None if no TITLE prefix exists
     """
     if text.startswith("TITLE: "):
         # Split on first newline after title
-        lines = text.split('\n', 1)
+        lines = text.split("\n", 1)
         title = lines[0].replace("TITLE: ", "").strip()
         if len(lines) > 1:
             # Remove all leading whitespace from the content

@@ -1,30 +1,39 @@
-from flask import Blueprint, redirect
-from flask_login import login_required, current_user
+"""
+User interaction routes and handlers.
+
+Manages user actions within the social network including following/unfollowing,
+posting content, sharing posts, reacting (liking/disliking), voting, and
+commenting. Integrates sentiment analysis, toxicity detection, and LLM-based
+content annotation.
+"""
+
+from flask import Blueprint, redirect, request
+from flask_login import current_user, login_required
+
 from . import db
+from .llm_annotations import Annotator, ContentAnnotator
 from .models import (
-    Follow,
-    Rounds,
-    Post,
-    Hashtags,
-    Post_hashtags,
+    Admin_users,
+    Articles,
     Emotions,
-    Post_emotions,
-    Mentions,
-    User_mgmt,
+    Follow,
+    Hashtags,
+    Images,
     Interests,
-    User_interest,
+    Mentions,
+    Post,
+    Post_emotions,
+    Post_hashtags,
+    Post_Sentiment,
     Post_topics,
     Reactions,
-    Admin_users,
-    Images,
-    Post_Sentiment,
-    Articles,
+    Rounds,
+    User_interest,
+    User_mgmt,
     Websites,
 )
-from flask import request
-from .llm_annotations import ContentAnnotator, Annotator
-from .utils.text_utils import vader_sentiment, toxicity
 from .utils.article_extractor import extract_article_info
+from .utils.text_utils import toxicity, vader_sentiment
 
 user = Blueprint("user_actions", __name__)
 
@@ -32,6 +41,18 @@ user = Blueprint("user_actions", __name__)
 @user.route("/follow/<int:user_id>/<int:follower_id>", methods=["GET", "POST"])
 @login_required
 def follow(user_id, follower_id):
+    """
+    Handle follow/unfollow action between users.
+
+    Toggles follow relationship and creates appropriate Follow record.
+
+    Args:
+        user_id: ID of user to follow/unfollow
+        follower_id: ID of user performing the action
+
+    Returns:
+        Redirect to referrer page
+    """
     # get the last round id from Rounds
     current_round = Rounds.query.order_by(Rounds.id.desc()).first()
 
@@ -70,6 +91,17 @@ def follow(user_id, follower_id):
 @user.route("/share_content")
 @login_required
 def share_content():
+    """
+    Share/retweet an existing post.
+
+    Creates a new post that references the original as a shared post.
+
+    Query params:
+        post_id: ID of post to share
+
+    Returns:
+        Redirect to referrer page
+    """
     post_id = request.args.get("post_id")
 
     # get the post
@@ -104,6 +136,7 @@ def share_content():
 @user.route("/react_to_content")
 @login_required
 def react():
+    """Handle react operation."""
     post_id = request.args.get("post_id")
     action = request.args.get("action")
 
@@ -144,13 +177,23 @@ def react():
 @user.route("/publish")
 @login_required
 def publish_post():
+    """
+    Publish a new post from form submission.
+
+    Returns:
+        Redirect to referrer page after posting
+    """
     text = request.args.get("post")
     url = request.args.get("url")
+
+    user = Admin_users.query.filter_by(username=current_user.username).first()
+    llm = user.llm if user.llm != "" else "llama3.2:latest"
+    llm_url = user.llm_url if user.llm_url != "" else None
 
     img_id = None
     if url is not None and url != "":
         llm_v = "minicpm-v"
-        image_annotator = Annotator(llm_v)
+        image_annotator = Annotator(llm_v, llm_url=llm_url)
         annotation = image_annotator.annotate(url)
 
         img = Images.query.filter_by(url=url).first()
@@ -183,10 +226,7 @@ def publish_post():
     toxicity(text, current_user.username, post.id, db)
     sentiment = vader_sentiment(text)
 
-    user = Admin_users.query.filter_by(username=current_user.username).first()
-    llm = user.llm if user.llm != "" else "llama3.2:latest"
-
-    annotator = ContentAnnotator(llm=llm)
+    annotator = ContentAnnotator(llm=llm, llm_url=llm_url)
     emotions = annotator.annotate_emotions(text)
     hashtags = annotator.extract_components(text, c_type="hashtags")
     mentions = annotator.extract_components(text, c_type="mentions")
@@ -272,8 +312,18 @@ def publish_post():
 @user.route("/publish_reddit")
 @login_required
 def publish_post_reddit():
+    """
+    Publish a new Reddit-style post with title and content.
+
+    Returns:
+        Redirect to referrer page after posting
+    """
     text = request.args.get("post")
     url = request.args.get("url")
+
+    user = Admin_users.query.filter_by(username=current_user.username).first()
+    llm = user.llm if user.llm != "" else "llama3.2:latest"
+    llm_url = user.llm_url if user.llm_url != "" else None
 
     # Normalize URL: prepend http:// if missing
     if url and not url.lower().startswith(("http://", "https://")):
@@ -288,7 +338,7 @@ def publish_post_reddit():
         if is_image_url:
             try:
                 llm_v = "minicpm-v"
-                image_annotator = Annotator(llm_v)
+                image_annotator = Annotator(llm_v, llm_url=llm_url)
                 annotation = image_annotator.annotate(url)
 
                 img = Images.query.filter_by(url=url).first()
@@ -375,10 +425,7 @@ def publish_post_reddit():
     toxicity(text, current_user.username, post.id, db)
     sentiment = vader_sentiment(text)
 
-    user = Admin_users.query.filter_by(username=current_user.username).first()
-    llm = user.llm if user.llm != "" else "llama3.2:latest"
-
-    annotator = ContentAnnotator(llm=llm)
+    annotator = ContentAnnotator(llm=llm, llm_url=llm_url)
     emotions = annotator.annotate_emotions(text)
     hashtags = annotator.extract_components(text, c_type="hashtags")
     mentions = annotator.extract_components(text, c_type="mentions")
@@ -464,6 +511,12 @@ def publish_post_reddit():
 @user.route("/publish_comment")
 @login_required
 def publish_comment():
+    """
+    Publish a comment on a post from form submission.
+
+    Returns:
+        Redirect to thread page after commenting
+    """
     text = request.args.get("post")
     pid = request.args.get("parent")
 
@@ -508,8 +561,9 @@ def publish_comment():
 
     user = Admin_users.query.filter_by(username=current_user.username).first()
     llm = user.llm if user.llm != "" else "llama3.1"
+    llm_url = user.llm_url if user.llm_url != "" else None
 
-    annotator = ContentAnnotator(llm=llm)
+    annotator = ContentAnnotator(llm=llm, llm_url=llm_url)
     emotions = annotator.annotate_emotions(text)
     hashtags = annotator.extract_components(text, c_type="hashtags")
     mentions = annotator.extract_components(text, c_type="mentions")
@@ -591,6 +645,7 @@ def publish_comment():
 @user.route("/delete_post")
 @login_required
 def delete_post():
+    """Delete post."""
     post_id = request.args.get("post_id")
 
     post = Post.query.get(int(post_id))
@@ -603,6 +658,7 @@ def delete_post():
 @user.route("/cancel_notification")
 @login_required
 def cancel_notification():
+    """Handle cancel notification operation."""
     pid = request.args.get("post_id")
 
     # check if the comment is to answer a mention

@@ -1,13 +1,43 @@
+"""
+Agent population generation utilities.
+
+Provides functions for generating realistic AI agent populations with diverse
+demographic profiles, personality traits, and behavioral characteristics
+based on population configuration parameters.
+"""
+
 import random
+
 import faker
 import numpy as np
-from y_web import db
 from sqlalchemy.sql import func
-from y_web.models import Population, Agent, Agent_Population, Profession
+
+from y_web import db
+from y_web.models import (
+    Agent,
+    Agent_Population,
+    Population,
+    PopulationActivityProfile,
+    Profession,
+)
 
 
 def __sample_age(mean, std_dev, min_age, max_age):
-    """Sample an age from a Gaussian distribution while ensuring it falls within [min_age, max_age]."""
+    """
+    Sample age from Gaussian distribution within specified bounds.
+
+    Repeatedly samples from normal distribution until a value within the
+    valid age range is obtained.
+
+    Args:
+        mean: Mean age for the distribution
+        std_dev: Standard deviation for age distribution
+        min_age: Minimum allowed age
+        max_age: Maximum allowed age
+
+    Returns:
+        Integer age within [min_age, max_age]
+    """
     while True:
         age = np.random.normal(mean, std_dev)  # Sample from Gaussian
         if min_age <= age <= max_age:  # Ensure it's within the range
@@ -15,7 +45,19 @@ def __sample_age(mean, std_dev, min_age, max_age):
 
 
 def __sample_pareto(values, alpha=2.0):
-    """Sample a value from the given set following a Pareto distribution."""
+    """
+    Sample a value from a discrete set using Pareto distribution.
+
+    Uses Pareto distribution to model power-law behavior, normalized to
+    map onto discrete value set (e.g., for activity levels).
+
+    Args:
+        values: List of discrete values to sample from
+        alpha: Pareto distribution shape parameter (default 2.0)
+
+    Returns:
+        One value from the input list
+    """
     pareto_sample = np.random.pareto(alpha)  # Shifted Pareto sample
     normalized_sample = pareto_sample / (pareto_sample + 1)  # Normalize to (0,1)
 
@@ -25,12 +67,39 @@ def __sample_pareto(values, alpha=2.0):
 
 def generate_population(population_name):
     """
-    Generate a fake user
-    :param population_name: the name of the population
+    Generate a population of AI agents with realistic profiles.
+
+    Creates agents based on population configuration including demographics
+    (age, nationality, gender), Big Five personality traits (OCEAN model),
+    political leaning, toxicity level, education, language, profession,
+    and activity profiles based on specified distribution percentages.
+    Uses statistical distributions to ensure realistic diversity.
+
+    Args:
+        population_name: Name of the population configuration to use
+
+    Side effects:
+        Creates and persists Agent and Agent_Population records in database
     """
 
     # get population by name
     population = Population.query.filter_by(name=population_name).first()
+
+    # Get activity profile distribution for this population
+    profile_distributions = PopulationActivityProfile.query.filter_by(
+        population=population.id
+    ).all()
+
+    # Build cumulative distribution for activity profile assignment
+    activity_profile_cdf = []
+    cumulative = 0
+    for dist in profile_distributions:
+        cumulative += dist.percentage / 100.0
+        activity_profile_cdf.append((cumulative, dist.activity_profile))
+
+    # If no profiles assigned, use None
+    if not activity_profile_cdf:
+        activity_profile_cdf = [(1.0, None)]
 
     for _ in range(population.size):
         try:
@@ -96,6 +165,14 @@ def generate_population(population_name):
         # get random profession from db
         profession = Profession.query.order_by(func.random()).first()
 
+        # Assign activity profile based on population distribution
+        rand_val = random.random()
+        assigned_profile_id = None
+        for cumulative_prob, profile_id in activity_profile_cdf:
+            if rand_val <= cumulative_prob:
+                assigned_profile_id = profile_id
+                break
+
         agent = Agent(
             name=name.replace(" ", ""),
             age=age,
@@ -116,6 +193,7 @@ def generate_population(population_name):
             crecsys=population.crecsys,
             daily_activity_level=daily_activity_level,
             profession=profession.profession,
+            activity_profile=assigned_profile_id,
         )
 
         db.session.add(agent)

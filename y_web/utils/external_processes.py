@@ -1,40 +1,45 @@
-import subprocess
-import os
-import re
-import sys
-from requests import post
+"""
+External process management utilities.
+
+Manages simulation client processes, Ollama server interactions, and
+environment detection. Handles process lifecycle including starting,
+monitoring, and terminating simulation clients running in screen sessions.
+Provides utilities for network generation, database operations, and
+LLM model management.
+"""
+
 import json
-import time
+import os
 import random
-from multiprocessing import Process
+import re
+import shutil
+import subprocess
+import sys
+import time
 import traceback
+from collections import defaultdict
+from multiprocessing import Process
+from pathlib import Path
+
+import numpy as np
+import requests
+from flask import current_app
+from ollama import Client as oclient
+from requests import post
+from sklearn.utils import deprecated
+
+from y_web import client_processes, db
 from y_web.models import (
+    ActivityProfile,
     Client_Execution,
-    Ollama_Pull
+    Ollama_Pull,
+    PopulationActivityProfile,
 )
 
-from flask import current_app
-from y_web import db, client_processes
-import requests
-from ollama import Client as oclient
-import concurrent
-import numpy as np
 
-import os
-import sys
-import subprocess
-from pathlib import Path
-import shutil
-
-
-import os
-import sys
-import shutil
-import subprocess
-from pathlib import Path
-
-
-def detect_env_handler():
+@deprecated
+def detect_env_handler_old():
+    """Handle detect env handler old operation."""
     python_exe = sys.executable
     env_type = None
     env_name = None
@@ -67,33 +72,6 @@ def detect_env_handler():
         print(f"Detected conda environment: {env_name} at {env_bin}")
 
         return env_type, env_name, str(env_bin), str(conda_sh) if conda_sh else None
-    # Check for pyenv
-    pyenv_version = os.environ.get("PYENV_VERSION")
-    pyenv_root_env = os.environ.get("PYENV_ROOT")
-    if pyenv_version or pyenv_root_env or ".pyenv" in python_exe:
-        env_type = "pyenv"
-        # Determine pyenv root directory
-        if pyenv_root_env:
-            pyenv_root = Path(pyenv_root_env)
-        else:
-            parts = Path(python_exe).parts
-            try:
-                idx = parts.index(".pyenv")
-                pyenv_root = Path(*parts[: idx + 1])
-            except ValueError:
-                pyenv_root = Path.home() / ".pyenv"
-        # Determine environment/version name
-        if pyenv_version:
-            env_name = pyenv_version
-        else:
-            try:
-                idx_vers = parts.index("versions")
-                env_name = parts[idx_vers + 1] if len(parts) > idx_vers + 1 else None
-            except (ValueError, NameError):
-                env_name = None
-        env_bin = pyenv_root
-        print(f"Detected pyenv environment: {env_name} at {env_bin}")
-        return env_type, env_name, str(env_bin), str(pyenv_root)
 
     # Check for pipenv
     if os.environ.get("PIPENV_ACTIVE"):
@@ -114,14 +92,16 @@ def detect_env_handler():
     return "system", None, str(Path(python_exe).parent), None
 
 
-def build_screen_command(script_path, config_path, screen_name=None):
-    env_type, env_name, env_bin, conda_sh_or_pyenv_root = detect_env_handler()
+@deprecated
+def build_screen_command_old(script_path, config_path, screen_name=None):
+    """Handle build screen command old operation."""
+    env_type, env_name, env_bin, conda_sh = detect_env_handler()
     screen_name = screen_name or env_name or "experiment"
 
-    if env_type == "conda" and conda_sh_or_pyenv_root:
+    if env_type == "conda" and conda_sh:
         command = (
             f"screen -dmS {screen_name} bash -c "
-            f"'source {conda_sh_or_pyenv_root} && conda activate {env_name} && "
+            f"'source {conda_sh} && conda activate {env_name} && "
             f"python {script_path} -c {config_path}'"
         )
     elif env_type in ("venv", "pipenv"):
@@ -129,30 +109,101 @@ def build_screen_command(script_path, config_path, screen_name=None):
             f"screen -dmS {screen_name} bash -c "
             f"'source {env_bin}/activate && python {script_path} -c {config_path}'"
         )
-    elif env_type == "pyenv":
-        # env_bin is the pyenv root directory, conda_sh_or_pyenv_root is also pyenv_root
-        pyenv_root = conda_sh_or_pyenv_root
-        version_python = f"{pyenv_root}/versions/{env_name}/bin/python"
-        command = (
-            f"screen -dmS {screen_name} bash -lc "
-            f"\"export PYENV_ROOT={pyenv_root} && "
-            f"export PATH='{pyenv_root}/shims:$PATH' && "
-            f"eval \\\"\\$(pyenv init -)\\\" && "
-            f"pyenv shell {env_name} && "
-            f"{version_python} {script_path} -c {config_path}\""
-        )
     else:  # system
         command = f"screen -dmS {screen_name} python {script_path} -c {config_path}"
 
     return command
 
 
-def terminate_process_on_port(port):
-    """
-    Terminate the process using the specified port
+##############
 
-    :param port: the port number
+
+def detect_env_handler():
     """
+    Detect the active Python environment and return executable path.
+
+    Detects conda, pipenv, virtualenv/venv environments and returns
+    appropriate Python command/path for running scripts in the same
+    environment context.
+
+    Returns:
+        String: Python executable path or command prefix (e.g., 'pipenv run python')
+    """
+    python_exe = Path(sys.executable)
+
+    # --- Case 1: Conda / Miniconda ---
+    conda_prefix = os.environ.get("CONDA_PREFIX")
+    if conda_prefix:
+        conda_prefix = Path(conda_prefix).resolve()
+        env_name = os.environ.get("CONDA_DEFAULT_ENV") or conda_prefix.name
+        env_bin = conda_prefix / "bin"
+
+        # Detect conda base (handle .../envs/<env_name>)
+        if conda_prefix.parent.name == "envs":
+            conda_base = conda_prefix.parent.parent
+        else:
+            conda_base = conda_prefix
+
+        conda_sh = conda_base / "etc" / "profile.d" / "conda.sh"
+        python_bin = env_bin / "python"
+
+        if conda_sh.exists():
+            # Safe approach: just use the environment's Python binary
+            return str(python_bin)
+
+    # --- Case 2: Pipenv ---
+    if os.environ.get("PIPENV_ACTIVE"):
+        return "pipenv run python"
+
+    # --- Case 3: Virtualenv / venv ---
+    venv_prefix = os.environ.get("VIRTUAL_ENV")
+    if venv_prefix:
+        python_bin = Path(venv_prefix) / "bin" / "python"
+        return str(python_bin)
+
+    # --- Case 4: System Python fallback ---
+    return str(python_exe)
+
+
+def build_screen_command(script_path, config_path, screen_name=None):
+    """
+    Build a screen command to run Python script in detected environment.
+
+    Creates a detached screen session running the script with the correct
+    Python interpreter for the current environment.
+
+    Args:
+        script_path: Path to Python script to execute
+        config_path: Path to configuration file (optional)
+        screen_name: Name for screen session (default: "experiment")
+
+    Returns:
+        String: Complete screen command ready for execution
+    """
+    python_cmd = detect_env_handler()
+    screen_name = screen_name or "experiment"
+
+    # Quote script and config paths to handle spaces
+    script_path_quoted = f'"{script_path}"'
+    config_path_quoted = f'"{config_path}"' if config_path else ""
+
+    run_cmd = f"{python_cmd} {script_path_quoted}"
+    if config_path_quoted:
+        run_cmd += f" -c {config_path_quoted}"
+
+    # Single bash -c block inside screen
+    screen_cmd = f"screen -dmS {screen_name} bash -c '{run_cmd}'"
+    return screen_cmd
+
+
+#############
+
+
+def terminate_process_on_port(port):
+    """Terminate the process using the specified port
+
+    Args:
+        port: the port number"""
     try:
         result = subprocess.run(
             ["lsof", "-t", "-i", f":{port}"], capture_output=True, text=True, check=True
@@ -171,11 +222,10 @@ def terminate_process_on_port(port):
 
 
 def start_server(exp):
-    """
-    Start the y_server in a detached screen
+    """Start the y_server in a detached screen
 
-    :param exp: the experiment object
-    """
+    Args:
+        exp: the experiment object"""
     yserver_path = os.path.dirname(os.path.abspath(__file__)).split("y_web")[0]
     sys.path.append(f"{yserver_path}{os.sep}external{os.sep}YServer{os.sep}")
     BASE_DIR = os.path.dirname(os.path.abspath(__file__)).split("utils")[0]
@@ -184,29 +234,31 @@ def start_server(exp):
         config = f"{yserver_path}y_web{os.sep}{exp.db_name.split('database_server.db')[0]}config_server.json"
         exp_uid = exp.db_name.split(os.sep)[1]
     else:
-        uid = exp.db_name.removeprefix('experiments_')
+        uid = exp.db_name.removeprefix("experiments_")
         exp_uid = f"{uid}{os.sep}"
-        config = f"{yserver_path}y_web{os.sep}experiments{os.sep}{exp_uid}config_server.json"
+        config = (
+            f"{yserver_path}y_web{os.sep}experiments{os.sep}{exp_uid}config_server.json"
+        )
 
     if exp.platform_type == "microblogging":
         screen_command = build_screen_command(
             script_path=f"{yserver_path}external{os.sep}YServer{os.sep}y_server_run.py",
             config_path=f"{config}",
-            screen_name=f"{exp_uid.replace(f'{os.sep}', '')}"
+            screen_name=f"{exp_uid.replace(f'{os.sep}', '')}",
         )
 
     elif exp.platform_type == "forum":
         screen_command = build_screen_command(
             script_path=f"{yserver_path}external{os.sep}YServerReddit{os.sep}y_server_run.py",
             config_path=f"{config}",
-            screen_name=f"{exp_uid.replace(f'{os.sep}', '')}"
+            screen_name=f"{exp_uid.replace(f'{os.sep}', '')}",
         )
-        #subprocess.run(cmd, shell=True, check=True)
+        # subprocess.run(cmd, shell=True, check=True)
     else:
         raise NotImplementedError(f"Unsupported platform {exp.platform_type}")
 
     # Command to run in the detached screen
-    #screen_command = f"screen -dmS {exp_uid.replace(f'{os.sep}', '')} {flask_command}"
+    # screen_command = f"screen -dmS {exp_uid.replace(f'{os.sep}', '')} {flask_command}"
     print(screen_command)
 
     print(f"Starting server for experiment {exp_uid} ...")
@@ -237,6 +289,7 @@ def start_server(exp):
 
 def is_ollama_installed():
     # Step 1: Check if Ollama is installed
+    """Handle is ollama installed operation."""
     try:
         subprocess.run(
             ["ollama", "--version"], capture_output=True, text=True, check=True
@@ -253,6 +306,7 @@ def is_ollama_installed():
 
 def is_ollama_running():
     # Step 2: Check if Ollama is running
+    """Handle is ollama running operation."""
     try:
         response = requests.get("http://127.0.0.1:11434/api/version")
         if response.status_code == 200:
@@ -269,6 +323,7 @@ def is_ollama_running():
 
 
 def start_ollama_server():
+    """Handle start ollama server operation."""
     if is_ollama_installed():
         if not is_ollama_running():
             screen_command = f"screen -dmS ollama ollama serve"
@@ -285,6 +340,7 @@ def start_ollama_server():
 
 
 def pull_ollama_model(model_name):
+    """Handle pull ollama model operation."""
     if is_ollama_running():
         process = Process(target=start_ollama_pull, args=(model_name,))
         process.start()
@@ -292,6 +348,12 @@ def pull_ollama_model(model_name):
 
 
 def start_ollama_pull(model_name):
+    """
+    Start downloading an Ollama model in background.
+
+    Args:
+        model_name: Name of model to download
+    """
     ol_client = oclient(
         host="http://127.0.0.1:11434", headers={"x-some-header": "some-value"}
     )
@@ -314,6 +376,12 @@ def start_ollama_pull(model_name):
 
 
 def get_ollama_models():
+    """
+    Get list of installed Ollama models.
+
+    Returns:
+        List of available model names
+    """
     pattern = r"model='(.*?)'"
     models = []
 
@@ -330,6 +398,12 @@ def get_ollama_models():
 
 
 def delete_ollama_model(model_name):
+    """
+    Delete an Ollama model from the system.
+
+    Args:
+        model_name: Name of model to delete
+    """
     ol_client = oclient(
         host="http://0.0.0.0:11434", headers={"x-some-header": "some-value"}
     )
@@ -338,6 +412,12 @@ def delete_ollama_model(model_name):
 
 
 def delete_model_pull(model_name):
+    """
+    Cancel an ongoing model download.
+
+    Args:
+        model_name: Name of model to cancel download for
+    """
     if model_name in client_processes:
         process = client_processes[model_name]
         process.terminate()
@@ -348,18 +428,152 @@ def delete_model_pull(model_name):
     db.session.commit()
 
 
-def terminate_client(cli, pause=False):
-    """
-    Stop the y_client
+#############
+# vLLM Functions
+#############
 
-    :param cli: the client object
+
+def is_vllm_installed():
+    """Check if vLLM is installed."""
+    try:
+        subprocess.run(
+            ["vllm", "--version"], capture_output=True, text=True, check=True
+        )
+        print("vLLM is installed.")
+        return True
+    except FileNotFoundError:
+        print("vLLM is not installed.")
+        return False
+    except subprocess.CalledProcessError as e:
+        print(f"Error checking vLLM installation: {e}")
+        return False
+
+
+def is_vllm_running():
+    """Check if vLLM server is running."""
+    try:
+        response = requests.get("http://127.0.0.1:8000/health")
+        if response.status_code == 200:
+            print("vLLM is running.")
+            return True
+        else:
+            print(
+                f"vLLM responded but not running correctly. Status: {response.status_code}"
+            )
+            return False
+    except requests.ConnectionError:
+        print("vLLM is not running or cannot be reached.")
+        return False
+
+
+def start_vllm_server(model_name=None):
     """
+    Start vLLM server.
+
+    Args:
+        model_name: Name of model to serve (optional, if None, server must be started manually)
+    """
+    if is_vllm_installed():
+        if not is_vllm_running():
+            if model_name:
+                screen_command = f"screen -dmS vllm vllm serve {model_name} --host 0.0.0.0 --port 8000"
+                print(f"Starting vLLM server with model {model_name}...")
+                subprocess.run(screen_command, shell=True, check=True)
+                # Wait for the server to start
+                time.sleep(10)
+            else:
+                print(
+                    "vLLM is installed but not running. Please start manually with a model."
+                )
+        else:
+            print("vLLM is already running.")
+    else:
+        print("vLLM is not installed.")
+
+
+def get_vllm_models():
+    """
+    Get list of models available on vLLM server.
+
+    Returns:
+        List of model names available on vLLM server
+    """
+    if not is_vllm_running():
+        return []
+
+    try:
+        response = requests.get("http://127.0.0.1:8000/v1/models")
+        if response.status_code == 200:
+            data = response.json()
+            # vLLM returns models in OpenAI-compatible format
+            models = [model["id"] for model in data.get("data", [])]
+            return models
+        else:
+            print(f"Failed to get vLLM models. Status: {response.status_code}")
+            return []
+    except requests.ConnectionError:
+        print("vLLM server is not accessible.")
+        return []
+
+
+def get_llm_models(llm_url=None):
+    """
+    Get list of models from any OpenAI-compatible LLM server.
+
+    Args:
+        llm_url: Base URL of the LLM server (e.g., 'http://localhost:8000/v1').
+                 If None, uses LLM_URL from environment or falls back to ollama.
+
+    Returns:
+        List of model names available on the LLM server
+    """
+    import os
+
+    # Determine URL
+    if llm_url is None:
+        llm_url = os.getenv("LLM_URL")
+        if not llm_url:
+            backend = os.getenv("LLM_BACKEND", "ollama")
+            if backend == "vllm":
+                llm_url = "http://127.0.0.1:8000/v1"
+            else:
+                llm_url = "http://127.0.0.1:11434/v1"
+
+    # Construct models endpoint URL
+    models_url = (
+        llm_url.replace("/v1", "/v1/models")
+        if "/v1" in llm_url
+        else f"{llm_url}/models"
+    )
+
+    try:
+        response = requests.get(models_url, timeout=5)
+        if response.status_code == 200:
+            data = response.json()
+            # OpenAI-compatible format
+            models = [model["id"] for model in data.get("data", [])]
+            return models
+        else:
+            print(
+                f"Failed to get LLM models from {models_url}. Status: {response.status_code}"
+            )
+            return []
+    except requests.exceptions.RequestException as e:
+        print(f"LLM server at {models_url} is not accessible: {e}")
+        return []
+
+
+def terminate_client(cli, pause=False):
+    """Stop the y_client
+
+    Args:
+        cli: the client object"""
     process = client_processes[cli.name]
     process.terminate()
     process.join()
 
     # update client execution object
-    #if not pause:
+    # if not pause:
     #    ce = Client_Execution.query.filter_by(client_id=cli.id).first()
     #    ce.expected_duration_rounds = 0
     #    ce.elapsed_time = 0
@@ -367,6 +581,7 @@ def terminate_client(cli, pause=False):
 
 
 def start_client(exp, cli, population, resume=False):
+    """Handle start client operation."""
     process = Process(
         target=start_client_process,
         args=(
@@ -381,9 +596,21 @@ def start_client(exp, cli, population, resume=False):
 
 
 def start_client_process(exp, cli, population, resume=False):
+    """
+    Initialize and start client simulation process.
+
+    Args:
+        exp: Experiment object
+        cli: Client configuration object
+        population: Population object
+        resume: Boolean indicating if resuming (default: False)
+    """
+    import json
+    import os
+    import sys
+
     from y_web import create_app, db
     from y_web.models import Client_Execution
-    import os, sys, json
 
     app = create_app()  # create app instance for this subprocess
 
@@ -404,15 +631,15 @@ def start_client_process(exp, cli, population, resume=False):
 
         # postgres
         if "experiments_" in exp.db_name:
-            uid = exp.db_name.removeprefix('experiments_')
+            uid = exp.db_name.removeprefix("experiments_")
             filename = f"{BASE_DIR}experiments{os.sep}{uid}{os.sep}{population.name.replace(' ', '')}.json".replace(
                 "utils/", ""
-            )
+            )  #
         else:
             uid = exp.db_name.split(os.sep)[1]
             filename = f"{BASE_DIR}{os.sep}{exp.db_name.split('database_server.db')[0]}{population.name.replace(' ', '')}.json".replace(
                 "utils/", ""
-            )
+            )  # .replace(' ', '')
 
         data_base_path = f"{BASE_DIR}experiments{os.sep}{uid}{os.sep}"
         config_file = json.load(
@@ -440,7 +667,9 @@ def start_client_process(exp, cli, population, resume=False):
 
         if first_run and cli.network_type:
             path = f"{cli.name}_network.csv"
-            cl = YClientWeb(config_file, data_base_path, first_run=first_run, network=path)
+            cl = YClientWeb(
+                config_file, data_base_path, first_run=first_run, network=path
+            )
         else:
             cl = YClientWeb(config_file, data_base_path, first_run=first_run)
 
@@ -456,10 +685,54 @@ def start_client_process(exp, cli, population, resume=False):
         if not os.path.exists(filename):
             cl.save_agents(filename)
 
-        run_simulation(cl, cli.id, filename, exp)
+        run_simulation(cl, cli.id, filename, exp, population)
 
 
-def run_simulation(cl, cli_id, agent_file, exp):
+def get_users_per_hour(population, agents):
+    # get population activity profiles
+    activity_profiles = defaultdict(list)
+    population_activity_profiles = (
+        db.session.query(PopulationActivityProfile)
+        .filter(PopulationActivityProfile.population == population.id)
+        .all()
+    )
+    for ap in population_activity_profiles:
+        profile = (
+            db.session.query(ActivityProfile)
+            .filter(ActivityProfile.id == ap.activity_profile)
+            .first()
+        )
+        activity_profiles[profile.name] = [int(x) for x in profile.hours.split(",")]
+
+    hours_to_users = defaultdict(list)
+    for ag in agents:
+        profile = activity_profiles[ag.activity_profile]
+
+        for h in profile:
+            hours_to_users[h].append(ag)
+
+    return hours_to_users
+
+
+def sample_agents(agents, expected_active_users):
+    weights = [a.daily_activity_level for a in agents]
+    # normalize weights to sum to 1
+    weights = [w / sum(weights) for w in weights]
+
+    try:
+        sagents = np.random.choice(
+            agents,
+            size=expected_active_users,
+            p=weights,
+            replace=False,
+        )
+    except Exception as e:
+        sagents = np.random.choice(agents, size=expected_active_users, replace=False)
+
+    return sagents
+
+
+def run_simulation(cl, cli_id, agent_file, exp, population):
     """
     Run the simulation
     """
@@ -468,19 +741,25 @@ def run_simulation(cl, cli_id, agent_file, exp):
     total_days = int(cl.days)
     daily_slots = int(cl.slots)
 
+    page_agents = [p for p in cl.agents.agents if p.is_page]
+
     for d1 in range(total_days):
+        common_agents = [p for p in cl.agents.agents if not p.is_page]
+        hour_to_users = get_users_per_hour(population, common_agents)
+
         daily_active = {}
         tid, _, _ = cl.sim_clock.get_current_slot()
 
         for _ in range(daily_slots):
             tid, d, h = cl.sim_clock.get_current_slot()
 
-            # get expected active users for this time slot (at least 1)
+            # get expected active users for this time slot considering the global population (at least 1)
             expected_active_users = max(
                 int(len(cl.agents.agents) * cl.hourly_activity[str(h)]), 1
             )
 
-            page_agents = [p for p in cl.agents.agents if p.is_page]
+            # take the minimum between expected active over the whole population and available users at time h
+            expected_active_users = min(expected_active_users, len(hour_to_users[h]))
 
             if platform_type == "microblogging":
                 # pages post at least a news each slot of the day (7-22), more if they were selected randomly
@@ -498,21 +777,8 @@ def run_simulation(cl, cli_id, agent_file, exp):
                 break
 
             # get the daily activities of each agent
-            # @todo: simplifiy once the daily_activity_level is always set on YReddit
-            try:
-                weights = [a.daily_activity_level for a in cl.agents.agents]
-                # normalize weights to sum to 1
-                weights = [w / sum(weights) for w in weights]
-                # sample agents
-                sagents = np.random.choice(
-                    cl.agents.agents, size=expected_active_users, p=weights, replace=False
-                )
-            except Exception as e:
-                sagents = np.random.choice(
-                    cl.agents.agents, size=expected_active_users, replace=False
-                )
+            sagents = sample_agents(hour_to_users[h], expected_active_users)
 
-            # available actions
             # shuffle agents
             random.shuffle(sagents)
 

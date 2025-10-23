@@ -1,21 +1,36 @@
+"""
+Follower recommendation system algorithms.
+
+Implements user and page recommendation strategies for suggesting new accounts
+to follow based on network structure, shared interests, and user preferences.
+"""
+
+import numpy as np
 from sqlalchemy.sql.expression import func
+
+from y_web import db
 from y_web.models import (
-    User_mgmt,
-    Page,
+    Admin_users,
     Agent,
     Follow,
-    Admin_users,
+    Page,
+    User_mgmt,
 )
-from y_web import db
-import numpy as np
 
 
 def get_suggested_users(user_id, pages=False):
     """
-    Get follow suggestions for a user.
+    Get follow recommendations for a user.
 
-    :param user_id:
-    :return:
+    Suggests accounts to follow based on the user's recommendation system
+    preference, optionally filtering for pages or regular users.
+
+    Args:
+        user_id: ID of user to get recommendations for, or "all" for none
+        pages: If True, return only page accounts; if False, only regular users
+
+    Returns:
+        List of dictionaries with keys: 'username', 'id', 'profile_pic'
     """
 
     if user_id == "all":
@@ -77,14 +92,15 @@ def get_suggested_users(user_id, pages=False):
 
 
 def __follow_suggestions(rectype, user_id, n_neighbors, leaning_biased):
-    """
-    Get follow suggestions for a user based on the follow recommender system.
+    """Get follow suggestions for a user based on the follow recommender system.
 
-    :param rectype:
-    :param user_id:
-    :param n_neighbors:
-    :param leaning_biased:
-    :return:
+    Args:
+        rectype:
+        user_id:
+        n_neighbors:
+        leaning_biased:
+
+    Returns:
     """
 
     res = {}
@@ -167,12 +183,13 @@ def __follow_suggestions(rectype, user_id, n_neighbors, leaning_biased):
 
 
 def __get_two_hops_neighbors(node_id):
-    """
-    Get the two hops neighbors of a user.
+    """Get the two hops neighbors of a user.
 
-    :param node_id: the user id
-    :return: the two hops neighbors
-    """
+    Args:
+        node_id: the user id
+
+    Returns:
+        the two hops neighbors"""
     # (node_id, direct_neighbors)
     first_order_followers = set(
         [
@@ -200,12 +217,13 @@ def __get_two_hops_neighbors(node_id):
 
 
 def __get_users_leanings(agents):
-    """
-    Get the political leaning of a list of users.
+    """Get the political leaning of a list of users.
 
-    :param agents: the list of users
-    :return: the political leaning of the users
-    """
+    Args:
+        agents: the list of users
+
+    Returns:
+        the political leaning of the users"""
     leanings = {}
     for agent in agents:
         leanings[agent] = User_mgmt.query.filter_by(id=agent).first().leaning

@@ -6,6 +6,7 @@ CREATE TABLE admin_users (
     last_seen       TEXT,
     role            TEXT,
     llm             TEXT DEFAULT '',
+    llm_url         TEXT DEFAULT '',
     profile_pic     TEXT DEFAULT '',
     perspective_api TEXT DEFAULT NULL
 );
@@ -13,7 +14,7 @@ CREATE TABLE admin_users (
 CREATE TABLE agents (
     id                   SERIAL PRIMARY KEY,
     name                 TEXT NOT NULL,
-    ag_type              TEXT NOT NULL,
+    ag_type              TEXT DEFAULT '',
     leaning              TEXT,
     oe                   TEXT,
     co                   TEXT,
@@ -31,7 +32,8 @@ CREATE TABLE agents (
     frecsys              TEXT,
     profile_pic          TEXT DEFAULT '',
     daily_activity_level INTEGER DEFAULT 1,
-    profession           TEXT
+    profession           TEXT,
+    activity_profile INTEGER REFERENCES activity_profiles(id)
 );
 
 CREATE TABLE agent_profile (
@@ -95,6 +97,11 @@ CREATE TABLE nationalities (
     nationality TEXT NOT NULL
 );
 
+CREATE TABLE toxicity_levels (
+    id             SERIAL PRIMARY KEY,
+    toxicity_level TEXT NOT NULL
+);
+
 CREATE TABLE ollama_pull (
     id         SERIAL PRIMARY KEY,
     model_name TEXT NOT NULL,
@@ -128,7 +135,8 @@ CREATE TABLE population (
     toxicity      TEXT,
     languages     TEXT,
     frecsys       TEXT,
-    crecsys       TEXT
+    crecsys       TEXT,
+    llm_url       TEXT
 );
 
 CREATE TABLE agent_population (
@@ -224,6 +232,24 @@ CREATE TABLE user_experiment (
     exp_id  INTEGER REFERENCES exps(idexp) ON DELETE CASCADE
 );
 
+CREATE TABLE activity_profiles (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(120) NOT NULL UNIQUE,
+    hours VARCHAR(100) NOT NULL
+);
+
+CREATE TABLE population_activity_profile (
+    id SERIAL PRIMARY KEY,
+    population INTEGER NOT NULL
+        REFERENCES population(id)
+        ON DELETE CASCADE,
+    activity_profile INTEGER NOT NULL
+        REFERENCES activity_profiles(id)
+        ON DELETE CASCADE,
+    percentage REAL NOT NULL
+);
+
+
 INSERT INTO content_recsys (name, value) VALUES
   ('ContentRecSys', 'Random'),
   ('ReverseChrono', '(RC) Reverse Chrono'),
@@ -248,6 +274,11 @@ INSERT INTO leanings (leaning) VALUES
 ('republican'),
 ('centrist');
 
+INSERT INTO toxicity_levels (toxicity_level) VALUES
+('none'),
+('low'),
+('medium'),
+('high');
 
 INSERT INTO education (education_level) VALUES
   ('high school'),
@@ -474,3 +505,28 @@ INSERT INTO nationalities (nationality) VALUES
 ('Thai'),
 ('Turkish'),
 ('Ukrainian');
+
+
+INSERT INTO activity_profiles (name, hours) VALUES
+('Always On', '0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23'),
+('Morning Enthusiast', '6,7,8,9,10,11,12'),
+('Coffee Break User', '9,10,13,15,17'),
+('News Tracker', '7,8,12,18,19,20'),
+('Researcher Mode', '8,9,10,11,14,15,16,17'),
+('Professional Broadcaster', '8,9,10,11,12,13,14,15,16,17'),
+('Evening Commentator', '18,19,20,21,22,23'),
+('Night Owl', '22,23,0,1,2,3'),
+('Weekend Gamer', '20,21,22,23,0,1'),
+('Activist Pulse', '10,11,12,18,19,20,21'),
+('Global Connector', '6,7,9,11,13,15,17,19,21,23,1,3'),
+('Casual Scroller', '8,12,19,21'),
+('Trend Surfer', '11,12,18,19,20,21'),
+('Quiet Observer', '9,10,22,23'),
+('Early Poster', '5,6,7,8,9'),
+('Late Poster', '18,19,20,21,22'),
+('Hyper Connected', '0,2,4,8,12,16,20,23'),
+('Minimalist User', '12,18'),
+('Community Builder', '8,9,10,11,18,19,20,21'),
+('Storyteller', '10,11,12,13,19,20,21'),
+('Casual Poster', '8,13,19'),
+('Frequent Lurker', '9,10,11,22,23,0,1');

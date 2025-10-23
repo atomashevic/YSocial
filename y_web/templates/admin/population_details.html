@@ -29,11 +29,15 @@
 
                     <!--Dashboard box-->
                     <div class="dashboard-box">
-                        <h3 class="title is-5 is-thin">Population</h3>
+                        <h3 class="title is-5 is-thin">Population Overview</h3>
+                        <p style="font-size: 0.9em; color: #666; margin-bottom: 1em;">
+                            Core information about this synthetic population, including configuration and agent demographics.
+                        </p>
 
                         <div class="box-content">
                             <div class="box-lines">
-                                <b>General Information</b>
+                                <b>Basic Information</b>
+                                <p style="font-size: 0.85em; color: #777; margin-bottom: 0.5em;">Population name, description, and configuration settings.</p>
                                 <div class="box-line">
                                     <span class="left">Name</span>
                                     <span class="right">{{ population.name }}</span>
@@ -42,10 +46,7 @@
                                     <span class="left">Description</span>
                                     <span class="right">{{ population.descr }}</span>
                                 </div>
-                                <div class="box-line">
-                                    <span class="left">Prevalent LLM</span>
-                                    <span class="right">{{ population.llm }}</span>
-                                </div>
+
                                 <div class="box-line">
                                     <span class="left">Prevalent Content Recsys</span>
                                     <span class="right">{{ population.crecsys }}</span>
@@ -59,7 +60,8 @@
                                     <span class="right">{{ population.size }}</span>
                                 </div>
                                 <hr>
-                                <b>Agents Data</b>
+                                <b>Demographics & Attributes</b>
+                                <p style="font-size: 0.85em; color: #777; margin-bottom: 0.5em;">Agent characteristics and diversity settings for this population.</p>
                                 <div class="box-line">
                                     <span class="left">Age Range</span>
                                     <span class="right">{{ population.age_min }} - {{ population.age_max }}</span>
@@ -84,6 +86,23 @@
                                     <span class="left">Spoken Languages</span>
                                     <span class="right">{{ population.languages }}</span>
                                 </div>
+                                <hr>
+                                <b>Activity Profiles Distribution</b>
+                                <p style="font-size: 0.85em; color: #777; margin-bottom: 0.5em;">Hourly activity patterns assigned to agents in this population.</p>
+                                {% if activity_profiles.profiles %}
+                                {% for i in range(activity_profiles.profiles|length) %}
+                                <div class="box-line">
+                                    <span class="left">{{ activity_profiles.profiles[i] }}</span>
+                                    <span class="right">
+                                        {{ activity_profiles.assigned_count[i] }} agents ({{ "%.1f"|format(activity_profiles.expected_pct[i]) }}% expected)
+                                    </span>
+                                </div>
+                                {% endfor %}
+                                {% else %}
+                                <div class="box-line">
+                                    <span class="left">No activity profiles assigned</span>
+                                </div>
+                                {% endif %}
 
                             </div>
                                 <div class="buttons" style="display: flex; justify-content: right">
@@ -100,11 +119,15 @@
                 <div class="column is-6">
 
                     <div class="dashboard-box">
-                        <h3 class="title is-5 is-thin">Experiments</h3>
+                        <h3 class="title is-5 is-thin">Experiment Deployments</h3>
+                        <p style="font-size: 0.9em; color: #666; margin-bottom: 1em;">
+                            Experiments where this population is currently deployed.
+                        </p>
                         <div class="box-content">
                             <div class="box-lines">
+                                {% if population_experiments %}
                                 <div class="box-line">
-                                    <span class="left">Deployed on</span>
+                                    <span class="left">Active Experiments</span>
                                     <span class="right">
                                         <ul>
                                         {% for exp in population_experiments %}
@@ -113,40 +136,18 @@
                                         </ul>
                                     </span>
                                 </div>
+                                {% else %}
+                                <div class="box-line">
+                                    <span class="left">No experiments yet</span>
+                                </div>
+                                {% endif %}
+                                <div class="box-line">
+                                    <span class="left">
+                                        <small>ℹ️ Populations are automatically assigned to experiments when creating a client.</small>
+                                    </span>
+                                </div>
                             </div>
 
-                        </div>
-                    </div>
-
-                    <div class="dashboard-box">
-                        <h3 class="title is-5 is-thin">Add to Experiment</h3>
-                        <div class="box-content">
-                            <form action="/admin/add_to_experiment" enctype="multipart/form-data" method="POST">
-                                <div class="box-lines">
-                                    <div class="box-line">
-                                        <span class="left">
-                                            A population can be deployed in multiple experiments.
-                                        </span>
-                                    </div>
-                                    <div class="box-line">
-                                        <input type="hidden" name="population_id" value="{{ population.id }}">
-                                        <span class="left">Experiment</span>
-                                        <div class="select">
-                                            <select name="experiment_id">
-                                                {% for experiment in experiments %}
-                                                <option value="{{ experiment.idexp }}">{{ experiment.exp_name }}
-                                                </option>
-                                                {% endfor %}
-                                            </select>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="button-wrap">
-                                    <button class="button is-solid primary-button is-fullwidth">
-                                        Update
-                                    </button>
-                                </div>
-                            </form>
                         </div>
                     </div>
 
@@ -161,27 +162,39 @@
              <div class="columns">
 
                 <div class="column is-12">
-                    <hr>
-                <h3 class="title is-5 is-thin" style="text-align: center">Population Recommenders and LLM</h3>
+                    <hr style="margin: 2em 0;">
+                <h3 class="title is-5 is-thin" style="text-align: center">Recommender Systems Configuration</h3>
+                <p style="text-align: center; font-size: 0.9em; color: #666; margin-top: 0.5em;">
+                    Update recommendation algorithms for content and friendship suggestions across all agents in this population.
+                </p>
                 </div>
             </div>
 
             <div class="columns">
 
                 <div class="column is-6">
-                    <div class="dashboard-box">Update Recommender Systems</h3>
+                    <div class="dashboard-box">
+                        <h3 class="title is-6 is-thin">Update Recommender Systems</h3>
                         <div class="box-content">
                                 <div class="box-lines">
                                     <div class="box-line">
                                         <span class="left">
-                                            The updates will be applied to all the agents in the population.<br>
-                                            The changes will be reflected in the next simulation run (they do not affect already deployed experiments).
+                                            <small style="color: #666;">
+                                            ℹ️ Updates apply to all agents in this population.<br>
+                                            Changes take effect in future simulation runs only (not active experiments).
+                                            </small>
                                         </span>
                                     </div>
                                      <div class="box-line">
-                                    <span class="left">Current Recommender</span>
-                                    <span class="right">Follow: {{ population.frecsys }}</span>
-                                    <span class="right">Content: {{ population.crecsys }}</span>
+                                    <span class="left"><b>Current Configuration</b></span>
+                                </div>
+                                <div class="box-line">
+                                    <span class="left">Content RecSys</span>
+                                    <span class="right">{{ population.crecsys }}</span>
+                                </div>
+                                <div class="box-line">
+                                    <span class="left">Friendship RecSys</span>
+                                    <span class="right">{{ population.frecsys }}</span>
                                 </div>
                                     <hr>
                                 <form action="/admin/update_population_recsys/{{ population.id }}" enctype="multipart/form-data" method="POST">
@@ -227,56 +240,17 @@
 
                 </div>
 
-                <div class="column is-6">
-                     <div class="dashboard-box">Update Large Language Model</h3>
-                        <div class="box-content">
-                                <div class="box-lines">
-                                    <div class="box-line">
-                                        <span class="left">
-                                            The updates will be applied to all the agents in the population.<br>
-                                            The changes will be reflected in the next simulation run (they do not affect already deployed experiments).
-                                        </span>
-                                    </div>
-                                     <div class="box-line">
-                                    <span class="left">Current LLM</span>
-                                    <span class="right">{{ population.llm }}</span>
-                                </div>
-                                    <hr>
-                                <form action="/admin/update_population_llm/{{ population.id }}" enctype="multipart/form-data" method="POST">
-                                <div class="box-lines">
 
-                                    <div class="box-line">
-                                        <span class="left">Available Models</span>
-                                        <span class="right">
-                                            <div class="select">
-                                            <select name="user_type">
-                                                <option value=""></option>
-                                                    {% for model in models %}
-                                                    <option value="{{ model }}">{{ model }}</option>
-                                                    {% endfor %}
-                                            </select>
-                                        </div>
-                                        </span>
-                                    </div>
-
-                                </div>
-                                <div class="button-wrap">
-                                        <button class="button is-solid primary-button is-fullwidth">
-                                            Save
-                                        </button>
-                                    </div>
-                            </form>
-                        </div>
-                    </div>
-                    </div>
-                </div>
             </div>
 
             <div class="columns">
 
                 <div class="column is-12">
-                    <hr>
-                <h3 class="title is-5 is-thin" style="text-align: center">Population Statistics</h3>
+                    <hr style="margin: 2em 0;">
+                <h3 class="title is-5 is-thin" style="text-align: center">Population Statistics & Analytics</h3>
+                <p style="text-align: center; font-size: 0.9em; color: #666; margin-top: 0.5em;">
+                    Visual analysis of agent distribution across demographics, attributes, and behavior patterns.
+                </p>
                 </div>
             </div>
 

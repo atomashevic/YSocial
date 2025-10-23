@@ -1,23 +1,33 @@
+"""
+Page/news organization management routes.
+
+Administrative routes for creating and managing institutional pages,
+configuring RSS feeds, political leanings, topics, and associating
+pages with populations.
+"""
+
 import json
 import os
 
-from flask import Blueprint, render_template, request, redirect, send_file
-from flask_login import login_required, current_user
+from flask import Blueprint, flash, redirect, render_template, request, send_file
+from flask_login import current_user, login_required
 
+from y_web import db
 from y_web.models import (
-    Population,
+    ActivityProfile,
+    Leanings,
     Page,
     Page_Population,
-    Leanings, Topic_List, Page_Topic
+    Page_Topic,
+    Population,
+    Topic_List,
 )
 from y_web.utils import (
     get_feed,
+    get_llm_models,
     get_ollama_models,
 )
-
-from y_web import db
-from y_web.utils.miscellanea import check_privileges
-from y_web.utils.miscellanea import ollama_status
+from y_web.utils.miscellanea import check_privileges, llm_backend_status, ollama_status
 
 pages = Blueprint("pages", __name__)
 
@@ -25,19 +35,33 @@ pages = Blueprint("pages", __name__)
 @pages.route("/admin/pages")
 @login_required
 def page_data():
+    """
+    Display page management interface.
+
+    Returns:
+        Rendered page data template with available models
+    """
     check_privileges(current_user.username)
 
-    models = get_ollama_models()
+    models = get_llm_models()  # Use generic function for any LLM server
     ollamas = ollama_status()
+    llm_backend = llm_backend_status()
     leanings = Leanings.query.all()
+    activity_profiles = ActivityProfile.query.all()
     return render_template(
-        "admin/pages.html", models=models, ollamas=ollamas, leanings=leanings
+        "admin/pages.html",
+        models=models,
+        ollamas=ollamas,
+        llm_backend=llm_backend,
+        leanings=leanings,
+        activity_profiles=activity_profiles,
     )
 
 
 @pages.route("/admin/create_page", methods=["POST"])
 @login_required
 def create_page():
+    """Create page."""
     check_privileges(current_user.username)
 
     name = request.form.get("name")
@@ -69,6 +93,7 @@ def create_page():
 @pages.route("/admin/pages_data")
 @login_required
 def pages_data():
+    """Display pages data page."""
     query = Page.query
 
     # search filter
@@ -90,7 +115,14 @@ def pages_data():
         for s in sort.split(","):
             direction = s[0]
             name = s[1:]
-            if name not in ["name", "descr", "keywords", "page_type", "logo", "leaning"]:
+            if name not in [
+                "name",
+                "descr",
+                "keywords",
+                "page_type",
+                "logo",
+                "leaning",
+            ]:
                 name = "name"
             col = getattr(Page, name)
             if direction == "-":
@@ -128,9 +160,18 @@ def pages_data():
 @pages.route("/admin/delete_page/<int:uid>")
 @login_required
 def delete_page(uid):
+    """Delete page."""
     check_privileges(current_user.username)
 
     page = Page.query.filter_by(id=uid).first()
+
+    # check if page is assigned to any population
+    page_pop = Page_Population.query.filter_by(page_id=uid).first()
+    if page_pop:
+        # show an error message
+        flash("Page is assigned to a population. Cannot delete.")
+        return page_data()
+
     db.session.delete(page)
     db.session.commit()
 
@@ -146,6 +187,7 @@ def delete_page(uid):
 @pages.route("/admin/page_details/<int:uid>")
 @login_required
 def page_details(uid):
+    """Handle page details operation."""
     check_privileges(current_user.username)
 
     # get page details
@@ -175,6 +217,7 @@ def page_details(uid):
     feed = get_feed(page.feed)
 
     ollamas = ollama_status()
+    llm_backend = llm_backend_status()
 
     return render_template(
         "admin/page_details.html",
@@ -183,6 +226,7 @@ def page_details(uid):
         populations=populations,
         feeds=feed[:3],
         ollamas=ollamas,
+        llm_backend=llm_backend,
         topics=topics,
         page_topics=page_topics,
     )
@@ -191,6 +235,12 @@ def page_details(uid):
 @pages.route("/admin/add_topic_to_page", methods=["POST"])
 @login_required
 def add_topic_to_page():
+    """
+    Associate a topic with a page.
+
+    Returns:
+        Redirect to page details
+    """
     check_privileges(current_user.username)
 
     page_id = request.form.get("page_id")
@@ -212,6 +262,7 @@ def add_topic_to_page():
 @pages.route("/admin/add_page_to_population", methods=["POST"])
 @login_required
 def add_page_to_population():
+    """Handle add page to population operation."""
     check_privileges(current_user.username)
 
     page_id = request.form.get("page_id")
@@ -235,6 +286,7 @@ def add_page_to_population():
 @pages.route("/admin/upload_page_collection", methods=["POST"])
 @login_required
 def upload_page_collection():
+    """Upload page collection."""
     check_privileges(current_user.username)
 
     collection = request.files["collection"]
@@ -275,6 +327,12 @@ def upload_page_collection():
 @pages.route("/admin/download_pages")
 @login_required
 def download_pages():
+    """
+    Download pages data as JSON file.
+
+    Returns:
+        JSON file download response
+    """
     check_privileges(current_user.username)
 
     pages = Page.query.all()
