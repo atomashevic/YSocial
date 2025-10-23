@@ -80,6 +80,13 @@ def detect_env_handler_old():
         env_bin = Path(python_exe).parent
         return env_type, env_name, str(env_bin), None
 
+    # Check for pyenv 
+    if (".pyenv" in python_exe) or ("PYENV_VERSION" in os.environ):
+        env_type = "pyenv"
+        env_name = os.path.dirname(python_exe).split('/')[-2]
+        env_bin = os.path.dirname(python_exe)
+        return env_type, env_name, str(env_bin), None
+
     # Check for venv
     venv_path = os.environ.get("VIRTUAL_ENV")
     if venv_path:
@@ -122,7 +129,7 @@ def detect_env_handler():
     """
     Detect the active Python environment and return executable path.
 
-    Detects conda, pipenv, virtualenv/venv environments and returns
+    Detects conda, pipenv, virtualenv/venv, pyenv environments and returns
     appropriate Python command/path for running scripts in the same
     environment context.
 
@@ -161,7 +168,11 @@ def detect_env_handler():
         python_bin = Path(venv_prefix) / "bin" / "python"
         return str(python_bin)
 
-    # --- Case 4: System Python fallback ---
+    # --- Case 4: pyenv ---
+    if (".pyenv" in str(python_exe)) or ("PYENV_VERSION" in os.environ):
+        return str(python_exe)
+
+    # --- Case 5: System Python fallback ---
     return str(python_exe)
 
 
