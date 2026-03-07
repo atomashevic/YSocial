@@ -569,6 +569,9 @@ def create_app(db_type="sqlite", desktop_mode=False):
     from .routes_api.reddit import api_reddit as api_reddit_blueprint
 
     app.register_blueprint(api_reddit_blueprint)
+    from .routes_uploads import uploads as uploads_blueprint
+
+    app.register_blueprint(uploads_blueprint)
 
     # Add context processor to detect PyInstaller mode
     @app.context_processor
