@@ -174,3 +174,18 @@ cython_debug/
 
 # PyPI configuration file
 .pypirc
+
+# YSocial runtime artifacts
+*.heartbeat
+y_social.out
+postgresql:/
+y_web/uploads/
+y_web/static/assets/img/posts/
+y_web/static/assets/img/reddit/
+y_web/experiments/*/
+external/YClientReddit/experiments/*.db
+external/YClientReddit/experiments/Reddit
+external/YClientReddit/experiments/Test
+external/YServerReddit/experiments/*.db
+external/YServer/gunicorn.ctl
+external/YServerReddit/gunicorn.ctl
