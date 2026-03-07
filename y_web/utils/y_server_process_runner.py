@@ -48,13 +48,17 @@ def main():
     else:
         raise NotImplementedError(f"Unsupported platform {args.platform}")
 
+    config_path = os.path.abspath(args.config)
+    # y_server reads config at import time, so set this before importing y_server.
+    os.environ["YSERVER_CONFIG"] = config_path
+
     # Load configuration
-    config = json.load(open(args.config, "r"))
+    config = json.load(open(config_path, "r"))
 
     # Calculate log file path using the same pattern as client runner
     # The config file is at: {writable_path}/y_web/experiments/{uid}/config_server.json
     # So the log file should be at: {writable_path}/y_web/experiments/{uid}/_server.log
-    config_dir = os.path.dirname(os.path.abspath(args.config))
+    config_dir = os.path.dirname(config_path)
     log_file = os.path.join(config_dir, "_server.log")
 
     print(f"Server log file: {log_file}", file=sys.stderr)

@@ -5,7 +5,7 @@ This module provides a lightweight watchdog that monitors server and client
 processes using log file modifications as heartbeat indicators. When a process
 appears hung (no log activity) or dead, it can be automatically restarted.
 
-The watchdog runs periodically (default every 15 minutes), performs its check,
+The watchdog runs periodically (default every 1 minute), performs its check,
 restarts any hung/dead processes, and terminates until the next scheduled run.
 """
 
@@ -22,11 +22,17 @@ import requests
 logger = logging.getLogger(__name__)
 
 # Default watchdog settings
-DEFAULT_RUN_INTERVAL_MINUTES = 15
+DEFAULT_RUN_INTERVAL_MINUTES = 1
 MAX_RUN_INTERVAL_MINUTES = 1440  # 24 hours
-DEFAULT_HEARTBEAT_TIMEOUT = 300  # seconds
+DEFAULT_SERVER_HEARTBEAT_TIMEOUT = 300  # seconds
+DEFAULT_CLIENT_HEARTBEAT_TIMEOUT = 300  # seconds
+DEFAULT_HEARTBEAT_TIMEOUT = (
+    DEFAULT_SERVER_HEARTBEAT_TIMEOUT  # backward compatible alias
+)
+DEFAULT_HEARTBEAT_INTERVAL_SECONDS = 60
 DEFAULT_MAX_RESTART_ATTEMPTS = 3
 DEFAULT_RESTART_COOLDOWN = 60  # seconds
+MAX_RESTART_BACKOFF_SECONDS = 1800  # 30 minutes
 SERVER_RESTART_DELAY = (
     30  # seconds to wait after restarting servers before restarting clients
 )
@@ -111,7 +117,7 @@ class ProcessWatchdog:
 
     If a process is detected as hung or dead, it calls a restart callback.
 
-    The watchdog runs on a schedule (default every 15 minutes), performs its
+    The watchdog runs on a schedule (default every 1 minute), performs its
     check/restart cycle, and terminates until the next scheduled run.
     """
 
@@ -121,6 +127,10 @@ class ProcessWatchdog:
         heartbeat_timeout: int = DEFAULT_HEARTBEAT_TIMEOUT,
         max_restart_attempts: int = DEFAULT_MAX_RESTART_ATTEMPTS,
         restart_cooldown: int = DEFAULT_RESTART_COOLDOWN,
+        server_heartbeat_timeout: Optional[int] = None,
+        client_heartbeat_timeout: Optional[int] = None,
+        heartbeat_interval_seconds: int = DEFAULT_HEARTBEAT_INTERVAL_SECONDS,
+        enabled: bool = True,
     ):
         """
         Initialize the watchdog.
@@ -130,11 +140,28 @@ class ProcessWatchdog:
             heartbeat_timeout: Max time without log activity before considering hung (seconds)
             max_restart_attempts: Maximum restart attempts before giving up
             restart_cooldown: Minimum time between restart attempts (seconds)
+            server_heartbeat_timeout: Optional override for server heartbeat timeout (seconds)
+            client_heartbeat_timeout: Optional override for client heartbeat timeout (seconds)
+            heartbeat_interval_seconds: Expected client heartbeat write interval (seconds)
+            enabled: Whether watchdog scheduling is enabled
         """
-        self._run_interval_minutes = run_interval_minutes
-        self._heartbeat_timeout = heartbeat_timeout
-        self._max_restart_attempts = max_restart_attempts
-        self._restart_cooldown = restart_cooldown
+        self._run_interval_minutes = max(1, min(run_interval_minutes, MAX_RUN_INTERVAL_MINUTES))
+        self._server_heartbeat_timeout = int(
+            server_heartbeat_timeout
+            if server_heartbeat_timeout is not None
+            else heartbeat_timeout
+        )
+        self._client_heartbeat_timeout = int(
+            client_heartbeat_timeout
+            if client_heartbeat_timeout is not None
+            else heartbeat_timeout
+        )
+        # Legacy/global field retained for backward compatibility and status payloads.
+        self._heartbeat_timeout = self._server_heartbeat_timeout
+        self._max_restart_attempts = max(1, int(max_restart_attempts))
+        self._restart_cooldown = max(0, int(restart_cooldown))
+        self._heartbeat_interval_seconds = max(1, int(heartbeat_interval_seconds))
+        self._enabled = bool(enabled)
 
         # Tracked processes: {process_id: ProcessInfo}
         self._processes: Dict[str, "ProcessInfo"] = {}
@@ -166,6 +193,83 @@ class ProcessWatchdog:
         elif self._last_run:
             self._next_run = self._last_run + timedelta(minutes=value)
 
+    @property
+    def max_restart_attempts(self) -> int:
+        """Get max restart attempts."""
+        return self._max_restart_attempts
+
+    @max_restart_attempts.setter
+    def max_restart_attempts(self, value: int) -> None:
+        """Set max restart attempts."""
+        self._max_restart_attempts = max(1, int(value))
+
+    @property
+    def restart_cooldown(self) -> int:
+        """Get restart cooldown in seconds."""
+        return self._restart_cooldown
+
+    @restart_cooldown.setter
+    def restart_cooldown(self, value: int) -> None:
+        """Set restart cooldown in seconds."""
+        self._restart_cooldown = max(0, int(value))
+
+    @property
+    def server_heartbeat_timeout(self) -> int:
+        """Get server heartbeat timeout in seconds."""
+        return self._server_heartbeat_timeout
+
+    @server_heartbeat_timeout.setter
+    def server_heartbeat_timeout(self, value: int) -> None:
+        """Set server heartbeat timeout in seconds."""
+        self._server_heartbeat_timeout = max(1, int(value))
+        self._heartbeat_timeout = self._server_heartbeat_timeout
+
+    @property
+    def client_heartbeat_timeout(self) -> int:
+        """Get client heartbeat timeout in seconds."""
+        return self._client_heartbeat_timeout
+
+    @client_heartbeat_timeout.setter
+    def client_heartbeat_timeout(self, value: int) -> None:
+        """Set client heartbeat timeout in seconds."""
+        self._client_heartbeat_timeout = max(1, int(value))
+
+    @property
+    def heartbeat_interval_seconds(self) -> int:
+        """Get expected client heartbeat interval in seconds."""
+        return self._heartbeat_interval_seconds
+
+    @heartbeat_interval_seconds.setter
+    def heartbeat_interval_seconds(self, value: int) -> None:
+        """Set expected client heartbeat interval in seconds."""
+        self._heartbeat_interval_seconds = max(1, int(value))
+
+    @property
+    def enabled(self) -> bool:
+        """Get watchdog enabled state."""
+        return self._enabled
+
+    @enabled.setter
+    def enabled(self, value: bool) -> None:
+        """Set watchdog enabled state."""
+        self._enabled = bool(value)
+
+    def _heartbeat_timeout_for_type(self, process_type: str) -> int:
+        """Resolve heartbeat timeout by process type."""
+        if process_type == "client":
+            return self._client_heartbeat_timeout
+        if process_type == "server":
+            return self._server_heartbeat_timeout
+        return self._heartbeat_timeout
+
+    def refresh_registered_timeouts(self) -> None:
+        """Apply current timeout policy to all currently tracked processes."""
+        with self._lock:
+            for info in self._processes.values():
+                info.heartbeat_timeout = self._heartbeat_timeout_for_type(
+                    info.process_type
+                )
+
     def register_process(
         self,
         process_id: str,
@@ -174,6 +278,7 @@ class ProcessWatchdog:
         restart_callback: Callable[[], Optional[int]],
         process_type: str = "unknown",
         server_url: Optional[str] = None,
+        heartbeat_timeout: Optional[int] = None,
     ) -> None:
         """
         Register a process for monitoring.
@@ -185,7 +290,13 @@ class ProcessWatchdog:
             restart_callback: Callback function to restart the process, returns new PID
             process_type: Type of process ("server" or "client")
             server_url: For server processes, the base URL for status checks (e.g., "http://localhost:5000")
+            heartbeat_timeout: Optional timeout override (seconds) for this specific process
         """
+        effective_timeout = (
+            max(1, int(heartbeat_timeout))
+            if heartbeat_timeout is not None
+            else self._heartbeat_timeout_for_type(process_type)
+        )
         with self._lock:
             self._processes[process_id] = ProcessInfo(
                 process_id=process_id,
@@ -198,6 +309,8 @@ class ProcessWatchdog:
                 restart_count=0,
                 last_restart_at=None,
                 server_url=server_url,
+                heartbeat_timeout=effective_timeout,
+                last_restart_error=None,
             )
             logger.info(
                 f"Watchdog: Registered {process_type} process {process_id} (PID: {pid})"
@@ -231,6 +344,9 @@ class ProcessWatchdog:
     def start_scheduler(self) -> None:
         """Start the watchdog scheduler that runs periodically."""
         with self._lock:
+            if not self._enabled:
+                logger.info("Watchdog: Scheduler start skipped (disabled)")
+                return
             if self._scheduler_running:
                 return
 
@@ -426,6 +542,14 @@ class ProcessWatchdog:
         results["processes_checked"] += 1
         pid = process_info.pid
         log_file = process_info.log_file
+        timeout_seconds = max(
+            1,
+            int(
+                process_info.heartbeat_timeout
+                if process_info.heartbeat_timeout is not None
+                else self._heartbeat_timeout_for_type(process_info.process_type)
+            ),
+        )
 
         # Check if process is running
         is_running = self._is_process_running(pid)
@@ -447,7 +571,7 @@ class ProcessWatchdog:
             needs_restart = True
             reason = "process not running"
         elif (
-            time_since_heartbeat.total_seconds() > self._heartbeat_timeout
+            time_since_heartbeat.total_seconds() > timeout_seconds
             and last_modified is not None
         ):
             # Only consider hung if we've seen the log file before
@@ -462,6 +586,14 @@ class ProcessWatchdog:
             "needs_restart": needs_restart,
             "reason": reason,
             "restarted": False,
+            "heartbeat_timeout_seconds": timeout_seconds,
+            "heartbeat_age_seconds": int(time_since_heartbeat.total_seconds()),
+            "quarantined": process_info.quarantined,
+            "next_restart_at": (
+                process_info.next_restart_at.isoformat()
+                if process_info.next_restart_at
+                else None
+            ),
         }
 
         restarted = False
@@ -471,7 +603,33 @@ class ProcessWatchdog:
             if restarted:
                 results["processes_restarted"] += 1
                 process_detail["new_pid"] = process_info.pid
+            elif process_info.last_restart_error:
+                process_detail["restart_error"] = process_info.last_restart_error
+            process_detail["quarantined"] = process_info.quarantined
+            process_detail["next_restart_at"] = (
+                process_info.next_restart_at.isoformat()
+                if process_info.next_restart_at
+                else None
+            )
         else:
+            # Process recovered: clear restart attempt state so a later incident can recover.
+            with self._lock:
+                if (
+                    process_info.restart_count > 0
+                    or process_info.last_restart_error
+                    or process_info.quarantined
+                ):
+                    logger.info(
+                        f"Watchdog: Resetting restart counter for {process_info.process_id} "
+                        f"after healthy heartbeat"
+                    )
+                process_info.restart_count = 0
+                process_info.last_restart_at = None
+                process_info.last_restart_error = None
+                process_info.next_restart_at = None
+                process_info.quarantined = False
+                process_info.quarantined_at = None
+                process_info.quarantine_reason = None
             results["processes_healthy"] += 1
 
         results["details"].append(process_detail)
@@ -538,6 +696,44 @@ class ProcessWatchdog:
             pass
         return None
 
+    def _compute_restart_backoff_seconds(self, attempt_count: int) -> int:
+        """
+        Compute exponential backoff delay for the next retry window.
+
+        Args:
+            attempt_count: Number of restart attempts already made for this incident.
+
+        Returns:
+            Backoff delay in seconds, capped at MAX_RESTART_BACKOFF_SECONDS.
+        """
+        if self._restart_cooldown <= 0:
+            return 0
+        if attempt_count <= 0:
+            return 0
+        delay = self._restart_cooldown * (2 ** (attempt_count - 1))
+        return int(min(delay, MAX_RESTART_BACKOFF_SECONDS))
+
+    def _mark_quarantined(
+        self,
+        process_info: "ProcessInfo",
+        now: datetime,
+        reason: str,
+    ) -> None:
+        """Mark a process as quarantined to suppress repeated failed restarts."""
+        with self._lock:
+            if process_info.quarantined:
+                return
+            process_info.quarantined = True
+            process_info.quarantined_at = now
+            process_info.quarantine_reason = reason
+            process_info.last_restart_error = reason
+            process_info.next_restart_at = None
+
+        logger.warning(
+            f"Watchdog: Quarantining {process_info.process_id} after repeated restart "
+            f"failures ({reason})"
+        )
+
     def _handle_restart(self, process_info: "ProcessInfo", reason: str) -> bool:
         """
         Handle restarting a process.
@@ -551,23 +747,36 @@ class ProcessWatchdog:
         """
         now = datetime.now()
 
-        # Check cooldown
-        if process_info.last_restart_at:
-            time_since_restart = (now - process_info.last_restart_at).total_seconds()
-            if time_since_restart < self._restart_cooldown:
-                logger.debug(
-                    f"Watchdog: Skipping restart for {process_info.process_id}, "
-                    f"cooldown not elapsed ({time_since_restart:.0f}s < {self._restart_cooldown}s)"
-                )
+        with self._lock:
+            if process_info.quarantined:
                 return False
 
-        # Check max restart attempts
+        # Check max restart attempts before trying another restart.
         if process_info.restart_count >= self._max_restart_attempts:
-            logger.warning(
-                f"Watchdog: Max restart attempts ({self._max_restart_attempts}) "
-                f"reached for {process_info.process_id}, giving up"
+            error = (
+                f"max restart attempts reached ({self._max_restart_attempts}) for "
+                f"{process_info.process_id}"
             )
+            self._mark_quarantined(process_info, now, error)
             return False
+
+        # Exponential cooldown between restart attempts.
+        if process_info.last_restart_at and process_info.restart_count > 0:
+            required_delay = self._compute_restart_backoff_seconds(
+                process_info.restart_count
+            )
+            next_restart_at = process_info.last_restart_at + timedelta(
+                seconds=required_delay
+            )
+            with self._lock:
+                process_info.next_restart_at = next_restart_at
+            if now < next_restart_at:
+                remaining = int((next_restart_at - now).total_seconds())
+                logger.debug(
+                    f"Watchdog: Skipping restart for {process_info.process_id}, "
+                    f"backoff window active ({remaining}s remaining)"
+                )
+                return False
 
         logger.warning(
             f"Watchdog: Restarting {process_info.process_type} "
@@ -584,6 +793,16 @@ class ProcessWatchdog:
                     process_info.restart_count += 1
                     process_info.last_restart_at = now
                     process_info.last_heartbeat = now
+                    process_info.last_restart_error = None
+                    process_info.quarantined = False
+                    process_info.quarantined_at = None
+                    process_info.quarantine_reason = None
+                    next_delay = self._compute_restart_backoff_seconds(
+                        process_info.restart_count
+                    )
+                    process_info.next_restart_at = (
+                        now + timedelta(seconds=next_delay) if next_delay > 0 else None
+                    )
 
                 logger.info(
                     f"Watchdog: Successfully restarted {process_info.process_id} "
@@ -591,6 +810,7 @@ class ProcessWatchdog:
                 )
                 return True
             else:
+                error = f"restart callback returned None for {process_info.process_id}"
                 logger.error(
                     f"Watchdog: Failed to restart {process_info.process_id} "
                     f"(callback returned None)"
@@ -598,6 +818,19 @@ class ProcessWatchdog:
                 with self._lock:
                     process_info.restart_count += 1
                     process_info.last_restart_at = now
+                    process_info.last_restart_error = error
+                    next_delay = self._compute_restart_backoff_seconds(
+                        process_info.restart_count
+                    )
+                    process_info.next_restart_at = (
+                        now + timedelta(seconds=next_delay) if next_delay > 0 else None
+                    )
+                if process_info.restart_count >= self._max_restart_attempts:
+                    quarantine_error = (
+                        f"max restart attempts reached ({self._max_restart_attempts}) for "
+                        f"{process_info.process_id}"
+                    )
+                    self._mark_quarantined(process_info, now, quarantine_error)
                 return False
 
         except Exception as e:
@@ -605,6 +838,19 @@ class ProcessWatchdog:
             with self._lock:
                 process_info.restart_count += 1
                 process_info.last_restart_at = now
+                process_info.last_restart_error = str(e)
+                next_delay = self._compute_restart_backoff_seconds(
+                    process_info.restart_count
+                )
+                process_info.next_restart_at = (
+                    now + timedelta(seconds=next_delay) if next_delay > 0 else None
+                )
+            if process_info.restart_count >= self._max_restart_attempts:
+                quarantine_error = (
+                    f"max restart attempts reached ({self._max_restart_attempts}) for "
+                    f"{process_info.process_id}"
+                )
+                self._mark_quarantined(process_info, now, quarantine_error)
             return False
 
     def get_status(self) -> Dict:
@@ -616,9 +862,22 @@ class ProcessWatchdog:
         """
         with self._lock:
             processes = {}
+            latest_restart_error = None
+            latest_restart_at = None
+            quarantined_processes_count = 0
             for process_id, info in self._processes.items():
                 is_running = self._is_process_running(info.pid)
                 last_modified = self._get_log_mtime(info.log_file)
+                if info.last_restart_error and info.last_restart_at:
+                    if latest_restart_at is None or info.last_restart_at > latest_restart_at:
+                        latest_restart_at = info.last_restart_at
+                        latest_restart_error = {
+                            "process_id": info.process_id,
+                            "error": info.last_restart_error,
+                            "at": info.last_restart_at.isoformat(),
+                        }
+                if info.quarantined:
+                    quarantined_processes_count += 1
 
                 processes[process_id] = {
                     "pid": info.pid,
@@ -637,16 +896,36 @@ class ProcessWatchdog:
                         if info.last_restart_at
                         else None
                     ),
+                    "heartbeat_timeout_seconds": info.heartbeat_timeout,
+                    "last_restart_error": info.last_restart_error,
+                    "next_restart_at": (
+                        info.next_restart_at.isoformat()
+                        if info.next_restart_at
+                        else None
+                    ),
+                    "quarantined": info.quarantined,
+                    "quarantined_at": (
+                        info.quarantined_at.isoformat()
+                        if info.quarantined_at
+                        else None
+                    ),
+                    "quarantine_reason": info.quarantine_reason,
                 }
 
             return {
+                "enabled": self._enabled,
                 "scheduler_running": self._scheduler_running,
                 "run_interval_minutes": self._run_interval_minutes,
                 "last_run": self._last_run.isoformat() if self._last_run else None,
                 "next_run": self._next_run.isoformat() if self._next_run else None,
-                "heartbeat_timeout": self._heartbeat_timeout,
+                "heartbeat_timeout": self._server_heartbeat_timeout,
+                "server_heartbeat_timeout": self._server_heartbeat_timeout,
+                "client_heartbeat_timeout": self._client_heartbeat_timeout,
+                "heartbeat_interval_seconds": self._heartbeat_interval_seconds,
                 "max_restart_attempts": self._max_restart_attempts,
                 "restart_cooldown": self._restart_cooldown,
+                "latest_restart_error": latest_restart_error,
+                "quarantined_processes_count": quarantined_processes_count,
                 "processes": processes,
             }
 
@@ -671,6 +950,12 @@ class ProcessInfo:
         restart_count: int,
         last_restart_at: Optional[datetime],
         server_url: Optional[str] = None,
+        heartbeat_timeout: Optional[int] = None,
+        last_restart_error: Optional[str] = None,
+        next_restart_at: Optional[datetime] = None,
+        quarantined: bool = False,
+        quarantined_at: Optional[datetime] = None,
+        quarantine_reason: Optional[str] = None,
     ):
         self.process_id = process_id
         self.pid = pid
@@ -682,6 +967,12 @@ class ProcessInfo:
         self.restart_count = restart_count
         self.last_restart_at = last_restart_at
         self.server_url = server_url
+        self.heartbeat_timeout = heartbeat_timeout
+        self.last_restart_error = last_restart_error
+        self.next_restart_at = next_restart_at
+        self.quarantined = quarantined
+        self.quarantined_at = quarantined_at
+        self.quarantine_reason = quarantine_reason
 
 
 def _save_watchdog_last_run(last_run: datetime) -> None:
@@ -706,7 +997,14 @@ def _save_watchdog_last_run(last_run: datetime) -> None:
             else:
                 # Create settings row if it doesn't exist
                 settings = WatchdogSettings(
-                    enabled=True, run_interval_minutes=15, last_run=last_run
+                    enabled=True,
+                    run_interval_minutes=DEFAULT_RUN_INTERVAL_MINUTES,
+                    server_heartbeat_timeout_sec=DEFAULT_SERVER_HEARTBEAT_TIMEOUT,
+                    client_heartbeat_timeout_sec=DEFAULT_CLIENT_HEARTBEAT_TIMEOUT,
+                    heartbeat_interval_sec=DEFAULT_HEARTBEAT_INTERVAL_SECONDS,
+                    max_restart_attempts=DEFAULT_MAX_RESTART_ATTEMPTS,
+                    restart_cooldown_sec=DEFAULT_RESTART_COOLDOWN,
+                    last_run=last_run,
                 )
                 db.session.add(settings)
                 db.session.commit()
@@ -714,12 +1012,66 @@ def _save_watchdog_last_run(last_run: datetime) -> None:
         logger.debug(f"Could not save watchdog last_run to database: {e}")
 
 
+def _upgrade_legacy_watchdog_defaults(settings) -> None:
+    """
+    Upgrade untouched legacy watchdog defaults to the new run interval.
+
+    Only updates rows that still match the historical default tuple to avoid
+    overriding operator-customized values.
+    """
+    try:
+        from y_web import db
+
+        legacy_defaults = (
+            int(getattr(settings, "run_interval_minutes", DEFAULT_RUN_INTERVAL_MINUTES))
+            == 15
+            and int(
+                getattr(
+                    settings,
+                    "server_heartbeat_timeout_sec",
+                    DEFAULT_SERVER_HEARTBEAT_TIMEOUT,
+                )
+            )
+            == 300
+            and int(
+                getattr(
+                    settings,
+                    "client_heartbeat_timeout_sec",
+                    DEFAULT_CLIENT_HEARTBEAT_TIMEOUT,
+                )
+            )
+            == 300
+            and int(
+                getattr(
+                    settings,
+                    "heartbeat_interval_sec",
+                    DEFAULT_HEARTBEAT_INTERVAL_SECONDS,
+                )
+            )
+            == 60
+            and int(getattr(settings, "max_restart_attempts", DEFAULT_MAX_RESTART_ATTEMPTS))
+            == 3
+            and int(getattr(settings, "restart_cooldown_sec", DEFAULT_RESTART_COOLDOWN))
+            == 60
+        )
+
+        if legacy_defaults:
+            settings.run_interval_minutes = DEFAULT_RUN_INTERVAL_MINUTES
+            db.session.commit()
+            logger.info(
+                "Watchdog: upgraded legacy default interval from 15m to "
+                f"{DEFAULT_RUN_INTERVAL_MINUTES}m"
+            )
+    except Exception as e:
+        logger.debug(f"Could not upgrade legacy watchdog defaults: {e}")
+
+
 def _load_watchdog_settings() -> Dict:
     """
     Load watchdog settings from the database.
 
     Returns:
-        Dictionary with enabled, run_interval_minutes, and last_run
+        Dictionary with watchdog settings
     """
     try:
         from flask import current_app
@@ -729,23 +1081,62 @@ def _load_watchdog_settings() -> Dict:
 
             settings = WatchdogSettings.query.first()
             if settings:
+                _upgrade_legacy_watchdog_defaults(settings)
                 return {
+                    "loaded": True,
                     "enabled": settings.enabled,
                     "run_interval_minutes": settings.run_interval_minutes,
                     "last_run": settings.last_run,
+                    "server_heartbeat_timeout_sec": getattr(
+                        settings,
+                        "server_heartbeat_timeout_sec",
+                        DEFAULT_SERVER_HEARTBEAT_TIMEOUT,
+                    ),
+                    "client_heartbeat_timeout_sec": getattr(
+                        settings,
+                        "client_heartbeat_timeout_sec",
+                        DEFAULT_CLIENT_HEARTBEAT_TIMEOUT,
+                    ),
+                    "heartbeat_interval_sec": getattr(
+                        settings,
+                        "heartbeat_interval_sec",
+                        DEFAULT_HEARTBEAT_INTERVAL_SECONDS,
+                    ),
+                    "max_restart_attempts": getattr(
+                        settings,
+                        "max_restart_attempts",
+                        DEFAULT_MAX_RESTART_ATTEMPTS,
+                    ),
+                    "restart_cooldown_sec": getattr(
+                        settings,
+                        "restart_cooldown_sec",
+                        DEFAULT_RESTART_COOLDOWN,
+                    ),
                 }
     except Exception as e:
         logger.debug(f"Could not load watchdog settings from database: {e}")
 
     return {
+        "loaded": False,
         "enabled": True,
         "run_interval_minutes": DEFAULT_RUN_INTERVAL_MINUTES,
         "last_run": None,
+        "server_heartbeat_timeout_sec": DEFAULT_SERVER_HEARTBEAT_TIMEOUT,
+        "client_heartbeat_timeout_sec": DEFAULT_CLIENT_HEARTBEAT_TIMEOUT,
+        "heartbeat_interval_sec": DEFAULT_HEARTBEAT_INTERVAL_SECONDS,
+        "max_restart_attempts": DEFAULT_MAX_RESTART_ATTEMPTS,
+        "restart_cooldown_sec": DEFAULT_RESTART_COOLDOWN,
     }
 
 
 def _save_watchdog_settings(
-    enabled: bool = None, run_interval_minutes: int = None
+    enabled: bool = None,
+    run_interval_minutes: int = None,
+    server_heartbeat_timeout_sec: int = None,
+    client_heartbeat_timeout_sec: int = None,
+    heartbeat_interval_sec: int = None,
+    max_restart_attempts: int = None,
+    restart_cooldown_sec: int = None,
 ) -> None:
     """
     Save watchdog settings to the database.
@@ -753,6 +1144,11 @@ def _save_watchdog_settings(
     Args:
         enabled: Whether the watchdog is enabled
         run_interval_minutes: The interval between watchdog runs
+        server_heartbeat_timeout_sec: Server heartbeat timeout in seconds
+        client_heartbeat_timeout_sec: Client heartbeat timeout in seconds
+        heartbeat_interval_sec: Expected client heartbeat interval in seconds
+        max_restart_attempts: Max restart attempts per incident
+        restart_cooldown_sec: Restart cooldown in seconds
     """
     try:
         from flask import current_app
@@ -767,13 +1163,50 @@ def _save_watchdog_settings(
                     settings.enabled = enabled
                 if run_interval_minutes is not None:
                     settings.run_interval_minutes = run_interval_minutes
+                if server_heartbeat_timeout_sec is not None:
+                    settings.server_heartbeat_timeout_sec = server_heartbeat_timeout_sec
+                if client_heartbeat_timeout_sec is not None:
+                    settings.client_heartbeat_timeout_sec = client_heartbeat_timeout_sec
+                if heartbeat_interval_sec is not None:
+                    settings.heartbeat_interval_sec = heartbeat_interval_sec
+                if max_restart_attempts is not None:
+                    settings.max_restart_attempts = max_restart_attempts
+                if restart_cooldown_sec is not None:
+                    settings.restart_cooldown_sec = restart_cooldown_sec
                 db.session.commit()
             else:
                 # Create settings row if it doesn't exist
                 settings = WatchdogSettings(
                     enabled=enabled if enabled is not None else True,
                     run_interval_minutes=(
-                        run_interval_minutes if run_interval_minutes is not None else 15
+                        run_interval_minutes
+                        if run_interval_minutes is not None
+                        else DEFAULT_RUN_INTERVAL_MINUTES
+                    ),
+                    server_heartbeat_timeout_sec=(
+                        server_heartbeat_timeout_sec
+                        if server_heartbeat_timeout_sec is not None
+                        else DEFAULT_SERVER_HEARTBEAT_TIMEOUT
+                    ),
+                    client_heartbeat_timeout_sec=(
+                        client_heartbeat_timeout_sec
+                        if client_heartbeat_timeout_sec is not None
+                        else DEFAULT_CLIENT_HEARTBEAT_TIMEOUT
+                    ),
+                    heartbeat_interval_sec=(
+                        heartbeat_interval_sec
+                        if heartbeat_interval_sec is not None
+                        else DEFAULT_HEARTBEAT_INTERVAL_SECONDS
+                    ),
+                    max_restart_attempts=(
+                        max_restart_attempts
+                        if max_restart_attempts is not None
+                        else DEFAULT_MAX_RESTART_ATTEMPTS
+                    ),
+                    restart_cooldown_sec=(
+                        restart_cooldown_sec
+                        if restart_cooldown_sec is not None
+                        else DEFAULT_RESTART_COOLDOWN
                     ),
                 )
                 db.session.add(settings)
@@ -788,10 +1221,13 @@ _watchdog_lock = threading.Lock()
 
 
 def get_watchdog(
-    run_interval_minutes: int = DEFAULT_RUN_INTERVAL_MINUTES,
-    heartbeat_timeout: int = DEFAULT_HEARTBEAT_TIMEOUT,
-    max_restart_attempts: int = DEFAULT_MAX_RESTART_ATTEMPTS,
-    restart_cooldown: int = DEFAULT_RESTART_COOLDOWN,
+    run_interval_minutes: Optional[int] = None,
+    heartbeat_timeout: Optional[int] = None,
+    max_restart_attempts: Optional[int] = None,
+    restart_cooldown: Optional[int] = None,
+    server_heartbeat_timeout: Optional[int] = None,
+    client_heartbeat_timeout: Optional[int] = None,
+    heartbeat_interval_seconds: Optional[int] = None,
 ) -> ProcessWatchdog:
     """
     Get or create the global watchdog instance.
@@ -801,6 +1237,9 @@ def get_watchdog(
         heartbeat_timeout: Max time without log activity before considering hung (seconds)
         max_restart_attempts: Maximum restart attempts before giving up
         restart_cooldown: Minimum time between restart attempts (seconds)
+        server_heartbeat_timeout: Per-server heartbeat timeout override (seconds)
+        client_heartbeat_timeout: Per-client heartbeat timeout override (seconds)
+        heartbeat_interval_seconds: Expected heartbeat write interval from clients (seconds)
 
     Returns:
         The global ProcessWatchdog instance
@@ -808,13 +1247,101 @@ def get_watchdog(
     global _watchdog
 
     with _watchdog_lock:
+        db_settings = _load_watchdog_settings()
+        settings_loaded = bool(db_settings.get("loaded", False))
+
+        if heartbeat_timeout is not None:
+            server_heartbeat_timeout = (
+                server_heartbeat_timeout
+                if server_heartbeat_timeout is not None
+                else heartbeat_timeout
+            )
+            client_heartbeat_timeout = (
+                client_heartbeat_timeout
+                if client_heartbeat_timeout is not None
+                else heartbeat_timeout
+            )
+
+        effective_run_interval = (
+            run_interval_minutes
+            if run_interval_minutes is not None
+            else db_settings.get("run_interval_minutes", DEFAULT_RUN_INTERVAL_MINUTES)
+        )
+        effective_server_timeout = (
+            server_heartbeat_timeout
+            if server_heartbeat_timeout is not None
+            else db_settings.get(
+                "server_heartbeat_timeout_sec", DEFAULT_SERVER_HEARTBEAT_TIMEOUT
+            )
+        )
+        effective_client_timeout = (
+            client_heartbeat_timeout
+            if client_heartbeat_timeout is not None
+            else db_settings.get(
+                "client_heartbeat_timeout_sec", DEFAULT_CLIENT_HEARTBEAT_TIMEOUT
+            )
+        )
+        effective_max_restarts = (
+            max_restart_attempts
+            if max_restart_attempts is not None
+            else db_settings.get(
+                "max_restart_attempts", DEFAULT_MAX_RESTART_ATTEMPTS
+            )
+        )
+        effective_restart_cooldown = (
+            restart_cooldown
+            if restart_cooldown is not None
+            else db_settings.get("restart_cooldown_sec", DEFAULT_RESTART_COOLDOWN)
+        )
+        effective_heartbeat_interval = (
+            heartbeat_interval_seconds
+            if heartbeat_interval_seconds is not None
+            else db_settings.get(
+                "heartbeat_interval_sec", DEFAULT_HEARTBEAT_INTERVAL_SECONDS
+            )
+        )
+        effective_enabled = bool(db_settings.get("enabled", True))
+
         if _watchdog is None:
             _watchdog = ProcessWatchdog(
-                run_interval_minutes=run_interval_minutes,
-                heartbeat_timeout=heartbeat_timeout,
-                max_restart_attempts=max_restart_attempts,
-                restart_cooldown=restart_cooldown,
+                run_interval_minutes=effective_run_interval,
+                heartbeat_timeout=DEFAULT_HEARTBEAT_TIMEOUT,
+                max_restart_attempts=effective_max_restarts,
+                restart_cooldown=effective_restart_cooldown,
+                server_heartbeat_timeout=effective_server_timeout,
+                client_heartbeat_timeout=effective_client_timeout,
+                heartbeat_interval_seconds=effective_heartbeat_interval,
+                enabled=effective_enabled,
             )
+            if settings_loaded and db_settings.get("last_run"):
+                _watchdog._last_run = db_settings["last_run"]
+        else:
+            if run_interval_minutes is not None:
+                _watchdog.run_interval_minutes = run_interval_minutes
+            if max_restart_attempts is not None:
+                _watchdog.max_restart_attempts = max_restart_attempts
+            if restart_cooldown is not None:
+                _watchdog.restart_cooldown = restart_cooldown
+            if server_heartbeat_timeout is not None:
+                _watchdog.server_heartbeat_timeout = server_heartbeat_timeout
+            if client_heartbeat_timeout is not None:
+                _watchdog.client_heartbeat_timeout = client_heartbeat_timeout
+            if heartbeat_interval_seconds is not None:
+                _watchdog.heartbeat_interval_seconds = heartbeat_interval_seconds
+            if heartbeat_timeout is not None:
+                _watchdog.server_heartbeat_timeout = heartbeat_timeout
+                _watchdog.client_heartbeat_timeout = heartbeat_timeout
+            if settings_loaded:
+                _watchdog.enabled = effective_enabled
+                if not effective_enabled and _watchdog.is_running:
+                    _watchdog.stop_scheduler()
+
+            if (
+                server_heartbeat_timeout is not None
+                or client_heartbeat_timeout is not None
+                or heartbeat_timeout is not None
+            ):
+                _watchdog.refresh_registered_timeouts()
         return _watchdog
 
 
@@ -846,10 +1373,84 @@ def set_watchdog_interval(minutes: int) -> None:
     Args:
         minutes: Interval in minutes between watchdog runs
     """
+    set_watchdog_settings(run_interval_minutes=minutes)
+
+
+def set_watchdog_settings(
+    run_interval_minutes: Optional[int] = None,
+    server_heartbeat_timeout_sec: Optional[int] = None,
+    client_heartbeat_timeout_sec: Optional[int] = None,
+    heartbeat_interval_sec: Optional[int] = None,
+    max_restart_attempts: Optional[int] = None,
+    restart_cooldown_sec: Optional[int] = None,
+) -> Dict:
+    """
+    Update watchdog runtime and persisted settings.
+
+    Returns:
+        Updated watchdog status
+    """
     watchdog = get_watchdog()
-    watchdog.run_interval_minutes = minutes
-    # Persist to database
-    _save_watchdog_settings(run_interval_minutes=minutes)
+
+    if run_interval_minutes is not None:
+        watchdog.run_interval_minutes = max(1, int(run_interval_minutes))
+    if server_heartbeat_timeout_sec is not None:
+        watchdog.server_heartbeat_timeout = max(1, int(server_heartbeat_timeout_sec))
+    if client_heartbeat_timeout_sec is not None:
+        watchdog.client_heartbeat_timeout = max(1, int(client_heartbeat_timeout_sec))
+    if heartbeat_interval_sec is not None:
+        watchdog.heartbeat_interval_seconds = max(1, int(heartbeat_interval_sec))
+    if max_restart_attempts is not None:
+        watchdog.max_restart_attempts = max(1, int(max_restart_attempts))
+    if restart_cooldown_sec is not None:
+        watchdog.restart_cooldown = max(0, int(restart_cooldown_sec))
+
+    if (
+        server_heartbeat_timeout_sec is not None
+        or client_heartbeat_timeout_sec is not None
+    ):
+        watchdog.refresh_registered_timeouts()
+
+    _save_watchdog_settings(
+        run_interval_minutes=watchdog.run_interval_minutes
+        if run_interval_minutes is not None
+        else None,
+        server_heartbeat_timeout_sec=watchdog.server_heartbeat_timeout
+        if server_heartbeat_timeout_sec is not None
+        else None,
+        client_heartbeat_timeout_sec=watchdog.client_heartbeat_timeout
+        if client_heartbeat_timeout_sec is not None
+        else None,
+        heartbeat_interval_sec=watchdog.heartbeat_interval_seconds
+        if heartbeat_interval_sec is not None
+        else None,
+        max_restart_attempts=watchdog.max_restart_attempts
+        if max_restart_attempts is not None
+        else None,
+        restart_cooldown_sec=watchdog.restart_cooldown
+        if restart_cooldown_sec is not None
+        else None,
+    )
+    return get_watchdog_status()
+
+
+def set_watchdog_enabled(enabled: bool) -> Dict:
+    """
+    Enable/disable the watchdog scheduler and persist the flag.
+
+    Returns:
+        Updated watchdog status
+    """
+    watchdog = get_watchdog()
+    watchdog.enabled = bool(enabled)
+    _save_watchdog_settings(enabled=watchdog.enabled)
+
+    if watchdog.enabled:
+        watchdog.start_scheduler()
+    else:
+        watchdog.stop_scheduler()
+
+    return get_watchdog_status()
 
 
 def get_watchdog_status() -> Dict:
@@ -862,7 +1463,7 @@ def get_watchdog_status() -> Dict:
     watchdog = get_watchdog()
     status = watchdog.get_status()
 
-    # Try to load last_run from database if not set in memory
+    # Reconcile last_run with persisted values if missing from in-memory watchdog.
     if status.get("last_run") is None:
         db_settings = _load_watchdog_settings()
         if db_settings.get("last_run"):

@@ -26,7 +26,7 @@ class TestProcessWatchdog:
 
         watchdog = ProcessWatchdog()
 
-        assert watchdog._run_interval_minutes == 15
+        assert watchdog._run_interval_minutes == 1
         assert watchdog._heartbeat_timeout == 300
         assert watchdog._max_restart_attempts == 3
         assert watchdog._restart_cooldown == 60
@@ -332,6 +332,7 @@ class TestProcessWatchdog:
             watchdog._check_process(process_info, results)
             assert restart_callback.call_count == 2
             assert process_info.restart_count == 2
+            assert process_info.quarantined is True
 
             # Third attempt should be skipped (max attempts reached)
             watchdog._check_process(process_info, results)
@@ -377,6 +378,131 @@ class TestProcessWatchdog:
             watchdog._check_process(process_info, results)
             assert restart_callback.call_count == 1  # Not called again
 
+            # Move the last restart sufficiently into the past to satisfy backoff.
+            process_info.last_restart_at = datetime.now() - timedelta(seconds=120)
+            watchdog._check_process(process_info, results)
+            assert restart_callback.call_count == 2
+
+        finally:
+            os.unlink(temp_path)
+
+    def test_quarantine_count_exposed_in_status(self):
+        """Test get_status reports quarantined process counts and metadata."""
+        from y_web.utils.process_watchdog import ProcessWatchdog
+
+        watchdog = ProcessWatchdog(max_restart_attempts=1, restart_cooldown=0)
+        restart_callback = MagicMock(return_value=None)
+
+        with tempfile.NamedTemporaryFile(mode="w", delete=False) as f:
+            f.write("log entry\n")
+            temp_path = f.name
+
+        try:
+            watchdog.register_process(
+                process_id="q_process",
+                pid=999999999,
+                log_file=temp_path,
+                restart_callback=restart_callback,
+                process_type="server",
+            )
+
+            process_info = watchdog._processes["q_process"]
+            results = {
+                "processes_checked": 0,
+                "processes_restarted": 0,
+                "processes_healthy": 0,
+                "details": [],
+            }
+
+            watchdog._check_process(process_info, results)
+            status = watchdog.get_status()
+
+            assert status["quarantined_processes_count"] == 1
+            proc_status = status["processes"]["q_process"]
+            assert proc_status["quarantined"] is True
+            assert proc_status["quarantine_reason"] is not None
+            assert proc_status["quarantined_at"] is not None
+        finally:
+            os.unlink(temp_path)
+
+    def test_process_type_timeouts_applied_on_registration(self):
+        """Test that server/client registrations use different heartbeat timeouts."""
+        from y_web.utils.process_watchdog import ProcessWatchdog
+
+        watchdog = ProcessWatchdog(
+            server_heartbeat_timeout=120, client_heartbeat_timeout=900
+        )
+        restart_callback = MagicMock(return_value=12345)
+
+        with tempfile.NamedTemporaryFile(mode="w", delete=False) as f:
+            f.write("log entry\n")
+            temp_path = f.name
+
+        try:
+            watchdog.register_process(
+                process_id="server_1",
+                pid=os.getpid(),
+                log_file=temp_path,
+                restart_callback=restart_callback,
+                process_type="server",
+            )
+            watchdog.register_process(
+                process_id="client_1",
+                pid=os.getpid(),
+                log_file=temp_path,
+                restart_callback=restart_callback,
+                process_type="client",
+            )
+
+            assert watchdog._processes["server_1"].heartbeat_timeout == 120
+            assert watchdog._processes["client_1"].heartbeat_timeout == 900
+        finally:
+            os.unlink(temp_path)
+
+    def test_restart_counter_resets_after_process_becomes_healthy(self):
+        """Test restart attempts are reset once process is healthy again."""
+        from y_web.utils.process_watchdog import ProcessWatchdog
+
+        watchdog = ProcessWatchdog(restart_cooldown=0)
+        restart_callback = MagicMock(return_value=None)
+
+        with tempfile.NamedTemporaryFile(mode="w", delete=False) as f:
+            f.write("log entry\n")
+            temp_path = f.name
+
+        try:
+            watchdog.register_process(
+                process_id="client_1",
+                pid=999999999,  # dead PID
+                log_file=temp_path,
+                restart_callback=restart_callback,
+                process_type="client",
+            )
+
+            process_info = watchdog._processes["client_1"]
+            results = {
+                "processes_checked": 0,
+                "processes_restarted": 0,
+                "processes_healthy": 0,
+                "details": [],
+            }
+
+            watchdog._check_process(process_info, results)
+            assert process_info.restart_count == 1
+            process_info.quarantined = True
+            process_info.quarantined_at = datetime.now()
+            process_info.quarantine_reason = "test quarantine"
+
+            process_info.pid = os.getpid()  # now healthy
+            with open(temp_path, "a", encoding="utf-8") as fh:
+                fh.write("healthy heartbeat\n")
+
+            watchdog._check_process(process_info, results)
+            assert process_info.restart_count == 0
+            assert process_info.last_restart_error is None
+            assert process_info.quarantined is False
+            assert process_info.quarantined_at is None
+            assert process_info.quarantine_reason is None
         finally:
             os.unlink(temp_path)
 
@@ -570,9 +696,9 @@ class TestWatchdogRunOnce:
         """Test that run_interval_minutes can be get and set."""
         from y_web.utils.process_watchdog import ProcessWatchdog
 
-        watchdog = ProcessWatchdog(run_interval_minutes=15)
+        watchdog = ProcessWatchdog(run_interval_minutes=1)
 
-        assert watchdog.run_interval_minutes == 15
+        assert watchdog.run_interval_minutes == 1
 
         watchdog.run_interval_minutes = 30
         assert watchdog.run_interval_minutes == 30
@@ -635,4 +761,48 @@ class TestGlobalWatchdogFunctions:
         assert "processes" in status
 
         # Cleanup
+        stop_watchdog()
+
+    def test_set_watchdog_settings(self):
+        """Test advanced watchdog settings update runtime state."""
+        from y_web.utils.process_watchdog import (
+            get_watchdog,
+            set_watchdog_settings,
+            stop_watchdog,
+        )
+
+        stop_watchdog()
+        status = set_watchdog_settings(
+            run_interval_minutes=20,
+            server_heartbeat_timeout_sec=180,
+            client_heartbeat_timeout_sec=600,
+            heartbeat_interval_sec=45,
+            max_restart_attempts=4,
+            restart_cooldown_sec=30,
+        )
+        watchdog = get_watchdog()
+
+        assert watchdog.run_interval_minutes == 20
+        assert watchdog.server_heartbeat_timeout == 180
+        assert watchdog.client_heartbeat_timeout == 600
+        assert watchdog.heartbeat_interval_seconds == 45
+        assert watchdog.max_restart_attempts == 4
+        assert watchdog.restart_cooldown == 30
+        assert status["server_heartbeat_timeout"] == 180
+        assert status["client_heartbeat_timeout"] == 600
+
+        stop_watchdog()
+
+    def test_set_watchdog_enabled(self):
+        """Test enabling/disabling watchdog persists runtime enabled state."""
+        from y_web.utils.process_watchdog import set_watchdog_enabled, stop_watchdog
+
+        stop_watchdog()
+        disabled = set_watchdog_enabled(False)
+        assert disabled["enabled"] is False
+        assert disabled["scheduler_running"] is False
+
+        enabled = set_watchdog_enabled(True)
+        assert enabled["enabled"] is True
+
         stop_watchdog()
