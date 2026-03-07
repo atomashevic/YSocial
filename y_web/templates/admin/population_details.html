@@ -47,6 +47,24 @@
                                     <span class="right">{{ population.descr }}</span>
                                 </div>
                                 <div class="box-line">
+                                    <span class="left">Username Type</span>
+                                    <span class="right">{{ population.username_type }}</span>
+                                </div>
+                                <div class="box-line">
+                                    <span class="left">Update Username Type</span>
+                                    <span class="right">
+                                        <form action="/admin/update_population_username_type/{{ population.id }}" method="POST" style="display: flex; gap: 8px; align-items: center; justify-content: flex-end;">
+                                            <div class="select is-small">
+                                                <select name="username_type">
+                                                    <option value="microblogging" {% if population.username_type == "microblogging" %}selected{% endif %}>Microblogging</option>
+                                                    <option value="forum" {% if population.username_type == "forum" %}selected{% endif %}>Forum</option>
+                                                </select>
+                                            </div>
+                                            <button type="submit" class="button is-small is-info">Save</button>
+                                        </form>
+                                    </span>
+                                </div>
+                                <div class="box-line">
                                     <span class="left">Initial Size<small>(initial agents)</small></span>
                                     <span class="right">{{ population.size }}</span>
                                 </div>

@@ -74,6 +74,15 @@ def create_page():
     leaning = request.form.get("leaning")
     activity_profile_id = request.form.get("activity_profile")
 
+    # Image extraction settings
+    fetch_images_from_url = request.form.get("fetch_images_from_url") == "1"
+    fetch_images_timeout = request.form.get("fetch_images_timeout", 10)
+    try:
+        fetch_images_timeout = int(fetch_images_timeout)
+        fetch_images_timeout = max(1, min(60, fetch_images_timeout))  # Clamp to 1-60
+    except (ValueError, TypeError):
+        fetch_images_timeout = 10
+
     # Validate that page name is unique
     existing_page = Page.query.filter_by(name=name).first()
     if existing_page:
@@ -90,6 +99,8 @@ def create_page():
         pg_type=pg_type,
         leaning=leaning,
         activity_profile=activity_profile_id,
+        fetch_images_from_url=fetch_images_from_url,
+        fetch_images_timeout=fetch_images_timeout,
     )
 
     db.session.add(page)
@@ -110,6 +121,32 @@ def create_page():
     )
 
     return page_data()
+
+
+@pages.route("/admin/update_page_image_settings/<int:page_id>", methods=["POST"])
+@login_required
+def update_page_image_settings(page_id):
+    """Update page image extraction settings."""
+    check_privileges(current_user.username)
+
+    page = Page.query.get_or_404(page_id)
+
+    # Image extraction settings
+    fetch_images_from_url = request.form.get("fetch_images_from_url") == "1"
+    fetch_images_timeout = request.form.get("fetch_images_timeout", 10)
+    try:
+        fetch_images_timeout = int(fetch_images_timeout)
+        fetch_images_timeout = max(1, min(60, fetch_images_timeout))  # Clamp to 1-60
+    except (ValueError, TypeError):
+        fetch_images_timeout = 10
+
+    page.fetch_images_from_url = fetch_images_from_url
+    page.fetch_images_timeout = fetch_images_timeout
+
+    db.session.commit()
+
+    flash(f"Image extraction settings updated for '{page.name}'.")
+    return redirect(f"/admin/page_details/{page_id}")
 
 
 @pages.route("/admin/pages_data")

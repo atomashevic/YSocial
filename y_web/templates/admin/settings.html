@@ -1293,6 +1293,79 @@
                                         </span>
                                     </div>
 
+                                    <!-- LLM Default Configuration (experiment-wide) -->
+                                    <div id="llm_defaults_section" style="margin-top: 15px; padding: 15px; background: #f8f9fa; border-radius: 8px; border: 1px solid #e9ecef;">
+                                        <div class="form-section-header" style="margin-bottom: 10px;">Default LLM Configuration</div>
+                                        <div class="form-section-description" style="margin-bottom: 15px; color: #666; font-size: 0.9rem;">
+                                            Set default LLM settings that will be inherited by all clients in this experiment.
+                                            Clients can override these defaults if needed.
+                                        </div>
+                                        <div class="box-line">
+                                            <span class="left">LLM Server URL</span>
+                                            <span class="right" style="width: 70%;">
+                                                <input type="text" name="llm_default" class="input"
+                                                       value="http://127.0.0.1:11434/v1"
+                                                       placeholder="e.g., http://127.0.0.1:11434/v1">
+                                            </span>
+                                        </div>
+                                        <div class="box-line">
+                                            <span class="left">API Key</span>
+                                            <span class="right" style="width: 70%;">
+                                                <input type="text" name="llm_api_key_default" class="input" value="NULL">
+                                            </span>
+                                        </div>
+                                        <div class="box-line">
+                                            <span class="left">Max Tokens</span>
+                                            <span class="right" style="width: 70%;">
+                                                <input type="number" name="llm_max_tokens_default" class="input" value="-1">
+                                                <small style="color: #666; display: block; margin-top: 4px;">-1 = model default</small>
+                                            </span>
+                                        </div>
+                                        <div class="box-line">
+                                            <span class="left">Temperature</span>
+                                            <span class="right" style="width: 70%;">
+                                                <input type="number" name="llm_temperature_default" class="input"
+                                                       min="0" max="2" step="0.1" value="1.5">
+                                            </span>
+                                        </div>
+                                        <div style="margin-top: 15px; padding-top: 10px; border-top: 1px solid #ddd;">
+                                            <strong style="font-size: 0.9rem; color: #555;">Vision LLM (Image Transcription)</strong>
+                                        </div>
+                                        <div class="box-line">
+                                            <span class="left">Vision LLM Server URL</span>
+                                            <span class="right" style="width: 70%;">
+                                                <input type="text" name="llm_v_default" class="input"
+                                                       value="http://127.0.0.1:11434/v1"
+                                                       placeholder="e.g., http://127.0.0.1:11434/v1">
+                                            </span>
+                                        </div>
+                                        <div class="box-line">
+                                            <span class="left">Vision API Key</span>
+                                            <span class="right" style="width: 70%;">
+                                                <input type="text" name="llm_v_api_key_default" class="input" value="NULL">
+                                            </span>
+                                        </div>
+                                        <div class="box-line">
+                                            <span class="left">Vision Max Tokens</span>
+                                            <span class="right" style="width: 70%;">
+                                                <input type="number" name="llm_v_max_tokens_default" class="input" value="300">
+                                            </span>
+                                        </div>
+                                        <div class="box-line">
+                                            <span class="left">Vision Temperature</span>
+                                            <span class="right" style="width: 70%;">
+                                                <input type="number" name="llm_v_temperature_default" class="input"
+                                                       min="0" max="2" step="0.1" value="0.5">
+                                            </span>
+                                        </div>
+                                    </div>
+                                    <script>
+                                        // Toggle LLM defaults section visibility based on LLM agents toggle
+                                        document.getElementById('llm_agents_toggle').addEventListener('change', function() {
+                                            document.getElementById('llm_defaults_section').style.display = this.checked ? 'block' : 'none';
+                                        });
+                                    </script>
+
                                     <div class="box-line">
                                         <span class="left">Simulation Topics</span>
                                         <span class="right" style="width: 70%;">

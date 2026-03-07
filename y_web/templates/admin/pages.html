@@ -321,6 +321,31 @@
                                     </div>
 
                                     <hr>
+                                    <div class="form-section-header-page">Image Extraction</div>
+                                    <div class="form-section-description-page">
+                                        When RSS feeds don't include images, optionally fetch them from article URLs.
+                                        This adds an HTTP request per article but significantly increases image coverage.
+                                    </div>
+                                    <div class="box-line">
+                                        <span class="left">Fetch Images from URLs</span>
+                                        <span class="right" style="width: 70%;">
+                                            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                                                <input type="checkbox" name="fetch_images_from_url" value="1" style="cursor: pointer;">
+                                                <span style="font-size: 0.9em; color: #666;">Extract og:image from article pages when RSS lacks media_content</span>
+                                            </label>
+                                        </span>
+                                    </div>
+                                    <div class="box-line">
+                                        <span class="left">Image Fetch Timeout (seconds)</span>
+                                        <span class="right" style="width: 70%;">
+                                            <input type="number" name="fetch_images_timeout" class="input" value="10" min="1" max="60" step="1">
+                                            <small style="color: #666; display: block; margin-top: 4px;">
+                                                HTTP request timeout when fetching article pages for images (1-60 seconds)
+                                            </small>
+                                        </span>
+                                    </div>
+
+                                    <hr>
                                     <style>
                                         .form-section-header-page {
                                             font-size: 0.95em;

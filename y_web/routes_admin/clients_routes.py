@@ -265,6 +265,12 @@ def clients(idexp):
         if population_ids
         else Population.query.all()
     )
+    pops = [
+        p
+        for p in pops
+        if (getattr(p, "username_type", "microblogging") or "microblogging")
+        == exp.platform_type
+    ]
 
     crecsys = Content_Recsys.query.all()
     frecsys = Follow_Recsys.query.all()
@@ -274,6 +280,18 @@ def clients(idexp):
         exp.llm_agents_enabled if hasattr(exp, "llm_agents_enabled") else True
     )
 
+    # Get experiment-wide LLM defaults
+    exp_llm_defaults = {
+        "llm": getattr(exp, "llm_default", None) or "http://127.0.0.1:11434/v1",
+        "llm_api_key": getattr(exp, "llm_api_key_default", None) or "NULL",
+        "llm_max_tokens": getattr(exp, "llm_max_tokens_default", None) or -1,
+        "llm_temperature": getattr(exp, "llm_temperature_default", None) or 1.5,
+        "llm_v": getattr(exp, "llm_v_default", None) or "http://127.0.0.1:11434/v1",
+        "llm_v_api_key": getattr(exp, "llm_v_api_key_default", None) or "NULL",
+        "llm_v_max_tokens": getattr(exp, "llm_v_max_tokens_default", None) or 300,
+        "llm_v_temperature": getattr(exp, "llm_v_temperature_default", None) or 0.5,
+    }
+
     return render_template(
         "admin/clients.html",
         experiment=exp,
@@ -281,6 +299,7 @@ def clients(idexp):
         crecsys=crecsys,
         frecsys=frecsys,
         llm_agents_enabled=llm_agents_enabled,
+        exp_llm_defaults=exp_llm_defaults,
     )
 
 
@@ -294,6 +313,7 @@ def create_client():
     descr = request.form.get("descr")
     exp_id = request.form.get("id_exp")
     population_id = request.form.get("population_id")
+    initial_agents = request.form.get("initial_agents")
     days = request.form.get("days")
     percentage_new_agents_iteration = request.form.get(
         "percentage_new_agents_iteration"
@@ -318,6 +338,11 @@ def create_client():
     search = request.form.get("search")
     vote = request.form.get("vote")
     share_link = request.form.get("share_link")
+
+    # Reply behavior controls
+    reply_probability = request.form.get("reply_probability", 0.4)
+    max_replies_per_round = request.form.get("max_replies_per_round", 2)
+    reply_cooldown_rounds = request.form.get("reply_cooldown_rounds", 2)
 
     # Check if LLM agents are enabled for this experiment
     exp = Exps.query.filter_by(idexp=exp_id).first()
@@ -490,6 +515,14 @@ def create_client():
         flash("Population not found.", "error")
         return redirect(request.referrer)
 
+    pop_type = getattr(population, "username_type", "microblogging") or "microblogging"
+    if pop_type != exp.platform_type:
+        flash(
+            f"Population Username Type '{pop_type}' is incompatible with experiment platform '{exp.platform_type}'.",
+            "error",
+        )
+        return redirect(request.referrer)
+
     # check if the population is already assigned to the experiment
     # if not, add it
     pop_exp = Population_Experiment.query.filter_by(
@@ -500,12 +533,22 @@ def create_client():
         db.session.add(pop_exp)
         db.session.commit()
 
+    initial_agents_int = None
+    if initial_agents and initial_agents.strip():
+        try:
+            initial_agents_int = int(initial_agents)
+            if initial_agents_int < 1:
+                initial_agents_int = None
+        except (ValueError, TypeError):
+            initial_agents_int = None
+
     # create the Client object
     client = Client(
         name=name,
         descr=descr,
         id_exp=exp_id,
         population_id=population_id,
+        initial_agents=initial_agents_int,
         days=days,
         percentage_new_agents_iteration=percentage_new_agents_iteration,
         percentage_removed_agents_iteration=percentage_removed_agents_iteration,
@@ -535,6 +578,9 @@ def create_client():
         probability_of_secondary_follow=probability_of_secondary_follow,
         crecsys=crecsys,
         frecsys=frecsys,
+        reply_probability=float(reply_probability),
+        max_replies_per_round=int(max_replies_per_round),
+        reply_cooldown_rounds=int(reply_cooldown_rounds),
         status=0,
         archetype_validator=archetype_validator,
         archetype_broadcaster=archetype_broadcaster,
@@ -636,6 +682,7 @@ def create_client():
             "client": "YClientWeb",
             "days": int(days),
             "slots": 24,
+            "initial_agents": initial_agents_int,
             "percentage_new_agents_iteration": float(percentage_new_agents_iteration),
             "percentage_removed_agents_iteration": float(
                 percentage_removed_agents_iteration
@@ -736,6 +783,9 @@ def create_client():
                 "ag": ["critical/judgmental", "friendly/compassionate"],
                 "ne": ["resilient/confident", "sensitive/nervous"],
             },
+            "reply_probability": float(reply_probability),
+            "max_replies_per_round": int(max_replies_per_round),
+            "reply_cooldown_rounds": int(reply_cooldown_rounds),
         },
     }
 
@@ -1135,6 +1185,7 @@ def create_client():
             "data": {
                 "llm_agents_enabled": llm_agents_enabled,
                 "days": days,
+                "initial_agents": initial_agents_int,
                 "percentage_new_agents_iteration": percentage_new_agents_iteration,
                 "percentage_removed_agents_iteration": percentage_removed_agents_iteration,
                 "max_length_thread_reading": max_length_thread_reading,

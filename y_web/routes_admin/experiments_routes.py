@@ -1181,6 +1181,16 @@ def create_experiment():
     llm_agents_enabled = 1 if request.form.get("llm_agents_enabled") == "true" else 0
     opinions_enabled = request.form.get("opinion_annotation") == "true"
 
+    # Get experiment-wide LLM defaults
+    llm_default = request.form.get("llm_default", "http://127.0.0.1:11434/v1")
+    llm_api_key_default = request.form.get("llm_api_key_default", "NULL")
+    llm_max_tokens_default = request.form.get("llm_max_tokens_default", -1)
+    llm_temperature_default = request.form.get("llm_temperature_default", 1.5)
+    llm_v_default = request.form.get("llm_v_default", "http://127.0.0.1:11434/v1")
+    llm_v_api_key_default = request.form.get("llm_v_api_key_default", "NULL")
+    llm_v_max_tokens_default = request.form.get("llm_v_max_tokens_default", 300)
+    llm_v_temperature_default = request.form.get("llm_v_temperature_default", 0.5)
+
     # Get annotation settings
     toxicity_annotation = request.form.get("toxicity_annotation") == "true"
     perspective_api = (
@@ -1366,6 +1376,14 @@ def create_experiment():
         server=host,
         annotations=annotations,
         llm_agents_enabled=llm_agents_enabled,
+        llm_default=llm_default,
+        llm_api_key_default=llm_api_key_default,
+        llm_max_tokens_default=int(llm_max_tokens_default) if llm_max_tokens_default else -1,
+        llm_temperature_default=float(llm_temperature_default) if llm_temperature_default else 1.5,
+        llm_v_default=llm_v_default,
+        llm_v_api_key_default=llm_v_api_key_default,
+        llm_v_max_tokens_default=int(llm_v_max_tokens_default) if llm_v_max_tokens_default else 300,
+        llm_v_temperature_default=float(llm_v_temperature_default) if llm_v_temperature_default else 0.5,
     )
 
     db.session.add(exp)
