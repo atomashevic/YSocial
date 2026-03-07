@@ -114,14 +114,15 @@ def create_postgresql_db(app):
             db_conn.execute(
                 text(
                     """
-                     INSERT INTO admin_users (username, email, password, role)
-                     VALUES (:username, :email, :password, :role)
+                     INSERT INTO admin_users (username, email, password, last_seen, role)
+                     VALUES (:username, :email, :password, :last_seen, :role)
                      """
                 ),
                 {
                     "username": "Admin",
                     "email": "admin@y-not.social",
                     "password": hashed_pw,
+                    "last_seen": "",
                     "role": "admin",
                 },
             )
@@ -277,9 +278,23 @@ def cleanup_db_jupyter_with_new_app():
         traceback.print_exc()
 
 
-# Only register atexit handler for the main application process, not subprocesses
-# Client subprocesses set Y_CLIENT_SUBPROCESS=1 to indicate they should not run cleanup
-if os.environ.get("Y_CLIENT_SUBPROCESS") != "1":
+def _should_register_atexit_cleanup(env=None) -> bool:
+    """
+    Decide whether process-exit cleanup should be registered.
+
+    Cleanup is intentionally opt-in to avoid side effects when utility scripts
+    import y_web just to access helpers/models.
+    """
+    env_map = env if env is not None else os.environ
+    enabled = str(env_map.get("YSOCIAL_ENABLE_ATEXIT_CLEANUP", "")).strip().lower()
+    if enabled not in {"1", "true", "yes", "on"}:
+        return False
+
+    # Client subprocesses explicitly opt out.
+    return str(env_map.get("Y_CLIENT_SUBPROCESS", "")).strip() != "1"
+
+
+if _should_register_atexit_cleanup():
     atexit.register(cleanup_db_jupyter_with_new_app)
 
 
@@ -301,8 +316,6 @@ def create_app(db_type="sqlite", desktop_mode=False):
         ValueError: If unsupported db_type is provided
     """
     import os
-
-    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
     app = Flask(__name__, static_url_path="/static")
 
@@ -381,6 +394,59 @@ def create_app(db_type="sqlite", desktop_mode=False):
 
     from .models import Admin_users, User_mgmt
 
+    # SQLite ships with a prebuilt dashboard.db. Ensure the default Admin
+    # credentials are consistent with docs/expectations: Admin / admin.
+    #
+    # Safety: only touches the single default admin record (id=1) when it's the
+    # only admin user and matches the known default email addresses.
+    def _ensure_default_admin_password():
+        if os.getenv("YSOCIAL_ENSURE_DEFAULT_ADMIN_PASSWORD", "1").strip().lower() in {
+            "0",
+            "false",
+            "off",
+            "",
+        }:
+            return
+        if db_type != "sqlite":
+            # Avoid surprising password resets on existing Postgres deployments.
+            # If you really want the same behavior on Postgres, opt in explicitly.
+            if (
+                os.getenv("YSOCIAL_ENSURE_DEFAULT_ADMIN_PASSWORD_POSTGRES", "0")
+                .strip()
+                .lower()
+                not in {"1", "true", "on", "yes"}
+            ):
+                return
+        try:
+            from werkzeug.security import check_password_hash, generate_password_hash
+
+            with app.app_context():
+                admin_count = int(Admin_users.query.filter_by(role="admin").count())
+                admin = (
+                    Admin_users.query.filter_by(id=1, username="Admin", role="admin")
+                    .limit(1)
+                    .first()
+                )
+                if not admin or admin_count != 1:
+                    return
+                if (admin.email or "").strip().lower() not in {
+                    "admin@ysocial.com",
+                    "admin@y-not.social",
+                }:
+                    return
+                if check_password_hash(admin.password, "admin"):
+                    return
+                admin.password = generate_password_hash("admin", method="pbkdf2:sha256")
+                db.session.commit()
+                print(
+                    "[auth] Reset default Admin password to 'admin' "
+                    "(set YSOCIAL_ENSURE_DEFAULT_ADMIN_PASSWORD=0 to disable)."
+                )
+        except Exception as e:
+            print(f"[auth] Failed to ensure default Admin password: {e}")
+
+    _ensure_default_admin_password()
+
     @login_manager.user_loader
     def load_user(user_id):
         """
@@ -440,6 +506,52 @@ def create_app(db_type="sqlite", desktop_mode=False):
     def inject_exp_id():
         """Inject exp_id into all templates."""
         return dict(exp_id=get_current_experiment_id())
+
+    @app.context_processor
+    def inject_feed_home_url():
+        """Inject canonical page-1 feed URL for the active experiment context."""
+        from flask_login import current_user
+
+        from .models import Exps, User_mgmt
+
+        try:
+            if not current_user.is_authenticated:
+                return dict(feed_home_url="/")
+
+            exp = None
+            exp_id = get_current_experiment_id()
+            if exp_id is not None:
+                exp = Exps.query.filter_by(idexp=int(exp_id)).first()
+
+            if exp is None:
+                active_exps = Exps.query.filter(Exps.status != 0).all()
+                if not active_exps:
+                    return dict(feed_home_url="/")
+                if len(active_exps) > 1:
+                    return dict(feed_home_url="/admin/join_simulation")
+                exp = active_exps[0]
+
+            if exp.platform_type == "forum":
+                return dict(
+                    feed_home_url=f"/{exp.idexp}/rfeed/all/feed/rf/1?feed_type=new"
+                )
+
+            feed_user_id = None
+            user_id_str = str(current_user.get_id() or "")
+            if user_id_str.isdigit():
+                feed_user_id = int(user_id_str)
+            else:
+                exp_user = User_mgmt.query.filter_by(
+                    username=getattr(current_user, "username", None)
+                ).first()
+                if exp_user is not None:
+                    feed_user_id = int(exp_user.id)
+
+            if feed_user_id is None:
+                return dict(feed_home_url=f"/{exp.idexp}/feed/all/feed/rf/1")
+            return dict(feed_home_url=f"/{exp.idexp}/feed/{feed_user_id}/feed/rf/1")
+        except Exception:
+            return dict(feed_home_url="/feed")
 
     @app.context_processor
     def inject_active_experiments():
@@ -520,6 +632,65 @@ def create_app(db_type="sqlite", desktop_mode=False):
                 print(f"Error injecting blog post info: {e}")
         return dict(new_blog_post_available=False, blog_post=None)
 
+    @app.context_processor
+    def inject_reply_notifications():
+        """
+        Inject Reddit-style reply notification count for forum UI.
+
+        Only applies to authenticated experiment users (not admin_* sessions) and
+        only when a forum experiment is active in the current request context.
+        """
+        from flask_login import current_user
+
+        try:
+            exp_id = get_current_experiment_id()
+            if not current_user.is_authenticated or exp_id is None:
+                return dict(reply_notif_unread_count=0, reply_notif_url=None)
+
+            # Admin/researcher sessions should not get forum reply notifications.
+            user_id_str = str(current_user.get_id())
+            if user_id_str.startswith("admin_"):
+                return dict(reply_notif_unread_count=0, reply_notif_url=None)
+
+            # Only show in forum (Reddit-style) experiments.
+            from .models import Exps
+
+            exp = Exps.query.filter_by(idexp=int(exp_id)).first()
+            if not exp or exp.platform_type != "forum":
+                return dict(reply_notif_unread_count=0, reply_notif_url=None)
+
+            reply_notif_url = f"/{int(exp_id)}/rnotifications"
+
+            from sqlalchemy import func
+            from sqlalchemy.orm import aliased
+
+            from .models import Post, ReplyInboxState
+
+            state = ReplyInboxState.query.filter_by(user_id=current_user.id).first()
+            cutoff = int(state.last_seen_reply_id) if state else 0
+
+            Reply = aliased(Post)
+            Parent = aliased(Post)
+
+            unread_count = (
+                db.session.query(func.count(Reply.id))
+                .join(Parent, Reply.comment_to == Parent.id)
+                .filter(
+                    Parent.user_id == current_user.id,
+                    Reply.user_id != current_user.id,
+                    Reply.comment_to != -1,
+                    Reply.id > cutoff,
+                )
+                .scalar()
+            )
+
+            return dict(
+                reply_notif_unread_count=int(unread_count or 0),
+                reply_notif_url=reply_notif_url,
+            )
+        except Exception:
+            return dict(reply_notif_unread_count=0, reply_notif_url=None)
+
     # Register your blueprints here as before
     from .auth import auth as auth_blueprint
 
@@ -569,6 +740,11 @@ def create_app(db_type="sqlite", desktop_mode=False):
     from .routes_api.reddit import api_reddit as api_reddit_blueprint
 
     app.register_blueprint(api_reddit_blueprint)
+
+    from .routes_api.interview import api_interview as api_interview_blueprint
+
+    app.register_blueprint(api_interview_blueprint)
+
     from .routes_uploads import uploads as uploads_blueprint
 
     app.register_blueprint(uploads_blueprint)
@@ -609,7 +785,7 @@ def create_app(db_type="sqlite", desktop_mode=False):
                 pg_port = os.getenv("PG_PORT", "5432")
                 pg_database = os.getenv("PG_DBNAME", "dashboard")
                 pg_user = os.getenv("PG_USER", "postgres")
-                pg_password = os.getenv("PG_PASSWORD", "")
+                pg_password = os.getenv("PG_PASSWORD", "password")
                 if pg_password:
                     migrate_postgresql(
                         pg_host, pg_port, pg_database, pg_user, pg_password
@@ -633,7 +809,7 @@ def create_app(db_type="sqlite", desktop_mode=False):
                 pg_port = os.getenv("PG_PORT", "5432")
                 pg_database = os.getenv("PG_DBNAME", "dashboard")
                 pg_user = os.getenv("PG_USER", "postgres")
-                pg_password = os.getenv("PG_PASSWORD", "")
+                pg_password = os.getenv("PG_PASSWORD", "password")
                 if pg_password:
                     migrate_postgresql(
                         pg_host, pg_port, pg_database, pg_user, pg_password
@@ -661,7 +837,7 @@ def create_app(db_type="sqlite", desktop_mode=False):
                 pg_port = os.getenv("PG_PORT", "5432")
                 pg_database = os.getenv("PG_DBNAME", "dashboard")
                 pg_user = os.getenv("PG_USER", "postgres")
-                pg_password = os.getenv("PG_PASSWORD", "")
+                pg_password = os.getenv("PG_PASSWORD", "password")
                 if pg_password:
                     migrate_log_sync_postgresql(
                         pg_host, pg_port, pg_database, pg_user, pg_password
@@ -689,7 +865,7 @@ def create_app(db_type="sqlite", desktop_mode=False):
                 pg_port = os.getenv("PG_PORT", "5432")
                 pg_database = os.getenv("PG_DBNAME", "dashboard")
                 pg_user = os.getenv("PG_USER", "postgres")
-                pg_password = os.getenv("PG_PASSWORD", "")
+                pg_password = os.getenv("PG_PASSWORD", "password")
                 if pg_password:
                     migrate_exp_status_postgresql(
                         pg_host, pg_port, pg_database, pg_user, pg_password
@@ -717,7 +893,7 @@ def create_app(db_type="sqlite", desktop_mode=False):
                 pg_port = os.getenv("PG_PORT", "5432")
                 pg_database = os.getenv("PG_DBNAME", "dashboard")
                 pg_user = os.getenv("PG_USER", "postgres")
-                pg_password = os.getenv("PG_PASSWORD", "")
+                pg_password = os.getenv("PG_PASSWORD", "password")
                 if pg_password:
                     migrate_schedule_postgresql(
                         pg_host, pg_port, pg_database, pg_user, pg_password
@@ -745,7 +921,7 @@ def create_app(db_type="sqlite", desktop_mode=False):
                 pg_port = os.getenv("PG_PORT", "5432")
                 pg_database = os.getenv("PG_DBNAME", "dashboard")
                 pg_user = os.getenv("PG_USER", "postgres")
-                pg_password = os.getenv("PG_PASSWORD", "")
+                pg_password = os.getenv("PG_PASSWORD", "password")
                 if pg_password:
                     migrate_watchdog_postgresql(
                         pg_host, pg_port, pg_database, pg_user, pg_password
@@ -773,7 +949,7 @@ def create_app(db_type="sqlite", desktop_mode=False):
                 pg_port = os.getenv("PG_PORT", "5432")
                 pg_database = os.getenv("PG_DBNAME", "dashboard")
                 pg_user = os.getenv("PG_USER", "postgres")
-                pg_password = os.getenv("PG_PASSWORD", "")
+                pg_password = os.getenv("PG_PASSWORD", "password")
                 if pg_password:
                     migrate_tutorial_postgresql(
                         pg_host, pg_port, pg_database, pg_user, pg_password
@@ -801,7 +977,7 @@ def create_app(db_type="sqlite", desktop_mode=False):
                 pg_port = os.getenv("PG_PORT", "5432")
                 pg_database = os.getenv("PG_DBNAME", "dashboard")
                 pg_user = os.getenv("PG_USER", "postgres")
-                pg_password = os.getenv("PG_PASSWORD", "")
+                pg_password = os.getenv("PG_PASSWORD", "password")
                 if pg_password:
                     migrate_exp_details_tutorial_postgresql(
                         pg_host, pg_port, pg_database, pg_user, pg_password
@@ -809,19 +985,19 @@ def create_app(db_type="sqlite", desktop_mode=False):
         except Exception as e:
             print(f"Failed to run exp_details_tutorial_shown column migration: {e}")
 
-        # Run agent archetypes migration
+        # Run LLM columns migration
         try:
             if db_type == "sqlite":
-                from y_web.migrations.add_agent_archetypes import (
-                    migrate_sqlite as migrate_agent_archetypes_sqlite,
+                from y_web.migrations.add_llm_columns import (
+                    migrate_sqlite as migrate_llm_sqlite,
                 )
 
                 dashboard_db_path = app.config.get("DASHBOARD_DB_PATH")
                 if dashboard_db_path:
-                    migrate_agent_archetypes_sqlite(dashboard_db_path)
+                    migrate_llm_sqlite(dashboard_db_path)
             elif db_type == "postgresql":
-                from y_web.migrations.add_agent_archetypes import (
-                    migrate_postgresql as migrate_agent_archetypes_postgresql,
+                from y_web.migrations.add_llm_columns import (
+                    migrate_postgresql as migrate_llm_postgresql,
                 )
 
                 # Get PostgreSQL connection details from environment variables (same as create_postgresql_db)
@@ -829,72 +1005,158 @@ def create_app(db_type="sqlite", desktop_mode=False):
                 pg_port = os.getenv("PG_PORT", "5432")
                 pg_database = os.getenv("PG_DBNAME", "dashboard")
                 pg_user = os.getenv("PG_USER", "postgres")
-                pg_password = os.getenv("PG_PASSWORD", "")
+                pg_password = os.getenv("PG_PASSWORD", "password")
                 if pg_password:
-                    migrate_agent_archetypes_postgresql(
+                    migrate_llm_postgresql(
                         pg_host, pg_port, pg_database, pg_user, pg_password
                     )
         except Exception as e:
-            print(f"Failed to run agent archetypes migration: {e}")
+            print(f"Failed to run LLM columns migration: {e}")
 
-        # Run agent archetype field migration (for agents and user_mgmt tables)
+        # Run activity_profile columns migration
         try:
             if db_type == "sqlite":
-                from y_web.migrations.add_agent_archetype_field import (
-                    migrate_experiment_databases,
-                    migrate_sqlite_dashboard,
-                    migrate_sqlite_server,
+                from y_web.migrations.add_activity_profile_columns import (
+                    migrate_sqlite as migrate_activity_profile_sqlite,
                 )
 
                 dashboard_db_path = app.config.get("DASHBOARD_DB_PATH")
                 if dashboard_db_path:
-                    migrate_sqlite_dashboard(dashboard_db_path)
-
-                # Migrate the dummy server database
-                dummy_db_path = app.config.get("DUMMY_DB_PATH")
-                if dummy_db_path:
-                    migrate_sqlite_server(dummy_db_path, quiet=True)
-
-                # Migrate all existing experiment databases
-                from y_web.utils.path_utils import get_writable_path
-
-                BASE_DIR = get_writable_path()
-                experiments_dir = os.path.join(BASE_DIR, "y_web", "experiments")
-                if os.path.exists(experiments_dir):
-                    print("Migrating existing experiment databases...")
-                    success, total = migrate_experiment_databases(
-                        experiments_dir, quiet=False
-                    )
-                    if total > 0:
-                        print(f"✓ Migrated {success}/{total} experiment databases")
-
+                    migrate_activity_profile_sqlite(dashboard_db_path)
             elif db_type == "postgresql":
-                from y_web.migrations.add_agent_archetype_field import (
-                    migrate_postgresql_dashboard,
-                    migrate_postgresql_server,
+                from y_web.migrations.add_activity_profile_columns import (
+                    migrate_postgresql as migrate_activity_profile_postgresql,
                 )
 
-                # Get PostgreSQL connection details for dashboard
+                # Get PostgreSQL connection details from environment variables (same as create_postgresql_db)
                 pg_host = os.getenv("PG_HOST", "localhost")
                 pg_port = os.getenv("PG_PORT", "5432")
                 pg_database = os.getenv("PG_DBNAME", "dashboard")
                 pg_user = os.getenv("PG_USER", "postgres")
-                pg_password = os.getenv("PG_PASSWORD", "")
-
+                pg_password = os.getenv("PG_PASSWORD", "password")
                 if pg_password:
-                    dashboard_config = {
-                        "host": pg_host,
-                        "port": pg_port,
-                        "database": pg_database,
-                        "user": pg_user,
-                        "password": pg_password,
-                    }
-                    migrate_postgresql_dashboard(dashboard_config)
-
-                    # Note: Server database migration will happen per experiment
-                    # The schema files are already updated for new installations
+                    migrate_activity_profile_postgresql(
+                        pg_host, pg_port, pg_database, pg_user, pg_password
+                    )
         except Exception as e:
-            print(f"Failed to run agent archetype field migration: {e}")
+            print(f"Failed to run activity_profile columns migration: {e}")
+
+        # Run population username_type column migration
+        try:
+            if db_type == "sqlite":
+                from y_web.migrations.add_population_username_type_column import (
+                    migrate_sqlite as migrate_population_username_type_sqlite,
+                )
+
+                dashboard_db_path = app.config.get("DASHBOARD_DB_PATH")
+                if dashboard_db_path:
+                    migrate_population_username_type_sqlite(dashboard_db_path)
+            elif db_type == "postgresql":
+                from y_web.migrations.add_population_username_type_column import (
+                    migrate_postgresql as migrate_population_username_type_postgresql,
+                )
+
+                pg_host = os.getenv("PG_HOST", "localhost")
+                pg_port = os.getenv("PG_PORT", "5432")
+                pg_database = os.getenv("PG_DBNAME", "dashboard")
+                pg_user = os.getenv("PG_USER", "postgres")
+                pg_password = os.getenv("PG_PASSWORD", "password")
+                if pg_password:
+                    migrate_population_username_type_postgresql(
+                        pg_host, pg_port, pg_database, pg_user, pg_password
+                    )
+        except Exception as e:
+            print(f"Failed to run population username_type migration: {e}")
+
+        # Run blog_posts table migration
+        try:
+            if db_type == "sqlite":
+                from y_web.migrations.add_blog_posts_table import migrate_dashboard_db
+
+                migrate_dashboard_db()
+            elif db_type == "postgresql":
+                from y_web.migrations.add_blog_posts_table import (
+                    migrate_postgresql as migrate_blog_posts_postgresql,
+                )
+
+                pg_host = os.getenv("PG_HOST", "localhost")
+                pg_port = os.getenv("PG_PORT", "5432")
+                pg_database = os.getenv("PG_DBNAME", "dashboard")
+                pg_user = os.getenv("PG_USER", "postgres")
+                pg_password = os.getenv("PG_PASSWORD", "password")
+                if pg_password:
+                    migrate_blog_posts_postgresql(
+                        pg_host, pg_port, pg_database, pg_user, pg_password
+                    )
+        except Exception as e:
+            print(f"Failed to run blog_posts table migration: {e}")
+
+        # Ensure admin interview run_id supports long run-scoped identifiers
+        try:
+            if db_type == "sqlite":
+                from y_web.migrations.add_admin_interview_run_id_text import (
+                    migrate_sqlite as migrate_admin_interview_run_id_sqlite,
+                )
+
+                dashboard_db_path = app.config.get("DASHBOARD_DB_PATH")
+                if dashboard_db_path:
+                    migrate_admin_interview_run_id_sqlite(dashboard_db_path)
+            elif db_type == "postgresql":
+                from y_web.migrations.add_admin_interview_run_id_text import (
+                    migrate_postgresql as migrate_admin_interview_run_id_postgresql,
+                )
+
+                pg_host = os.getenv("PG_HOST", "localhost")
+                pg_port = os.getenv("PG_PORT", "5432")
+                pg_database = os.getenv("PG_DBNAME", "dashboard")
+                pg_user = os.getenv("PG_USER", "postgres")
+                pg_password = os.getenv("PG_PASSWORD", "password")
+                if pg_password:
+                    migrate_admin_interview_run_id_postgresql(
+                        pg_host, pg_port, pg_database, pg_user, pg_password
+                    )
+        except Exception as e:
+            print(f"Failed to run admin interview run_id migration: {e}")
+
+        # Run PostgreSQL schema compatibility migration (adds missing columns/tables)
+        try:
+            if db_type == "postgresql":
+                from y_web.migrations.ensure_postgresql_schema import (
+                    migrate_postgresql as ensure_postgresql_schema,
+                )
+
+                pg_host = os.getenv("PG_HOST", "localhost")
+                pg_port = os.getenv("PG_PORT", "5432")
+                pg_database = os.getenv("PG_DBNAME", "dashboard")
+                pg_user = os.getenv("PG_USER", "postgres")
+                pg_password = os.getenv("PG_PASSWORD", "password")
+                if pg_password:
+                    ensure_postgresql_schema(
+                        pg_host, pg_port, pg_database, pg_user, pg_password
+                    )
+        except Exception as e:
+            print(f"Failed to run PostgreSQL schema compatibility migration: {e}")
+
+        # Ensure dashboard default configuration tables are populated with canonical defaults.
+        # This backfills missing rows for population builder dropdowns and does not delete
+        # or overwrite existing custom/legacy values.
+        try:
+            if db_type == "postgresql":
+                from y_web.migrations.ensure_dashboard_default_config import (
+                    migrate_postgresql as ensure_dashboard_default_config,
+                )
+
+                pg_host = os.getenv("PG_HOST", "localhost")
+                pg_port = os.getenv("PG_PORT", "5432")
+                pg_database = os.getenv("PG_DBNAME", "dashboard")
+                pg_user = os.getenv("PG_USER", "postgres")
+                pg_password = os.getenv("PG_PASSWORD", "password")
+
+                ensure_dashboard_default_config(
+                    pg_host, pg_port, pg_database, pg_user, pg_password
+                )
+        except Exception as e:
+            print(f"Failed to run PostgreSQL dashboard defaults migration: {e}")
 
         # Ensure all tables defined in models exist (including release_info)
         # This creates any missing tables that are defined in models.py
