@@ -73,6 +73,10 @@ class Post(db.Model):
     thread_id = db.Column(db.Integer)
     news_id = db.Column(db.String(50), db.ForeignKey("articles.id"), default=None)
     image_id = db.Column(db.Integer(), db.ForeignKey("images.id"), default=None)
+    image_post_id = db.Column(db.Integer(), db.ForeignKey("image_posts.id"), default=None)
+    dedupe_key = db.Column(db.String(64), nullable=True, default=None)
+    client_action_id = db.Column(db.String(96), nullable=True, default=None)
+    created_at = db.Column(db.DateTime, nullable=False, default=db.func.now())
     shared_from = db.Column(db.Integer, default=-1)
     reaction_count = db.Column(db.Integer, default=0)
 
@@ -126,6 +130,18 @@ class Mentions(db.Model):
     post_id = db.Column(db.Integer, db.ForeignKey("post.id"), nullable=False)
     round = db.Column(db.Integer, nullable=False)
     answered = db.Column(db.Integer, default=0)
+
+
+class ReplyInboxState(db.Model):
+    """Tracks the last seen reply notification for a user."""
+
+    __bind_key__ = "db_exp"
+    __tablename__ = "reply_inbox_state"
+
+    user_id = db.Column(
+        db.Integer, db.ForeignKey("user_mgmt.id"), primary_key=True, nullable=False
+    )
+    last_seen_reply_id = db.Column(db.Integer, nullable=False, default=0)
 
 
 class Reactions(db.Model):
@@ -282,6 +298,24 @@ class Images(db.Model):
     url = db.Column(db.String(200), nullable=True)
     description = db.Column(db.String(400), nullable=True)
     article_id = db.Column(db.Integer, db.ForeignKey("articles.id"), nullable=True)
+    remote_article_id = db.Column(db.Integer, nullable=True)
+
+
+class ImagePosts(db.Model):
+    """Standalone image posts available to experiment users."""
+
+    __tablename__ = "image_posts"
+    __bind_key__ = "db_exp"
+    id = db.Column(db.Integer, primary_key=True)
+    url = db.Column(db.String(500), nullable=False)
+    source_url = db.Column(db.String(500), nullable=True)
+    title = db.Column(db.String(300), nullable=True)
+    subreddit = db.Column(db.String(100), nullable=True)
+    description = db.Column(db.Text, nullable=True)
+    fetched_on = db.Column(db.String(20), nullable=True)
+    used = db.Column(db.Boolean, default=False)
+    local_path = db.Column(db.String(500), nullable=True)
+    high_res_url = db.Column(db.String(500), nullable=True)
 
 
 class Article_topics(db.Model):
@@ -387,7 +421,7 @@ class Admin_users(UserMixin, db.Model):
     username = db.Column(db.String(15), nullable=False, unique=True)
     email = db.Column(db.String(50), nullable=False, unique=True)
     password = db.Column(db.String(80), nullable=False)
-    last_seen = db.Column(db.String(30), nullable=False)
+    last_seen = db.Column(db.String(30), nullable=False, default="")
     role = db.Column(db.String(10), nullable=False)
     llm = db.Column(db.String(50), default="")
     llm_url = db.Column(db.String(200), default="")
@@ -433,6 +467,14 @@ class Exps(db.Model):
     server_pid = db.Column(db.Integer, nullable=True, default=None)
     llm_agents_enabled = db.Column(db.Integer, nullable=False, default=1)
     exp_status = db.Column(db.String(20), nullable=False, default="stopped")
+    llm_default = db.Column(db.String(100), default="http://127.0.0.1:11434/v1")
+    llm_api_key_default = db.Column(db.String(300), default="NULL")
+    llm_max_tokens_default = db.Column(db.Integer, default=-1)
+    llm_temperature_default = db.Column(db.REAL, default=1.5)
+    llm_v_default = db.Column(db.String(100), default="http://127.0.0.1:11434/v1")
+    llm_v_api_key_default = db.Column(db.String(300), default="NULL")
+    llm_v_max_tokens_default = db.Column(db.Integer, default=300)
+    llm_v_temperature_default = db.Column(db.REAL, default=0.5)
 
 
 class ExperimentScheduleGroup(db.Model):
@@ -534,6 +576,7 @@ class Population(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(50), nullable=False)
     descr = db.Column(db.String(200), nullable=False)
+    username_type = db.Column(db.String(20), nullable=False, default="microblogging")
     size = db.Column(db.Integer)
     llm = db.Column(db.String(50))
     age_min = db.Column(db.Integer)
@@ -632,6 +675,8 @@ class Page(db.Model):
     activity_profile = db.Column(
         db.Integer, db.ForeignKey("activity_profiles.id"), nullable=True
     )
+    fetch_images_from_url = db.Column(db.Boolean, default=False)
+    fetch_images_timeout = db.Column(db.Integer, default=10)
 
 
 class Population_Experiment(db.Model):
@@ -719,6 +764,10 @@ class Client(db.Model):
     crecsys = db.Column(db.String(50))
     frecsys = db.Column(db.String(50))
     pid = db.Column(db.Integer, nullable=True, default=None)
+    reply_probability = db.Column(db.REAL, default=0.4)
+    max_replies_per_round = db.Column(db.Integer, default=2)
+    reply_cooldown_rounds = db.Column(db.Integer, default=2)
+    initial_agents = db.Column(db.Integer, nullable=True, default=None)
     # Agent archetype percentages
     archetype_validator = db.Column(db.REAL, default=0.52)
     archetype_broadcaster = db.Column(db.REAL, default=0.20)
@@ -751,6 +800,7 @@ class Client_Execution(db.Model):
     expected_duration_rounds = db.Column(db.Integer, default=0)
     last_active_hour = db.Column(db.Integer, default=-1)
     last_active_day = db.Column(db.Integer, default=-1)
+    execution_stage = db.Column(db.String(20), default="initializing")
 
 
 class Ollama_Pull(db.Model):
@@ -1129,8 +1179,13 @@ class WatchdogSettings(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     enabled = db.Column(db.Boolean, nullable=False, default=True)
     run_interval_minutes = db.Column(
-        db.Integer, nullable=False, default=15
-    )  # Default 15 minutes
+        db.Integer, nullable=False, default=1
+    )  # Default 1 minute
+    server_heartbeat_timeout_sec = db.Column(db.Integer, nullable=False, default=300)
+    client_heartbeat_timeout_sec = db.Column(db.Integer, nullable=False, default=300)
+    heartbeat_interval_sec = db.Column(db.Integer, nullable=False, default=60)
+    max_restart_attempts = db.Column(db.Integer, nullable=False, default=3)
+    restart_cooldown_sec = db.Column(db.Integer, nullable=False, default=60)
     last_run = db.Column(db.DateTime, nullable=True)  # Last time watchdog ran
 
 

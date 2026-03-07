@@ -3,7 +3,12 @@ Database migration script to add watchdog_settings table for process watchdog.
 
 This script adds the watchdog_settings table which stores:
 - enabled: Whether the process watchdog is enabled
-- run_interval_minutes: Frequency of watchdog runs in minutes (default 15)
+- run_interval_minutes: Frequency of watchdog runs in minutes (default 1)
+- server_heartbeat_timeout_sec: Server heartbeat timeout in seconds (default 300)
+- client_heartbeat_timeout_sec: Client heartbeat timeout in seconds (default 300)
+- heartbeat_interval_sec: Expected heartbeat interval in seconds (default 60)
+- max_restart_attempts: Max restart attempts before giving up (default 3)
+- restart_cooldown_sec: Cooldown between restart attempts in seconds (default 60)
 - last_run: Timestamp of the last watchdog run
 
 Run this script to update existing YSocial installations.
@@ -51,7 +56,12 @@ def migrate_sqlite(db_path):
                 CREATE TABLE watchdog_settings (
                     id                   INTEGER PRIMARY KEY AUTOINCREMENT,
                     enabled              INTEGER NOT NULL DEFAULT 1,
-                    run_interval_minutes INTEGER NOT NULL DEFAULT 15,
+                    run_interval_minutes INTEGER NOT NULL DEFAULT 1,
+                    server_heartbeat_timeout_sec INTEGER NOT NULL DEFAULT 300,
+                    client_heartbeat_timeout_sec INTEGER NOT NULL DEFAULT 300,
+                    heartbeat_interval_sec INTEGER NOT NULL DEFAULT 60,
+                    max_restart_attempts INTEGER NOT NULL DEFAULT 3,
+                    restart_cooldown_sec INTEGER NOT NULL DEFAULT 60,
                     last_run             TEXT
                 )
             """
@@ -59,13 +69,58 @@ def migrate_sqlite(db_path):
             # Insert default settings row
             cursor.execute(
                 """
-                INSERT INTO watchdog_settings (enabled, run_interval_minutes)
-                VALUES (1, 15)
+                INSERT INTO watchdog_settings (
+                    enabled, run_interval_minutes, server_heartbeat_timeout_sec,
+                    client_heartbeat_timeout_sec, heartbeat_interval_sec,
+                    max_restart_attempts, restart_cooldown_sec
+                )
+                VALUES (1, 1, 300, 300, 60, 3, 60)
             """
             )
             print("✓ Created watchdog_settings table in SQLite database")
         else:
             print("○ watchdog_settings table already exists in SQLite database")
+
+            # Add missing columns for older installations
+            cursor.execute("PRAGMA table_info(watchdog_settings)")
+            existing_cols = {row[1] for row in cursor.fetchall()}
+            column_updates = [
+                (
+                    "server_heartbeat_timeout_sec",
+                    "INTEGER NOT NULL DEFAULT 300",
+                    300,
+                ),
+                (
+                    "client_heartbeat_timeout_sec",
+                    "INTEGER NOT NULL DEFAULT 300",
+                    300,
+                ),
+                (
+                    "heartbeat_interval_sec",
+                    "INTEGER NOT NULL DEFAULT 60",
+                    60,
+                ),
+                (
+                    "max_restart_attempts",
+                    "INTEGER NOT NULL DEFAULT 3",
+                    3,
+                ),
+                (
+                    "restart_cooldown_sec",
+                    "INTEGER NOT NULL DEFAULT 60",
+                    60,
+                ),
+            ]
+            for col_name, col_type, default_value in column_updates:
+                if col_name not in existing_cols:
+                    cursor.execute(
+                        f"ALTER TABLE watchdog_settings ADD COLUMN {col_name} {col_type}"
+                    )
+                    print(f"✓ Added {col_name} column to SQLite watchdog_settings")
+                cursor.execute(
+                    f"UPDATE watchdog_settings SET {col_name} = ? WHERE {col_name} IS NULL",
+                    (default_value,),
+                )
 
         conn.commit()
         conn.close()
@@ -118,7 +173,12 @@ def migrate_postgresql(host, port, database, user, password):
                 CREATE TABLE watchdog_settings (
                     id                   SERIAL PRIMARY KEY,
                     enabled              BOOLEAN NOT NULL DEFAULT TRUE,
-                    run_interval_minutes INTEGER NOT NULL DEFAULT 15,
+                    run_interval_minutes INTEGER NOT NULL DEFAULT 1,
+                    server_heartbeat_timeout_sec INTEGER NOT NULL DEFAULT 300,
+                    client_heartbeat_timeout_sec INTEGER NOT NULL DEFAULT 300,
+                    heartbeat_interval_sec INTEGER NOT NULL DEFAULT 60,
+                    max_restart_attempts INTEGER NOT NULL DEFAULT 3,
+                    restart_cooldown_sec INTEGER NOT NULL DEFAULT 60,
                     last_run             TIMESTAMP
                 )
             """
@@ -126,13 +186,39 @@ def migrate_postgresql(host, port, database, user, password):
             # Insert default settings row
             cursor.execute(
                 """
-                INSERT INTO watchdog_settings (enabled, run_interval_minutes)
-                VALUES (TRUE, 15)
+                INSERT INTO watchdog_settings (
+                    enabled, run_interval_minutes, server_heartbeat_timeout_sec,
+                    client_heartbeat_timeout_sec, heartbeat_interval_sec,
+                    max_restart_attempts, restart_cooldown_sec
+                )
+                VALUES (TRUE, 1, 300, 300, 60, 3, 60)
             """
             )
             print("✓ Created watchdog_settings table in PostgreSQL database")
         else:
             print("○ watchdog_settings table already exists in PostgreSQL database")
+
+            cursor.execute(
+                """
+                ALTER TABLE watchdog_settings
+                ADD COLUMN IF NOT EXISTS server_heartbeat_timeout_sec INTEGER NOT NULL DEFAULT 300,
+                ADD COLUMN IF NOT EXISTS client_heartbeat_timeout_sec INTEGER NOT NULL DEFAULT 300,
+                ADD COLUMN IF NOT EXISTS heartbeat_interval_sec INTEGER NOT NULL DEFAULT 60,
+                ADD COLUMN IF NOT EXISTS max_restart_attempts INTEGER NOT NULL DEFAULT 3,
+                ADD COLUMN IF NOT EXISTS restart_cooldown_sec INTEGER NOT NULL DEFAULT 60
+            """
+            )
+            cursor.execute(
+                """
+                UPDATE watchdog_settings
+                SET
+                    server_heartbeat_timeout_sec = COALESCE(server_heartbeat_timeout_sec, 300),
+                    client_heartbeat_timeout_sec = COALESCE(client_heartbeat_timeout_sec, 300),
+                    heartbeat_interval_sec = COALESCE(heartbeat_interval_sec, 60),
+                    max_restart_attempts = COALESCE(max_restart_attempts, 3),
+                    restart_cooldown_sec = COALESCE(restart_cooldown_sec, 60)
+            """
+            )
 
         conn.commit()
         conn.close()

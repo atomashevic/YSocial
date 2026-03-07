@@ -82,6 +82,13 @@ def setup_experiment_context():
     Dynamically routes queries to the correct experiment database by
     temporarily overriding the db_exp bind for this request.
     """
+    # Admin endpoints manage experiment DB access explicitly and should not
+    # implicitly override the db_exp bind in this global hook.
+    if request.path.startswith("/admin/"):
+        g.current_exp_id = None
+        g.current_db_bind = "db_exp"
+        return
+
     # Extract exp_id from URL if present
     exp_id = request.view_args.get("exp_id") if request.view_args else None
 
@@ -94,9 +101,78 @@ def setup_experiment_context():
             # Bind doesn't exist, need to register it
             from y_web.models import Exps
 
-            exp = Exps.query.filter_by(idexp=exp_id, status=1).first()
+            # Don't gate DB binding on Exps.status. "status" is used as an admin toggle,
+            # but experiments can still be running/inspectable when status=0.
+            exp = Exps.query.filter_by(idexp=exp_id).first()
             if exp:
                 register_experiment_database(current_app, exp_id, exp.db_name)
+                # Ensure any new db_exp tables exist for this experiment DB.
+                # This runs only on first access per process, so the overhead is acceptable.
+                exp_uri = current_app.config["SQLALCHEMY_BINDS"].get(bind_key)
+                if exp_uri:
+                    original_db_exp = current_app.config["SQLALCHEMY_BINDS"].get(
+                        "db_exp"
+                    )
+                    current_app.config["SQLALCHEMY_BINDS"]["db_exp"] = exp_uri
+                    try:
+                        db.create_all(bind="db_exp")
+                    finally:
+                        if original_db_exp is not None:
+                            current_app.config["SQLALCHEMY_BINDS"][
+                                "db_exp"
+                            ] = original_db_exp
+
+                    # For SQLite experiment DBs, run local schema migrations for post columns.
+                    if (
+                        current_app.config["SQLALCHEMY_DATABASE_URI"].startswith("sqlite")
+                        and exp_uri.startswith("sqlite:///")
+                    ):
+                        try:
+                            from y_web.migrations.add_post_created_at_column import (
+                                migrate_sqlite_experiment_db,
+                            )
+                            from y_web.migrations.add_comment_dedupe_columns import (
+                                migrate_sqlite_comment_dedupe_columns,
+                            )
+
+                            migrate_sqlite_experiment_db(exp_uri)
+                            migrate_sqlite_comment_dedupe_columns(exp_uri)
+                        except Exception as e:
+                            print(
+                                f"Warning: SQLite post schema migration failed for experiment {exp.idexp}: {e}"
+                            )
+
+                    # For PostgreSQL experiment DBs, ensure server schema columns/indexes exist.
+                    if current_app.config["SQLALCHEMY_DATABASE_URI"].startswith(
+                        "postgresql"
+                    ):
+                        try:
+                            from urllib.parse import urlparse
+
+                            from y_web.migrations.ensure_postgresql_schema import (
+                                migrate_server_db,
+                            )
+
+                            parsed_uri = urlparse(
+                                current_app.config["SQLALCHEMY_DATABASE_URI"]
+                            )
+                            pg_host = parsed_uri.hostname or "localhost"
+                            pg_port = str(parsed_uri.port or 5432)
+                            pg_user = parsed_uri.username or "postgres"
+                            pg_password = parsed_uri.password or ""
+
+                            if pg_password:
+                                migrate_server_db(
+                                    pg_host,
+                                    pg_port,
+                                    exp.db_name,
+                                    pg_user,
+                                    pg_password,
+                                )
+                        except Exception as e:
+                            print(
+                                f"Warning: PostgreSQL schema migration failed for experiment {exp.idexp}: {e}"
+                            )
 
         g.current_db_bind = bind_key
 
@@ -158,7 +234,8 @@ def initialize_active_experiment_databases(app):
     Initialize database bindings for all currently active experiments.
 
     This should be called during application startup to register
-    all active experiment databases.
+    all active experiment databases. For PostgreSQL databases, it also
+    runs schema migrations to ensure all required columns exist.
 
     Args:
         app: Flask application instance
@@ -168,5 +245,61 @@ def initialize_active_experiment_databases(app):
 
         active_experiments = Exps.query.filter_by(status=1).all()
 
+        # Check if we're using PostgreSQL
+        is_postgresql = app.config["SQLALCHEMY_DATABASE_URI"].startswith("postgresql")
+
         for exp in active_experiments:
             register_experiment_database(app, exp.idexp, exp.db_name)
+            bind_key = get_db_bind_key_for_exp(exp.idexp)
+
+            # Ensure any new db_exp tables exist in the experiment DB.
+            exp_uri = app.config["SQLALCHEMY_BINDS"].get(bind_key)
+            if exp_uri:
+                original_db_exp = app.config["SQLALCHEMY_BINDS"].get("db_exp")
+                app.config["SQLALCHEMY_BINDS"]["db_exp"] = exp_uri
+                try:
+                    db.create_all(bind="db_exp")
+                finally:
+                    if original_db_exp is not None:
+                        app.config["SQLALCHEMY_BINDS"]["db_exp"] = original_db_exp
+
+                # For SQLite experiment DBs, run local schema migration for post.created_at.
+                if not is_postgresql and exp_uri.startswith("sqlite:///"):
+                    try:
+                        from y_web.migrations.add_post_created_at_column import (
+                            migrate_sqlite_experiment_db,
+                        )
+                        from y_web.migrations.add_comment_dedupe_columns import (
+                            migrate_sqlite_comment_dedupe_columns,
+                        )
+
+                        migrate_sqlite_experiment_db(exp_uri)
+                        migrate_sqlite_comment_dedupe_columns(exp_uri)
+                    except Exception as e:
+                        print(
+                            f"Warning: SQLite post schema migration failed for experiment {exp.idexp}: {e}"
+                        )
+
+            # For PostgreSQL, run schema migration to ensure all columns exist
+            if is_postgresql:
+                try:
+                    from urllib.parse import urlparse
+
+                    from y_web.migrations.ensure_postgresql_schema import (
+                        migrate_server_db,
+                    )
+
+                    parsed_uri = urlparse(app.config["SQLALCHEMY_DATABASE_URI"])
+                    pg_host = parsed_uri.hostname or "localhost"
+                    pg_port = str(parsed_uri.port or 5432)
+                    pg_user = parsed_uri.username or "postgres"
+                    pg_password = parsed_uri.password or ""
+
+                    if pg_password:
+                        migrate_server_db(
+                            pg_host, pg_port, exp.db_name, pg_user, pg_password
+                        )
+                except Exception as e:
+                    print(
+                        f"Warning: PostgreSQL schema migration failed for experiment {exp.idexp}: {e}"
+                    )
