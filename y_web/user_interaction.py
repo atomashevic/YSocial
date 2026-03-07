@@ -7,7 +7,7 @@ commenting. Integrates sentiment analysis, toxicity detection, and LLM-based
 content annotation.
 """
 
-from flask import Blueprint, redirect, request
+from flask import Blueprint, flash, redirect, request
 from flask_login import current_user, login_required
 
 from . import db
@@ -16,6 +16,7 @@ from .models import (
     Admin_users,
     Articles,
     Emotions,
+    Exps,
     Follow,
     Hashtags,
     Images,
@@ -104,6 +105,14 @@ def share_content(exp_id):
     Returns:
         Redirect to referrer page
     """
+    exp = Exps.query.filter_by(idexp=exp_id).first()
+    if exp is not None and exp.platform_type == "forum":
+        flash(
+            "Sharing existing posts is disabled for forum experiments. Share external links instead.",
+            "warning",
+        )
+        return redirect(request.referrer or f"/{exp_id}/rfeed")
+
     post_id = request.args.get("post_id")
 
     # get the post
@@ -200,7 +209,7 @@ def publish_post(exp_id):
 
         img = Images.query.filter_by(url=url).first()
         if img is None:
-            img = Images(url=url, description=annotation, article_id=-1)
+            img = Images(url=url, description=annotation, article_id=None)
             db.session.add(img)
             db.session.commit()
             img_id = img.id
@@ -345,7 +354,7 @@ def publish_post_reddit(exp_id):
 
                 img = Images.query.filter_by(url=url).first()
                 if img is None:
-                    img = Images(url=url, description=annotation, article_id=-1)
+                    img = Images(url=url, description=annotation, article_id=None)
                     db.session.add(img)
                     db.session.commit()
                     img_id = img.id
@@ -407,6 +416,16 @@ def publish_post_reddit(exp_id):
             db.session.add(article)
             db.session.commit()
             news_id = article.id
+
+            image_url = article_info.get("image")
+            if image_url:
+                existing_image = Images.query.filter_by(article_id=article.id).first()
+                if existing_image is None:
+                    existing_image = Images.query.filter_by(url=image_url).first()
+                if existing_image is None:
+                    img = Images(url=image_url, article_id=article.id)
+                    db.session.add(img)
+                    db.session.commit()
 
     # add post to the db
     post = Post(
@@ -525,8 +544,9 @@ def publish_comment(exp_id):
     # get the last round id from Rounds
     current_round = Rounds.query.order_by(Rounds.id.desc()).first()
 
-    # get the thread if of the post with id pid
-    thread_id = Post.query.filter_by(id=pid).first().thread_id
+    # get the thread id and parent author of the post being replied to
+    parent_post = Post.query.filter_by(id=pid).first()
+    thread_id = parent_post.thread_id
 
     # add post to the db
     post = Post(
@@ -622,6 +642,7 @@ def publish_comment(exp_id):
         db.session.add(post_tag)
         db.session.commit()
 
+    mentioned_user_ids = set()
     for mention in mentions:
         if len(mention) < 1:
             continue
@@ -631,15 +652,23 @@ def publish_comment(exp_id):
         # existing user and not self
         # @todo: check ghost mentions to the current user...
         if us is not None and us.id != current_user.id:
-            mn = Mentions(user_id=us.id, post_id=post.id, round=current_round.id)
-            db.session.add(mn)
-            db.session.commit()
+            if us.id not in mentioned_user_ids:
+                mn = Mentions(user_id=us.id, post_id=post.id, round=current_round.id)
+                db.session.add(mn)
+                db.session.commit()
+                mentioned_user_ids.add(us.id)
         else:
             text = text.replace(mention, "")
 
             # update post
             post.tweet = text.lstrip().rstrip()
             db.session.commit()
+
+    # Mirror agent behavior for replies: notify parent author even without explicit @mention.
+    if parent_post.user_id != current_user.id and parent_post.user_id not in mentioned_user_ids:
+        mn = Mentions(user_id=parent_post.user_id, post_id=post.id, round=current_round.id)
+        db.session.add(mn)
+        db.session.commit()
 
     return {"message": "Published successfully", "status": 200}
 

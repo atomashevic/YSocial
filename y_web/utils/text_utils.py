@@ -229,29 +229,275 @@ def strip_tags(html):
     return s.get_data()
 
 
-def process_reddit_post(text):
+def strip_markdown_artifacts(text):
+    """
+    Remove markdown headers and common article structure artifacts.
+
+    Handles patterns like:
+    - # Conclusion: Some text
+    - # Call to Action
+    - ## Summary
+    - # Key Points:
+
+    Args:
+        text: Text content to clean
+
+    Returns:
+        Text with markdown artifacts removed
+    """
+    if not text:
+        return text
+
+    # Remove markdown headers with common article section names
+    # Patterns: # Conclusion:, # Call to Action, # Key Points, etc.
+    text = re.sub(
+        r'^#+\s*(Conclusion|Call to Action|Key Points?|Summary|Overview|'
+        r'Introduction|Background|TL;?DR|Final Thoughts?|Takeaway|'
+        r'What\'s Next|Next Steps?|Resources?)[:\s]*',
+        '', text, flags=re.MULTILINE | re.IGNORECASE
+    )
+
+    # Remove any isolated markdown header at the very start of text
+    # (e.g., "# Some random header" at the beginning)
+    text = re.sub(r'^#+\s+', '', text)
+
+    # Clean up multiple consecutive newlines
+    text = re.sub(r'\n{3,}', '\n\n', text)
+
+    return text.strip()
+
+
+def calculate_text_similarity(text1, text2):
+    """
+    Calculate similarity between two texts using word overlap (Jaccard similarity).
+
+    Args:
+        text1: First text to compare
+        text2: Second text to compare
+
+    Returns:
+        Float between 0 and 1 indicating similarity (1 = identical)
+    """
+    if not text1 or not text2:
+        return 0.0
+
+    # Normalize texts: lowercase and extract words
+    words1 = set(re.findall(r'\b\w+\b', text1.lower()))
+    words2 = set(re.findall(r'\b\w+\b', text2.lower()))
+
+    if not words1 or not words2:
+        return 0.0
+
+    # Jaccard similarity: intersection / union
+    intersection = len(words1 & words2)
+    union = len(words1 | words2)
+
+    return intersection / union if union > 0 else 0.0
+
+
+def strip_reproduced_article_content(post_body, article_summary, similarity_threshold=0.6):
+    """
+    Detect and strip content that appears to be reproduced from the article summary.
+
+    If the post body is too similar to the article summary, it indicates the LLM
+    reproduced the article content instead of writing original commentary.
+
+    Args:
+        post_body: The generated post body text
+        article_summary: The original article summary
+        similarity_threshold: Similarity threshold above which content is considered reproduced (0-1)
+
+    Returns:
+        Tuple of (cleaned_body, was_modified) where was_modified indicates if content was stripped
+    """
+    if not post_body or not article_summary:
+        return post_body, False
+
+    # Normalize article summary for substring checking
+    article_words = set(re.findall(r'\b\w+\b', article_summary.lower()))
+
+    # Check overall similarity
+    similarity = calculate_text_similarity(post_body, article_summary)
+
+    if similarity >= similarity_threshold:
+        # Content is too similar to article - try to find and remove the reproduced portion
+        # Split into sentences and check each one
+        sentences = re.split(r'(?<=[.!?])\s+', post_body)
+        filtered_sentences = []
+
+        # Use lower threshold for per-sentence matching since each sentence
+        # only contains part of the article (so Jaccard similarity is lower)
+        sentence_threshold = similarity_threshold * 0.6  # ~0.36 for default
+
+        for sentence in sentences:
+            sentence_similarity = calculate_text_similarity(sentence, article_summary)
+
+            # Also check if sentence words are mostly from article
+            sentence_words = set(re.findall(r'\b\w+\b', sentence.lower()))
+            if sentence_words:
+                # What percentage of sentence words appear in article?
+                overlap_ratio = len(sentence_words & article_words) / len(sentence_words)
+            else:
+                overlap_ratio = 0
+
+            # Keep sentences that are sufficiently different from the article
+            # Both similarity and overlap ratio must be below thresholds
+            if sentence_similarity < sentence_threshold and overlap_ratio < 0.7:
+                filtered_sentences.append(sentence)
+
+        if filtered_sentences:
+            return ' '.join(filtered_sentences), True
+        else:
+            # All content was reproduced - return empty
+            return "", True
+
+    return post_body, False
+
+
+def process_reddit_post(text, allow_legacy_blankline_title=True):
     """
     Process and format Reddit-style post text.
 
-    Handles posts with "TITLE: " prefix by splitting into title and content,
-    and removes leading whitespace from content.
+    Handles posts with "TITLE:" prefix (and variations/typos) by splitting
+    into title and content. Also strips markdown artifacts from body.
+
+    Supported title variations:
+    - TITLE:, TITTLE:, TITEL: (typos)
+    - title:, Title: (case variations)
+    - TITLE: , TITLE:no_space (optional space after colon)
 
     Args:
         text: Raw post text to process
+        allow_legacy_blankline_title: If True, infer title/body split from
+            "title + blank line + body" legacy format when no TITLE prefix is present.
 
     Returns:
         Tuple of (title, content) where title is None if no TITLE prefix exists
     """
-    if text.startswith("TITLE: "):
-        # Split on first newline after title
-        lines = text.split("\n", 1)
-        title = lines[0].replace("TITLE: ", "").strip()
+    if not text:
+        return None, ""
+
+    # Strip leading/trailing whitespace
+    text = text.strip()
+
+    # Match TITLE: prefix with variations (case-insensitive, typos, optional space)
+    # Handles: TITLE:, TITTLE:, TITEL:, Title:, title:, etc.
+    # Also handles markdown formatting: **TITLE:, *TITLE:, __TITLE:, _TITLE:
+    title_match = re.match(r'^[\*_]{0,2}(TITLE|TITTLE|TITEL)\s*:\s*', text, re.IGNORECASE)
+
+    if title_match:
+        # Remove the matched prefix
+        remaining = text[title_match.end():]
+
+        # Split on first newline to separate title from body.
+        # Some generations forget the newline after TITLE: and produce a single long line.
+        # In that case, the whole post renders as a "title" (typically bold) in the Reddit UI.
+        lines = remaining.split("\n", 1)
+        title = lines[0].strip()
+
+        # Strip trailing markdown bold/italic markers from title
+        title = re.sub(r'[\*_]{1,2}$', '', title).strip()
+
         if len(lines) > 1:
-            # Remove all leading whitespace from the content
             content = lines[1].lstrip()
         else:
             content = ""
-        return title, content
+
+            # Heuristic recovery: if TITLE has no newline and is extremely long,
+            # treat the first sentence-ish chunk as the title and the rest as body.
+            if len(title) >= 200:
+                t = title
+
+                # Prefer a sentence boundary early-ish; otherwise cut near a word boundary.
+                # Keep the title reasonably short so the body isn't swallowed by bold title styling.
+                min_idx, max_idx = 40, 160
+                boundary_patterns = [r"\.\s+", r"!\s+", r"\?\s+", r"\.\.\.\s+"]
+                split_at = None
+
+                for pat in boundary_patterns:
+                    m = re.search(pat, t)
+                    if not m:
+                        continue
+                    idx = m.end()
+                    if min_idx <= idx <= max_idx:
+                        split_at = idx
+                        break
+
+                if split_at is None:
+                    # Fall back to a whitespace cut before max_idx.
+                    cut = t.rfind(" ", 0, max_idx)
+                    if cut >= min_idx:
+                        split_at = cut + 1
+
+                if split_at is not None and split_at < len(t) - 1:
+                    title = t[:split_at].strip()
+                    content = t[split_at:].lstrip()
     else:
-        # For non-title posts, still remove leading whitespace
-        return None, text.lstrip()
+        title = None
+        content = text.lstrip()
+
+        if allow_legacy_blankline_title:
+            # Human compose payloads historically used "title + blank line + body"
+            # without a TITLE prefix. Treat that as a Reddit title/body split.
+            blocks = re.split(r"\n\s*\n", text, maxsplit=1)
+            if len(blocks) > 1:
+                candidate_title = blocks[0].strip()
+                candidate_body = blocks[1].lstrip()
+                if (
+                    candidate_title
+                    and candidate_body
+                    and len(candidate_title) <= 300
+                ):
+                    title = candidate_title
+                    content = candidate_body
+
+    # Strip markdown artifacts from body content
+    content = strip_markdown_artifacts(content)
+
+    # Guardrail: never leak TITLE markers in the rendered body.
+    content = re.sub(
+        r"^[\*_]{0,2}(TITLE|TITTLE|TITEL)\s*:\s*",
+        "",
+        content,
+        flags=re.IGNORECASE,
+    ).lstrip()
+
+    return title, content
+
+
+def normalize_punctuation_spacing(text):
+    """
+    Normalize missing spaces after punctuation for readability.
+
+    This adds a single space after common punctuation marks when missing,
+    while preserving URLs and common numeric patterns.
+    """
+    if not text:
+        return text
+
+    preserved = {}
+
+    def _preserve(match):
+        key = f"__URL_{len(preserved)}__"
+        preserved[key] = match.group(0)
+        return key
+
+    normalized = re.sub(r"https?://\S+", _preserve, str(text))
+
+    # Sentence punctuation spacing.
+    normalized = re.sub(
+        r"(?<!\d)([.!?;:])(?!\s|$)(?=[A-Za-z])",
+        r"\1 ",
+        normalized,
+    )
+    # Comma spacing, excluding thousands separators.
+    normalized = re.sub(
+        r"(?<!\d),(?!\s|$)(?=[A-Za-z])",
+        ", ",
+        normalized,
+    )
+
+    for key, url in preserved.items():
+        normalized = normalized.replace(key, url)
+
+    return normalized

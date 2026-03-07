@@ -26685,3 +26685,12 @@ background: #fff url('img/search.png') no-repeat 15px 15px;
     background-color: #005ba1 !important;
     border-color: #005ba1 !important;
 }
+
+/* Reddit compose: prevent uploaded preview overlapping the file chooser. */
+#compose-card #image-upload-wrapper {
+    margin-bottom: 10px;
+}
+
+#compose-card #feed-upload {
+    margin-top: 10px;
+}
