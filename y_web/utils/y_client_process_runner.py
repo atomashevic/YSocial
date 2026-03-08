@@ -4,6 +4,7 @@ Client process runner script for YSocial.
 This script is invoked as a subprocess to run client simulations.
 It's designed to be called by start_client using subprocess.Popen.
 """
+
 import argparse
 import json
 import math
@@ -11,9 +12,12 @@ import os
 import random
 import re
 import sys
+import threading
 import traceback
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from pathlib import Path
+from typing import Optional
 
 import numpy as np
 
@@ -25,6 +29,52 @@ from y_web.models import (
 # Number of days to run an infinite client per iteration before checking for termination
 # Infinite clients run for this many days, then loop back to continue running
 INFINITE_CLIENT_ITERATION_DAYS = 365
+
+
+def _touch_watchdog_heartbeat(path: Path) -> None:
+    """Update the watchdog heartbeat file mtime to signal liveness."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.touch(exist_ok=True)
+    os.utime(path, None)
+
+
+def _start_watchdog_heartbeat() -> Optional[threading.Event]:
+    """
+    Start a background heartbeat updater for watchdog checks.
+
+    Returns:
+        Stop event for the heartbeat thread, or None when disabled.
+    """
+    heartbeat_file = os.environ.get("YSOCIAL_WATCHDOG_HEARTBEAT_FILE")
+    if not heartbeat_file:
+        return None
+
+    try:
+        heartbeat_interval = max(
+            1, int(os.environ.get("YSOCIAL_WATCHDOG_HEARTBEAT_INTERVAL_SEC", "60"))
+        )
+    except (TypeError, ValueError):
+        heartbeat_interval = 60
+
+    heartbeat_path = Path(heartbeat_file)
+    stop_event = threading.Event()
+
+    def _heartbeat_loop():
+        while not stop_event.is_set():
+            try:
+                _touch_watchdog_heartbeat(heartbeat_path)
+            except Exception as exc:
+                print(f"Heartbeat update failed: {exc}", file=sys.stderr)
+            stop_event.wait(timeout=heartbeat_interval)
+
+    try:
+        _touch_watchdog_heartbeat(heartbeat_path)
+    except Exception as exc:
+        print(f"Heartbeat init failed: {exc}", file=sys.stderr)
+
+    heartbeat_thread = threading.Thread(target=_heartbeat_loop, daemon=True)
+    heartbeat_thread.start()
+    return stop_event
 
 
 def main():
@@ -69,6 +119,8 @@ def main():
     population = MinimalObject()
     population.id = args.population_id
 
+    heartbeat_stop_event = _start_watchdog_heartbeat()
+
     # Call start_client_process with the parameters
     try:
         start_client_process(exp, cli, population, args.resume, args.db_type)
@@ -77,6 +129,9 @@ def main():
 
         traceback.print_exc(file=sys.stderr)
         sys.exit(1)
+    finally:
+        if heartbeat_stop_event is not None:
+            heartbeat_stop_event.set()
 
 
 def start_client_process(exp, cli, population, resume=True, db_type="sqlite"):

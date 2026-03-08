@@ -7,6 +7,7 @@ This module provides functionality to:
 - Aggregate metrics in database tables
 """
 
+import ast
 import json
 import logging
 import os
@@ -196,8 +197,12 @@ def parse_server_log_incremental(log_file_path, exp_id, start_offset=0):
                     continue
 
                 try:
-                    # Parse JSON - log entries should already be properly formatted
-                    log_entry = json.loads(line)
+                    # Parse log entry - try JSON first, then Python literal (single quotes)
+                    try:
+                        log_entry = json.loads(line)
+                    except json.JSONDecodeError:
+                        # Log might be in Python dict format with single quotes
+                        log_entry = ast.literal_eval(line)
 
                     path = log_entry.get("path", "unknown")
                     duration = float(log_entry.get("duration", 0))
@@ -210,6 +215,12 @@ def parse_server_log_incremental(log_file_path, exp_id, start_offset=0):
                     if time_str:
                         try:
                             time_obj = datetime.strptime(time_str, "%Y-%m-%d %H:%M:%S")
+                            # Extract day and hour from timestamp if not present in log entry
+                            # Convert date to integer format YYYYMMDD for database storage
+                            if day is None:
+                                day = int(time_obj.strftime("%Y%m%d"))
+                            if hour is None:
+                                hour = time_obj.hour
                         except ValueError:
                             pass
 
@@ -228,8 +239,9 @@ def parse_server_log_incremental(log_file_path, exp_id, start_offset=0):
                         if time_obj:
                             hourly_data[key][path]["times"].append(time_obj)
 
-                except json.JSONDecodeError:
-                    # Skip invalid JSON lines
+                except (json.JSONDecodeError, SyntaxError, ValueError, TypeError):
+                    # Skip lines that aren't valid JSON or Python dict format
+                    # (e.g., Flask error messages, stack traces, etc.)
                     continue
 
             # Get the new offset
@@ -274,7 +286,8 @@ def parse_server_log_incremental(log_file_path, exp_id, start_offset=0):
                 db.session.add(metric)
 
     for key, paths in hourly_data.items():
-        day, hour = key.split("-")
+        # Key format is "YYYYMMDD-HH" (day as integer, hour as integer)
+        day, hour = key.rsplit("-", 1)
         day = int(day)
         hour = int(hour)
 

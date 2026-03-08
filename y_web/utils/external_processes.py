@@ -32,6 +32,7 @@ from y_web.models import (
     Exps,
     Ollama_Pull,
     Population,
+    WatchdogSettings,
 )
 from y_web.utils.path_utils import get_base_path, get_resource_path, get_writable_path
 
@@ -64,6 +65,9 @@ def _register_process(process_id, process, stdout_file=None, stderr_file=None):
         stderr_file: The stderr log file handle (optional)
     """
     global _process_registry
+    # Replace stale entries for the same process id to avoid leaking handles and
+    # unreaped child processes across watchdog restarts.
+    _unregister_process(process_id)
     _process_registry[process_id] = {
         "process": process,
         "stdout_file": stdout_file,
@@ -81,6 +85,14 @@ def _unregister_process(process_id):
     global _process_registry
     if process_id in _process_registry:
         entry = _process_registry.pop(process_id)
+        proc = entry.get("process")
+        if proc is not None:
+            try:
+                # Reap already-exited children without blocking.
+                if proc.poll() is not None:
+                    proc.wait(timeout=0)
+            except Exception:
+                pass
         # Close log file handles if they exist
         for key in ("stdout_file", "stderr_file"):
             fh = entry.get(key)
@@ -993,7 +1005,7 @@ def _find_available_port(original_port, port_range=100, min_port=None, max_port=
     return None
 
 
-def _update_server_port_in_configs(exp, new_port):
+def _update_server_port_in_configs(exp, new_port, force=False):
     """
     Update the server port in all configuration files and database.
 
@@ -1011,7 +1023,7 @@ def _update_server_port_in_configs(exp, new_port):
     """
     old_port = exp.port
 
-    if old_port == new_port:
+    if old_port == new_port and not force:
         return True  # No change needed
 
     print(f"Watchdog: Updating port from {old_port} to {new_port} in configs...")
@@ -1204,73 +1216,114 @@ def start_server(exp):
             f"Please ensure the experiment is properly configured."
         )
 
-    # === ROBUST PORT ALLOCATION ===
-    # Every time a YServer starts:
-    # 1. Terminate processes holding the database file (for SQLite)
-    # 2. Kill all processes attached to the current assigned port (for safety)
-    # 3. Find a NEW port in 5000-6000 that is free AND not allocated to other experiments
-    # 4. Update configs and database with the new port
-    # 5. Start server on the new port
-
+    db_uri_main = current_app.config["SQLALCHEMY_DATABASE_URI"]
+    use_gunicorn = db_uri_main.startswith("postgresql")
     old_port = exp.port
-    print(
-        f"Starting robust port allocation for experiment {exp.idexp} "
-        f"(current port: {old_port})..."
-    )
 
-    # Step 1: Terminate any processes holding the database file (SQLite safety)
-    print("Step 1: Terminating any processes holding the database file...")
-    _terminate_processes_holding_experiment_database(exp)
-    time.sleep(0.5)  # Brief pause to allow database release
+    # PostgreSQL mode keeps a stable port across restarts.
+    # SQLite retains legacy rotating-port behavior.
+    if use_gunicorn:
+        if not old_port:
+            raise RuntimeError(
+                f"Experiment {exp.idexp} has no assigned port; cannot start PostgreSQL server."
+            )
 
-    # Step 2: Kill all processes on the currently assigned port (port safety)
-    if old_port:
-        print(f"Step 2: Terminating any processes on port {old_port}...")
+        print(
+            f"Starting server for experiment {exp.idexp} on fixed port {old_port} "
+            "(PostgreSQL stable-port mode)..."
+        )
+
+        # Ensure stale processes and file handles are cleaned up before binding.
+        _terminate_processes_holding_experiment_database(exp)
         _terminate_processes_on_port(old_port)
-        time.sleep(1)  # Brief pause to allow port release
+        time.sleep(1)
 
-    # Step 3: Find a new available port that is:
-    # - Not currently in use by any process (socket check)
-    # - Not allocated to any other experiment in the database
-    # - Not the same as the current experiment's port (always get a fresh port)
-    print(
-        f"Step 3: Finding new available port in range "
-        f"{SERVER_PORT_MIN}-{SERVER_PORT_MAX} (excluding current port {old_port})..."
-    )
-    new_port = _find_new_available_port(
-        exclude_exp_id=exp.idexp,
-        exclude_current_port=old_port,
-        min_port=SERVER_PORT_MIN,
-        max_port=SERVER_PORT_MAX,
-    )
-
-    if new_port:
-        print(f"Found available port: {new_port}")
-
-        # Step 4: Update config files and database with the new port
-        # (always update since we're guaranteed a different port)
-        print(f"Step 4: Updating configurations from port {old_port} to {new_port}...")
-        if _update_server_port_in_configs(exp, new_port):
-            print(f"Successfully updated port to {new_port}")
-            # Refresh the experiment object to get updated port
+        # Keep config files aligned with experiment-assigned port.
+        if _update_server_port_in_configs(exp, old_port, force=True):
             db.session.refresh(exp)
         else:
             print(
-                f"Warning: Some config updates failed. "
-                f"Server may fail to start on port {new_port}"
+                f"Warning: Could not fully sync configs for port {old_port}; "
+                "server start may fail."
+            )
+
+        # Fail fast instead of silently rotating to a different port.
+        if not _is_port_available(old_port):
+            raise RuntimeError(
+                f"Port {old_port} is still busy after cleanup; refusing to rotate ports."
             )
     else:
-        # No port found - this is a serious error
-        raise RuntimeError(
-            f"Could not find available port in range "
-            f"{SERVER_PORT_MIN}-{SERVER_PORT_MAX}. "
-            f"All ports are either in use or allocated to other experiments."
+        # === ROBUST PORT ALLOCATION (SQLite legacy mode) ===
+        # Every time a YServer starts:
+        # 1. Terminate processes holding the database file
+        # 2. Kill all processes attached to the current assigned port
+        # 3. Find a NEW port in 5000-6000 that is free and unallocated
+        # 4. Update configs and database with the new port
+        print(
+            f"Starting robust port allocation for experiment {exp.idexp} "
+            f"(current port: {old_port})..."
         )
 
-    # Step 5: Start server on the new port
-    # Check database type to decide whether to use gunicorn or direct Python
-    db_uri_main = current_app.config["SQLALCHEMY_DATABASE_URI"]
-    use_gunicorn = db_uri_main.startswith("postgresql")
+        print("Step 1: Terminating any processes holding the database file...")
+        _terminate_processes_holding_experiment_database(exp)
+        time.sleep(0.5)
+
+        if old_port:
+            print(f"Step 2: Terminating any processes on port {old_port}...")
+            _terminate_processes_on_port(old_port)
+            time.sleep(1)
+
+        print(
+            f"Step 3: Finding new available port in range "
+            f"{SERVER_PORT_MIN}-{SERVER_PORT_MAX} (excluding current port {old_port})..."
+        )
+        new_port = _find_new_available_port(
+            exclude_exp_id=exp.idexp,
+            exclude_current_port=old_port,
+            min_port=SERVER_PORT_MIN,
+            max_port=SERVER_PORT_MAX,
+        )
+
+        if new_port:
+            print(f"Found available port: {new_port}")
+            print(
+                f"Step 4: Updating configurations from port {old_port} to {new_port}..."
+            )
+            if _update_server_port_in_configs(exp, new_port):
+                print(f"Successfully updated port to {new_port}")
+                db.session.refresh(exp)
+            else:
+                print(
+                    f"Warning: Some config updates failed. "
+                    f"Server may fail to start on port {new_port}"
+                )
+        else:
+            raise RuntimeError(
+                f"Could not find available port in range "
+                f"{SERVER_PORT_MIN}-{SERVER_PORT_MAX}. "
+                f"All ports are either in use or allocated to other experiments."
+            )
+
+    # For PostgreSQL, ensure the experiment database has all required tables/columns
+    if use_gunicorn:
+        try:
+            from urllib.parse import urlparse
+
+            from y_web.migrations.ensure_postgresql_schema import migrate_server_db
+
+            parsed_uri = urlparse(db_uri_main)
+            pg_host = parsed_uri.hostname or "localhost"
+            pg_port = str(parsed_uri.port or 5432)
+            pg_user = parsed_uri.username or "postgres"
+            pg_password = parsed_uri.password or ""
+
+            if pg_password:
+                print(
+                    f"Running PostgreSQL schema migration for experiment database {exp.db_name}..."
+                )
+                migrate_server_db(pg_host, pg_port, exp.db_name, pg_user, pg_password)
+        except Exception as e:
+            print(f"Warning: PostgreSQL schema migration failed: {e}")
 
     # Get the Python executable to use
     python_cmd = detect_env_handler()
@@ -1343,12 +1396,33 @@ def start_server(exp):
                 if gunicorn_which:
                     cmd = [gunicorn_which] + gunicorn_args
                 else:
-                    # Last resort: try 'gunicorn' and let subprocess fail if not found
-                    cmd = ["gunicorn"] + gunicorn_args
+                    # Try anaconda environment as last resort
+                    anaconda_gunicorn = "/opt/ysocial/anaconda3/envs/Y/bin/gunicorn"
+                    if os.path.exists(anaconda_gunicorn):
+                        cmd = [anaconda_gunicorn] + gunicorn_args
+                    else:
+                        # Last resort: try 'gunicorn' and let subprocess fail if not found
+                        cmd = ["gunicorn"] + gunicorn_args
 
         # Set environment variable for config file path
         env = os.environ.copy()
         env["YSERVER_CONFIG"] = config
+
+        # Set DATABASE_URL for PostgreSQL so the server uses the correct database
+        # Read the database_uri from the config file
+        try:
+            with open(config, "r") as f:
+                server_config = json.load(f)
+                if (
+                    "database_uri" in server_config
+                    and "postgresql" in server_config["database_uri"]
+                ):
+                    env["DATABASE_URL"] = server_config["database_uri"]
+                    print(
+                        f"Set DATABASE_URL for server: {server_config['database_uri']}"
+                    )
+        except Exception as e:
+            print(f"Warning: Could not read database_uri from config: {e}")
 
         # Create log files for server output
         log_dir = Path(config).parent
@@ -1397,29 +1471,75 @@ def start_server(exp):
             # Fallback: try to use gunicorn from system path
             print(f"Error starting server process: {e}")
             gunicorn_which = shutil.which("gunicorn")
-            fallback_cmd = [gunicorn_which or "gunicorn"] + gunicorn_args
-            if sys.platform.startswith("win"):
-                try:
-                    creationflags = subprocess.CREATE_NO_WINDOW
-                except AttributeError:
-                    creationflags = 0x08000000
-                process = subprocess.Popen(
-                    fallback_cmd,
-                    stdout=out_file,
-                    stderr=err_file,
-                    stdin=subprocess.DEVNULL,
-                    creationflags=creationflags,
-                    env=env,
-                )
+            if gunicorn_which:
+                fallback_cmd = [gunicorn_which] + gunicorn_args
             else:
-                process = subprocess.Popen(
-                    fallback_cmd,
-                    stdout=out_file,
-                    stderr=err_file,
-                    stdin=subprocess.DEVNULL,
-                    start_new_session=True,
-                    env=env,
+                # Try anaconda environment as last resort
+                anaconda_gunicorn = "/opt/ysocial/anaconda3/envs/Y/bin/gunicorn"
+                if os.path.exists(anaconda_gunicorn):
+                    fallback_cmd = [anaconda_gunicorn] + gunicorn_args
+                else:
+                    fallback_cmd = ["gunicorn"] + gunicorn_args
+            try:
+                if sys.platform.startswith("win"):
+                    try:
+                        creationflags = subprocess.CREATE_NO_WINDOW
+                    except AttributeError:
+                        creationflags = 0x08000000
+                    process = subprocess.Popen(
+                        fallback_cmd,
+                        stdout=out_file,
+                        stderr=err_file,
+                        stdin=subprocess.DEVNULL,
+                        creationflags=creationflags,
+                        env=env,
+                    )
+                else:
+                    process = subprocess.Popen(
+                        fallback_cmd,
+                        stdout=out_file,
+                        stderr=err_file,
+                        stdin=subprocess.DEVNULL,
+                        start_new_session=True,
+                        env=env,
+                    )
+            except FileNotFoundError:
+                # Gunicorn missing in this environment; fall back to direct Python server start.
+                print(
+                    "Gunicorn executable not found. Falling back to Python server runner."
                 )
+                if (
+                    isinstance(python_cmd, str)
+                    and " " in python_cmd
+                    and not os.path.isabs(python_cmd)
+                ):
+                    cmd_parts = python_cmd.split()
+                    python_fallback_cmd = cmd_parts + [script_path, "-c", config]
+                else:
+                    python_fallback_cmd = [python_cmd, script_path, "-c", config]
+
+                if sys.platform.startswith("win"):
+                    try:
+                        creationflags = subprocess.CREATE_NO_WINDOW
+                    except AttributeError:
+                        creationflags = 0x08000000
+                    process = subprocess.Popen(
+                        python_fallback_cmd,
+                        stdout=out_file,
+                        stderr=err_file,
+                        stdin=subprocess.DEVNULL,
+                        creationflags=creationflags,
+                        env=env,
+                    )
+                else:
+                    process = subprocess.Popen(
+                        python_fallback_cmd,
+                        stdout=out_file,
+                        stderr=err_file,
+                        stdin=subprocess.DEVNULL,
+                        start_new_session=True,
+                        env=env,
+                    )
     else:
         # Use standard Python execution for SQLite
         print(f"Starting server for experiment {exp_uid} with Python (SQLite)...")
@@ -1636,17 +1756,13 @@ def _register_server_with_watchdog(exp, pid, log_dir):
 
     # Build server URL for status checks
     server_url = f"http://{exp.server}:{exp.port}"
+    app_obj = current_app._get_current_object()
 
     # Create restart callback
     def restart_callback():
         """Callback to restart the server process."""
         try:
-            # Import here to avoid circular imports
-            from y_web import create_app
-
-            # Create app context for database operations
-            app = create_app()
-            with app.app_context():
+            with app_obj.app_context():
                 # Re-fetch experiment from database to get fresh state
                 fresh_exp = db.session.query(Exps).filter_by(idexp=exp_id).first()
                 if fresh_exp:
@@ -1663,14 +1779,13 @@ def _register_server_with_watchdog(exp, pid, log_dir):
                         fresh_exp.server_pid = None
                         db.session.commit()
 
-                    # start_server() will handle:
-                    # 1. Killing any processes on the old port
-                    # 2. Finding a new port not allocated to any experiment
-                    # 3. Updating configs and database
-                    # 4. Starting the server
+                    # start_server() will reclaim the configured port and restart.
                     print(f"Watchdog: Starting new server process...")
                     new_process = start_server(fresh_exp)
                     return new_process.pid if new_process else None
+                print(
+                    f"Watchdog: Server restart aborted - experiment {exp_id} not found"
+                )
         except Exception as e:
             print(f"Error in server restart callback: {e}")
         return None
@@ -2159,6 +2274,35 @@ def start_client(exp, cli, population, resume=True):
     if current_app.config["SQLALCHEMY_DATABASE_URI"].startswith("postgresql"):
         db_type = "postgresql"
 
+    # Guard against duplicate launches for the same client.
+    # Keep at most one live client runner process per client record.
+    fresh_cli = db.session.query(Client).filter_by(id=cli.id).first()
+    if fresh_cli and fresh_cli.pid:
+        existing_pid = int(fresh_cli.pid)
+        is_alive = False
+        try:
+            import psutil
+
+            proc = psutil.Process(existing_pid)
+            is_alive = proc.is_running() and proc.status() != psutil.STATUS_ZOMBIE
+        except Exception:
+            is_alive = False
+
+        if is_alive and _is_client_process(existing_pid):
+            print(
+                f"Client {fresh_cli.id} already running with PID {existing_pid}; "
+                "skipping duplicate start."
+            )
+            return None
+
+        # Stale PID in DB: clear it before attempting a new launch.
+        print(
+            f"Clearing stale client PID {existing_pid} for client {fresh_cli.id} "
+            "before starting a new process."
+        )
+        fresh_cli.pid = None
+        db.session.commit()
+
     # Build the command arguments
     cmd_args = [
         "--exp-id",
@@ -2226,6 +2370,25 @@ def start_client(exp, cli, population, resume=True):
 
     stdout_log = log_dir / f"{cli.name}_client_stdout.log"
     stderr_log = log_dir / f"{cli.name}_client_stderr.log"
+    heartbeat_file = log_dir / f"{cli.name}_client.heartbeat"
+
+    heartbeat_interval_sec = 60
+    try:
+        watchdog_settings = WatchdogSettings.query.first()
+        if watchdog_settings and getattr(
+            watchdog_settings, "heartbeat_interval_sec", None
+        ):
+            heartbeat_interval_sec = max(
+                1, int(watchdog_settings.heartbeat_interval_sec)
+            )
+    except Exception as e:
+        print(f"Warning: Could not read watchdog heartbeat interval: {e}")
+
+    try:
+        heartbeat_file.parent.mkdir(parents=True, exist_ok=True)
+        heartbeat_file.touch(exist_ok=True)
+    except Exception as e:
+        print(f"Warning: Could not initialize heartbeat file {heartbeat_file}: {e}")
 
     # Open log files for the subprocess
     try:
@@ -2243,6 +2406,8 @@ def start_client(exp, cli, population, resume=True):
     # Mark this as a client subprocess so the atexit handler doesn't run cleanup
     # This prevents the subprocess from killing all other experiments when it exits
     env["Y_CLIENT_SUBPROCESS"] = "1"
+    env["YSOCIAL_WATCHDOG_HEARTBEAT_FILE"] = str(heartbeat_file)
+    env["YSOCIAL_WATCHDOG_HEARTBEAT_INTERVAL_SEC"] = str(heartbeat_interval_sec)
 
     if getattr(sys, "frozen", False):
         # Running from PyInstaller - modules are in the bundle
@@ -2334,24 +2499,20 @@ def _register_client_with_watchdog(exp, cli, population, pid, log_dir):
     """
     from y_web.utils.process_watchdog import get_watchdog
 
-    # Use {client_name}_client.log as the heartbeat file
-    log_file = os.path.join(log_dir, f"{cli.name}_client.log")
+    # Use dedicated heartbeat file to avoid false hangs while client sleeps.
+    log_file = os.path.join(log_dir, f"{cli.name}_client.heartbeat")
 
     # Store only the IDs to avoid detached SQLAlchemy instance issues
     exp_id = exp.idexp
     cli_id = cli.id
     pop_id = population.id
+    app_obj = current_app._get_current_object()
 
     # Create restart callback
     def restart_callback():
         """Callback to restart the client process."""
         try:
-            # Import here to avoid circular imports
-            from y_web import create_app
-
-            # Create app context for database operations
-            app = create_app()
-            with app.app_context():
+            with app_obj.app_context():
                 # Re-fetch objects from database to get fresh state
                 fresh_exp = db.session.query(Exps).filter_by(idexp=exp_id).first()
                 fresh_cli = db.session.query(Client).filter_by(id=cli_id).first()
@@ -2419,6 +2580,11 @@ def _register_client_with_watchdog(exp, cli, population, pid, log_dir):
                         fresh_exp, fresh_cli, fresh_pop, resume=True
                     )
                     return new_process.pid if new_process else None
+                print(
+                    "Watchdog: Client restart aborted - experiment/client/population "
+                    f"records not found (exp={bool(fresh_exp)}, client={bool(fresh_cli)}, "
+                    f"population={bool(fresh_pop)})"
+                )
         except Exception as e:
             print(f"Error in client restart callback: {e}")
         return None

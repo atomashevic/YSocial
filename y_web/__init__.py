@@ -112,12 +112,10 @@ def create_postgresql_db(app):
 
             # Insert initial admin user
             db_conn.execute(
-                text(
-                    """
+                text("""
                      INSERT INTO admin_users (username, email, password, role)
                      VALUES (:username, :email, :password, :role)
-                     """
-                ),
+                     """),
                 {
                     "username": "Admin",
                     "email": "admin@y-not.social",
@@ -155,16 +153,14 @@ def create_postgresql_db(app):
             hashed_pw = generate_password_hash("admin", method="pbkdf2:sha256")
 
             # Insert initial admin user
-            stmt = text(
-                """
+            stmt = text("""
                         INSERT INTO user_mgmt (username, email, password, user_type, leaning, age,
                                                language, owner, joined_on, frecsys_type,
                                                round_actions, toxicity, is_page, daily_activity_level)
                         VALUES (:username, :email, :password, :user_type, :leaning, :age,
                                 :language, :owner, :joined_on, :frecsys_type,
                                 :round_actions, :toxicity, :is_page, :daily_activity_level)
-                        """
-            )
+                        """)
 
             dummy_conn.execute(
                 stmt,
@@ -277,9 +273,23 @@ def cleanup_db_jupyter_with_new_app():
         traceback.print_exc()
 
 
-# Only register atexit handler for the main application process, not subprocesses
-# Client subprocesses set Y_CLIENT_SUBPROCESS=1 to indicate they should not run cleanup
-if os.environ.get("Y_CLIENT_SUBPROCESS") != "1":
+def _should_register_atexit_cleanup(env=None) -> bool:
+    """
+    Decide whether process-exit cleanup should be registered.
+
+    Cleanup stays opt-in so helper scripts can import y_web without
+    unexpectedly trying to tear down running services on process exit.
+    """
+    env_map = env if env is not None else os.environ
+    enabled = str(env_map.get("YSOCIAL_ENABLE_ATEXIT_CLEANUP", "")).strip().lower()
+    if enabled not in {"1", "true", "yes", "on"}:
+        return False
+
+    # Client subprocesses explicitly opt out.
+    return str(env_map.get("Y_CLIENT_SUBPROCESS", "")).strip() != "1"
+
+
+if _should_register_atexit_cleanup():
     atexit.register(cleanup_db_jupyter_with_new_app)
 
 
