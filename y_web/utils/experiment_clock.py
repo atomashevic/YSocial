@@ -109,7 +109,9 @@ def ensure_experiment_clock(config: Dict[str, Any]) -> Dict[str, Any]:
 
     normalized: Dict[str, Any] = {
         "mode": validate_clock_mode(raw_clock.get("mode", DEFAULT_CLOCK_MODE)),
-        "timezone": validate_timezone(raw_clock.get("timezone", DEFAULT_CLOCK_TIMEZONE)),
+        "timezone": validate_timezone(
+            raw_clock.get("timezone", DEFAULT_CLOCK_TIMEZONE)
+        ),
         "feed_refresh": validate_feed_refresh(
             raw_clock.get("feed_refresh", DEFAULT_CLOCK_FEED_REFRESH)
         ),
@@ -123,10 +125,16 @@ def ensure_experiment_clock(config: Dict[str, Any]) -> Dict[str, Any]:
     return normalized
 
 
-def apply_clock_to_client_simulation(simulation: Dict[str, Any], clock: Dict[str, Any]) -> None:
+def apply_clock_to_client_simulation(
+    simulation: Dict[str, Any], clock: Dict[str, Any]
+) -> None:
     """Write experiment clock settings into a client simulation config payload."""
-    simulation["clock_mode"] = validate_clock_mode(clock.get("mode", DEFAULT_CLOCK_MODE))
-    simulation["timezone"] = validate_timezone(clock.get("timezone", DEFAULT_CLOCK_TIMEZONE))
+    simulation["clock_mode"] = validate_clock_mode(
+        clock.get("mode", DEFAULT_CLOCK_MODE)
+    )
+    simulation["timezone"] = validate_timezone(
+        clock.get("timezone", DEFAULT_CLOCK_TIMEZONE)
+    )
     simulation["feed_refresh"] = validate_feed_refresh(
         clock.get("feed_refresh", DEFAULT_CLOCK_FEED_REFRESH)
     )

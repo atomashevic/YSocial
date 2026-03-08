@@ -112,12 +112,10 @@ def create_postgresql_db(app):
 
             # Insert initial admin user
             db_conn.execute(
-                text(
-                    """
+                text("""
                      INSERT INTO admin_users (username, email, password, last_seen, role)
                      VALUES (:username, :email, :password, :last_seen, :role)
-                     """
-                ),
+                     """),
                 {
                     "username": "Admin",
                     "email": "admin@y-not.social",
@@ -156,16 +154,14 @@ def create_postgresql_db(app):
             hashed_pw = generate_password_hash("admin", method="pbkdf2:sha256")
 
             # Insert initial admin user
-            stmt = text(
-                """
+            stmt = text("""
                         INSERT INTO user_mgmt (username, email, password, user_type, leaning, age,
                                                language, owner, joined_on, frecsys_type,
                                                round_actions, toxicity, is_page, daily_activity_level)
                         VALUES (:username, :email, :password, :user_type, :leaning, :age,
                                 :language, :owner, :joined_on, :frecsys_type,
                                 :round_actions, :toxicity, :is_page, :daily_activity_level)
-                        """
-            )
+                        """)
 
             dummy_conn.execute(
                 stmt,
@@ -410,12 +406,9 @@ def create_app(db_type="sqlite", desktop_mode=False):
         if db_type != "sqlite":
             # Avoid surprising password resets on existing Postgres deployments.
             # If you really want the same behavior on Postgres, opt in explicitly.
-            if (
-                os.getenv("YSOCIAL_ENSURE_DEFAULT_ADMIN_PASSWORD_POSTGRES", "0")
-                .strip()
-                .lower()
-                not in {"1", "true", "on", "yes"}
-            ):
+            if os.getenv(
+                "YSOCIAL_ENSURE_DEFAULT_ADMIN_PASSWORD_POSTGRES", "0"
+            ).strip().lower() not in {"1", "true", "on", "yes"}:
                 return
         try:
             from werkzeug.security import check_password_hash, generate_password_hash

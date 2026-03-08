@@ -14,7 +14,6 @@ from werkzeug.utils import safe_join
 
 from y_web.utils.path_utils import get_writable_path
 
-
 uploads = Blueprint("uploads", __name__)
 
 

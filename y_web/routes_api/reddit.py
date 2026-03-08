@@ -8,22 +8,27 @@ from io import BytesIO
 from flask import Blueprint, jsonify, request
 from flask_login import current_user, login_required
 from PIL import Image
-from werkzeug.utils import safe_join
 from werkzeug.datastructures import FileStorage
+from werkzeug.utils import safe_join
 
 from y_web import db
 from y_web.data_access import get_elicited_emotions, get_topics
 from y_web.llm_annotations import Annotator
 from y_web.llm_annotations.url_summarizer import UrlSummarizer
-from y_web.models import Admin_users, Articles, Images, Post, Rounds, User_mgmt
 from y_web.models import (
+    Admin_users,
+    Articles,
+    Images,
     Mentions,
-    Post_Sentiment,
-    Post_Toxicity,
+    Post,
     Post_emotions,
     Post_hashtags,
+    Post_Sentiment,
     Post_topics,
+    Post_Toxicity,
     Reactions,
+    Rounds,
+    User_mgmt,
 )
 from y_web.reddit.actions import apply_vote, create_comment_reddit, create_post_reddit
 from y_web.reddit.service import (
@@ -302,7 +307,9 @@ def api_enrich_article(exp_id: int, article_id: int):
     if not article:
         return _json_error("Article not found.", 404)
 
-    if not force and not _article_summary_needs_enrichment(getattr(article, "summary", "")):
+    if not force and not _article_summary_needs_enrichment(
+        getattr(article, "summary", "")
+    ):
         return _json_success(
             {
                 "ok": True,
@@ -530,7 +537,9 @@ def _serialize_comment(comment: Post, skip_metadata: bool = False) -> dict:
     day = str(round_obj.day) if round_obj else "None"
     hour = f"{round_obj.hour:02d}" if round_obj else "00"
     comment_created_at = getattr(comment, "created_at", None)
-    display_time = _format_display_time_from_created_at(comment_created_at) or _format_display_time(day, hour)
+    display_time = _format_display_time_from_created_at(
+        comment_created_at
+    ) or _format_display_time(day, hour)
 
     # Get emotions and topics (skip for new comments to improve performance)
     if skip_metadata:
@@ -807,9 +816,9 @@ def api_delete_post(exp_id: int, post_id: int):
             synchronize_session=False
         )
         if ContentShown is not None:
-            ContentShown.query.filter(ContentShown.content_id.in_(target_post_ids)).delete(
-                synchronize_session=False
-            )
+            ContentShown.query.filter(
+                ContentShown.content_id.in_(target_post_ids)
+            ).delete(synchronize_session=False)
         Post.query.filter(Post.id.in_(target_post_ids)).delete(
             synchronize_session=False
         )
@@ -819,5 +828,9 @@ def api_delete_post(exp_id: int, post_id: int):
         return _json_error(f"Failed to delete post: {exc}", 500)
 
     return _json_success(
-        {"post_id": post_id, "deleted": True, "deleted_post_count": len(target_post_ids)}
+        {
+            "post_id": post_id,
+            "deleted": True,
+            "deleted_post_count": len(target_post_ids),
+        }
     )

@@ -129,13 +129,11 @@ def migrate_postgresql(host, port, database, user, password):
         cursor = conn.cursor()
 
         # Get existing columns in exps table
-        cursor.execute(
-            """
+        cursor.execute("""
             SELECT column_name 
             FROM information_schema.columns 
             WHERE table_name = 'exps'
-        """
-        )
+        """)
         exps_columns = [row[0] for row in cursor.fetchall()]
 
         # Add LLM default columns to exps table
@@ -163,13 +161,11 @@ def migrate_postgresql(host, port, database, user, password):
             print("○ All LLM columns already exist in exps table")
 
         # Get existing columns in client table
-        cursor.execute(
-            """
+        cursor.execute("""
             SELECT column_name 
             FROM information_schema.columns 
             WHERE table_name = 'client'
-        """
-        )
+        """)
         client_columns = [row[0] for row in cursor.fetchall()]
 
         # Add reply behavior columns to client table
@@ -259,4 +255,3 @@ def main():
 
 if __name__ == "__main__":
     sys.exit(main())
-
