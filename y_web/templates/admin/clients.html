@@ -113,6 +113,20 @@
                                         });
                                     </script>
                                     <div class="box-line">
+                                        <span class="left">Initial Number of Agents</span>
+                                        <span class="right" style="width: 70%;">
+                                            <input type="number"
+                                                   name="initial_agents"
+                                                   class="input"
+                                                   min="1"
+                                                   step="1"
+                                                   placeholder="Leave empty for all agents">
+                                            <small style="color: #666; display: block; margin-top: 4px;">
+                                                Subset of population to activate initially. Leave empty to use all agents.
+                                            </small>
+                                        </span>
+                                    </div>
+                                    <div class="box-line">
                                         <span class="left">% New Agents (daily)</span>
                                         <span class="right" style="width: 70%;"><input type="number"
                                                                                        name="percentage_new_agents_iteration"
@@ -198,6 +212,45 @@
                                                                                        required></span>
                                     </div>
                                     </div><!-- End section-simulation-params -->
+
+                                    <div id="section-reply-controls" class="tutorial-section">
+                                    <div class="form-section-header">Reply Behavior Controls</div>
+                                    <div class="form-section-description">
+                                        Configure how agents respond to mentions and comments.
+                                        These settings help prevent excessive reply loops in conversations.
+                                    </div>
+                                    <div class="box-line">
+                                        <span class="left">Reply Probability</span>
+                                        <span class="right" style="width: 70%;">
+                                            <input type="number" name="reply_probability" class="input"
+                                                   min="0" max="1" step="0.01" value="0.4" required>
+                                            <small style="color: #666; display: block; margin-top: 4px;">
+                                                Probability (0-1) that an agent will reply when mentioned
+                                            </small>
+                                        </span>
+                                    </div>
+                                    <div class="box-line">
+                                        <span class="left">Max Replies per Round</span>
+                                        <span class="right" style="width: 70%;">
+                                            <input type="number" name="max_replies_per_round" class="input"
+                                                   min="0" max="10" step="1" value="2" required>
+                                            <small style="color: #666; display: block; margin-top: 4px;">
+                                                Maximum number of replies an agent can make per simulation round
+                                            </small>
+                                        </span>
+                                    </div>
+                                    <div class="box-line">
+                                        <span class="left">Reply Cooldown (rounds)</span>
+                                        <span class="right" style="width: 70%;">
+                                            <input type="number" name="reply_cooldown_rounds" class="input"
+                                                   min="0" max="10" step="1" value="2" required>
+                                            <small style="color: #666; display: block; margin-top: 4px;">
+                                                Rounds to wait before replying to the same user again
+                                            </small>
+                                        </span>
+                                    </div>
+                                    </div><!-- End section-reply-controls -->
+
                                     <div id="section-actions-relevance" class="tutorial-section">
                                     <div class="form-section-header">Agents' Actions Relevance</div>
                                     <div class="form-section-description">
@@ -445,7 +498,7 @@
                                         <span class="left">LLM Server URL</span>
                                         <span class="right" style="width: 70%;">
                                             <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 5px;">
-                                                <input type="text" id="custom_llm_url_client" name="llm" class="input" placeholder="e.g., localhost:8000" value="http://127.0.0.1:11434/v1" style="flex: 1;">
+                                                <input type="text" id="custom_llm_url_client" name="llm" class="input" placeholder="e.g., localhost:8000" value="{{ exp_llm_defaults.llm }}" style="flex: 1;">
                                                 <button type="button" class="button is-solid primary-button" onclick="fetchModelsForClient()">
                                                     Fetch Models
                                                 </button>
@@ -469,21 +522,21 @@
                                         <span class="right" style="width: 70%;"><input type="text"
                                                                                        name="llm_api_key"
                                                                                        class="input"
-                                                                                       value="NULL"></span>
+                                                                                       value="{{ exp_llm_defaults.llm_api_key }}"></span>
                                     </div>
                                     <div class="box-line">
                                         <span class="left">Max tokens</span>
                                         <span class="right" style="width: 70%;"><input type="number"
                                                                                        name="llm_max_tokens"
                                                                                        class="input"
-                                                                                       value="-1"></span>
+                                                                                       value="{{ exp_llm_defaults.llm_max_tokens }}"></span>
                                     </div>
                                     <div class="box-line">
                                         <span class="left">Temperature</span>
                                         <span class="right" style="width: 70%;"><input type="number"
                                                                                        name="llm_temperature"
                                                                                        class="input"
-                                                                                       value="1.5"></span>
+                                                                                       value="{{ exp_llm_defaults.llm_temperature }}"></span>
                                     </div>
                                     <div class="form-section-header">Large Language Models (Image Transcription)</div>
                                     <div class="form-section-description">
@@ -501,7 +554,7 @@
                                         <span class="left">LLM Server URL</span>
                                         <span class="right" style="width: 70%;">
                                             <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 5px;">
-                                                <input type="text" id="custom_llm_url_v_client" name="llm_v" class="input" placeholder="e.g., localhost:8000" value="http://127.0.0.1:11434/v1" style="flex: 1;">
+                                                <input type="text" id="custom_llm_url_v_client" name="llm_v" class="input" placeholder="e.g., localhost:8000" value="{{ exp_llm_defaults.llm_v }}" style="flex: 1;">
                                                 <button type="button" class="button is-solid primary-button" onclick="validateImageLLMModel()">
                                                     Validate Model
                                                 </button>
@@ -514,21 +567,21 @@
                                         <span class="right" style="width: 70%;"><input type="text"
                                                                                        name="llm_v_api_key"
                                                                                        class="input"
-                                                                                       value="NULL"></span>
+                                                                                       value="{{ exp_llm_defaults.llm_v_api_key }}"></span>
                                     </div>
                                     <div class="box-line">
                                         <span class="left">Max tokens</span>
                                         <span class="right" style="width: 70%;"><input type="number"
                                                                                        name="llm_v_max_tokens"
                                                                                        class="input"
-                                                                                       value="300"></span>
+                                                                                       value="{{ exp_llm_defaults.llm_v_max_tokens }}"></span>
                                     </div>
                                     <div class="box-line">
                                         <span class="left">Temperature</span>
                                         <span class="right" style="width: 70%;"><input type="number"
                                                                                        name="llm_v_temperature"
                                                                                        class="input"
-                                                                                       value="0.5"></span>
+                                                                                       value="{{ exp_llm_defaults.llm_v_temperature }}"></span>
                                     </div>
                                     <input type="hidden" id="llm_v_validation_status" value="false">
                                     <div id="image_action_warning" style="padding: 10px; margin: 10px 0; background-color: #fff3cd; border: 1px solid #ffc107; border-radius: 4px; color: #856404;">

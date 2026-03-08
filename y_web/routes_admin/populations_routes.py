@@ -53,6 +53,12 @@ from y_web.utils.miscellanea import check_privileges, llm_backend_status, ollama
 population = Blueprint("population", __name__)
 
 
+def _normalize_username_type(raw_value, default="microblogging"):
+    """Normalize population username_type to supported values."""
+    value = str(raw_value or default).strip().lower()
+    return value if value in {"microblogging", "forum"} else default
+
+
 @population.route("/admin/create_population_empty", methods=["POST", "GET"])
 @login_required
 def create_population_empty():
@@ -70,9 +76,12 @@ def create_population_empty():
 
     name = request.form.get("empty_population_name")
     descr = request.form.get("empty_population_descr")
+    username_type = _normalize_username_type(
+        request.form.get("username_type", "microblogging")
+    )
 
     # add the experiment to the database
-    pop = Population(name=name, descr=descr)
+    pop = Population(name=name, descr=descr, username_type=username_type)
 
     db.session.add(pop)
     db.session.commit()
@@ -105,6 +114,9 @@ def create_population():
     descr = request.form.get("pop_descr")
     n_agents = request.form.get("n_agents")
     user_type = request.form.get("user_type")
+    username_type = _normalize_username_type(
+        request.form.get("username_type", "microblogging")
+    )
 
     llm = request.form.get("host_llm")
 
@@ -189,6 +201,7 @@ def create_population():
     population = Population(
         name=name,
         descr=descr,
+        username_type=username_type,
         size=n_agents,
         llm=user_type,
         age_min=None,
@@ -301,6 +314,9 @@ def populations_data():
                 "id": pop.id,
                 "name": pop.name,
                 "size": pop.size,
+                "username_type": _normalize_username_type(
+                    getattr(pop, "username_type", "microblogging")
+                ),
                 "education": [
                     education_dict.get(e_id.strip(), e_id.strip())
                     for e_id in (pop.education or "").split(",")
@@ -591,6 +607,9 @@ def population_details(uid):
             "id": population.id,
             "name": population.name,
             "descr": population.descr,
+            "username_type": _normalize_username_type(
+                getattr(population, "username_type", "microblogging")
+            ),
             "size": len(agents),
             "llm": max(llm, key=llm.get),
             "age_min": age_min_val,
@@ -643,6 +662,27 @@ def population_details(uid):
         crecsys=crecsys,
         frecsys=frecsys,
     )
+
+
+@population.route("/admin/update_population_username_type/<int:uid>", methods=["POST"])
+@login_required
+def update_population_username_type(uid):
+    """Update population username type from population details page."""
+    check_privileges(current_user.username)
+
+    population_obj = Population.query.filter_by(id=uid).first()
+    if not population_obj:
+        flash("Population not found.", "error")
+        return redirect(request.referrer or "/admin/populations")
+
+    population_obj.username_type = _normalize_username_type(
+        request.form.get("username_type"),
+        default=getattr(population_obj, "username_type", "microblogging"),
+    )
+    db.session.commit()
+
+    flash("Population username type updated.", "success")
+    return redirect(request.referrer or f"/admin/population_details/{uid}")
 
 
 @population.route("/admin/add_to_experiment", methods=["POST"])
@@ -737,6 +777,9 @@ def download_population(uid):
         "population_data": {
             "name": population.name,
             "descr": population.descr,
+            "username_type": _normalize_username_type(
+                getattr(population, "username_type", "microblogging")
+            ),
         },
         "agents": [],
         "pages": [],
@@ -855,8 +898,14 @@ def upload_population():
         population_name = f"{base_name}_{suffix}"
 
     # add the population to the database
+    username_type = _normalize_username_type(
+        data.get("population_data", {}).get("username_type", "microblogging")
+    )
+
     population = Population(
-        name=population_name, descr=data["population_data"]["descr"]
+        name=population_name,
+        descr=data["population_data"]["descr"],
+        username_type=username_type,
     )
     db.session.add(population)
     db.session.commit()
@@ -1120,9 +1169,24 @@ def merge_populations():
 
     # Create the new merged population with detailed description and all aggregated properties
     source_names = ", ".join([pop.name for pop in source_populations])
+    source_username_types = {
+        _normalize_username_type(getattr(pop, "username_type", "microblogging"))
+        for pop in source_populations
+    }
+    if len(source_username_types) > 1:
+        flash(
+            "Cannot merge populations with different Username Type values (forum vs microblogging).",
+            "error",
+        )
+        return redirect(request.referrer)
+
+    merged_username_type = (
+        next(iter(source_username_types)) if source_username_types else "microblogging"
+    )
     merged_population = Population(
         name=merged_name,
         descr=f"Merged from: {source_names}",
+        username_type=merged_username_type,
         size=len(unique_agent_ids),
         llm=llm,
         age_min=age_min,

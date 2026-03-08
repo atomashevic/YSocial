@@ -57,6 +57,25 @@
                                 </div>
 
                                 <hr>
+                                <b>Image Extraction Settings</b>
+                                <p style="font-size: 0.85em; color: #777; margin-bottom: 0.5em;">Configuration for extracting images from article URLs.</p>
+
+                                <div class="box-line">
+                                    <span class="left">Fetch Images from URLs</span>
+                                    <span class="right">
+                                        {% if page.fetch_images_from_url %}
+                                        <span style="color: #22c55e;">Enabled</span>
+                                        {% else %}
+                                        <span style="color: #9ca3af;">Disabled</span>
+                                        {% endif %}
+                                    </span>
+                                </div>
+                                <div class="box-line">
+                                    <span class="left">Image Fetch Timeout</span>
+                                    <span class="right">{{ page.fetch_images_timeout or 10 }} seconds</span>
+                                </div>
+
+                                <hr>
                                 <b>Content & Deployment</b>
                                 <p style="font-size: 0.85em; color: #777; margin-bottom: 0.5em;">Topics covered and population assignments.</p>
 
@@ -164,6 +183,48 @@
                                 <div class="button-wrap">
                                     <button class="button is-solid primary-button is-fullwidth">
                                         Update
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+
+                    <div class="dashboard-box">
+                        <h3 class="title is-5 is-thin">Image Extraction Settings</h3>
+                        <p style="font-size: 0.9em; color: #666; margin-bottom: 1em;">
+                            Configure how images are extracted from RSS feed articles.
+                        </p>
+                        <div class="box-content">
+                            <form action="/admin/update_page_image_settings/{{ page.id }}" enctype="multipart/form-data" method="POST">
+                                <div class="box-lines">
+                                    <div class="box-line">
+                                        <span class="left">
+                                            <small style="color: #666;">ℹ️ When enabled, images will be extracted from article URLs if the RSS feed doesn't provide them.</small>
+                                        </span>
+                                    </div>
+                                    <div class="box-line">
+                                        <span class="left">Fetch Images from URLs</span>
+                                        <span class="right" style="width: 70%;">
+                                            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                                                <input type="checkbox" name="fetch_images_from_url" value="1"
+                                                       {% if page.fetch_images_from_url %}checked{% endif %}
+                                                       style="cursor: pointer;">
+                                                <span style="font-size: 0.9em; color: #666;">Extract og:image from article pages</span>
+                                            </label>
+                                        </span>
+                                    </div>
+                                    <div class="box-line">
+                                        <span class="left">Timeout (seconds)</span>
+                                        <span class="right" style="width: 70%;">
+                                            <input type="number" name="fetch_images_timeout" class="input"
+                                                   value="{{ page.fetch_images_timeout or 10 }}"
+                                                   min="1" max="60" step="1">
+                                        </span>
+                                    </div>
+                                </div>
+                                <div class="button-wrap">
+                                    <button class="button is-solid primary-button is-fullwidth">
+                                        Save Settings
                                     </button>
                                 </div>
                             </form>

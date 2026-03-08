@@ -73,7 +73,9 @@ class Post(db.Model):
     thread_id = db.Column(db.Integer)
     news_id = db.Column(db.String(50), db.ForeignKey("articles.id"), default=None)
     image_id = db.Column(db.Integer(), db.ForeignKey("images.id"), default=None)
-    image_post_id = db.Column(db.Integer(), db.ForeignKey("image_posts.id"), default=None)
+    image_post_id = db.Column(
+        db.Integer(), db.ForeignKey("image_posts.id"), default=None
+    )
     dedupe_key = db.Column(db.String(64), nullable=True, default=None)
     client_action_id = db.Column(db.String(96), nullable=True, default=None)
     created_at = db.Column(db.DateTime, nullable=False, default=db.func.now())

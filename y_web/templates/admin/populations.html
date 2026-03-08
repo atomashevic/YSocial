@@ -356,6 +356,27 @@
                                             <input id="n_agents" name="n_agents" type="number" value="100" min="1" class="input" required>
                                         </div>
                                     </div>
+                                    <div class="box-line">
+                                        <span class="left">LLM Model <span style="color: red;">*</span></span>
+                                        <div class="select">
+                                            <select name="user_type" id="user_type" required>
+                                                <option value="">Select LLM model...</option>
+                                                {% for model in models %}
+                                                <option value="{{ model }}">{{ model }}</option>
+                                                {% endfor %}
+                                            </select>
+                                        </div>
+                                    </div>
+
+                                    <div class="box-line">
+                                        <span class="left">Username Type <span style="color: red;">*</span></span>
+                                        <div class="select">
+                                            <select name="username_type" id="username_type" required>
+                                                <option value="microblogging" selected>Microblogging (X/BlueSky-like)</option>
+                                                <option value="forum">Forum (Reddit-like)</option>
+                                            </select>
+                                        </div>
+                                    </div>
                                     </div><!-- End section-basic-info -->
 
                                     <div id="section-demographics" class="tutorial-section">
@@ -1674,6 +1695,15 @@
                                 <div class="box-line">
                                     <span class="left">Description</span>
                                     <span class="right"><input type="text" name="empty_population_descr" class="input" placeholder="Enter description"></span>
+                                </div>
+                                <div class="box-line">
+                                    <span class="left">Username Type</span>
+                                    <div class="select" style="width: 100%;">
+                                        <select name="username_type" required>
+                                            <option value="microblogging" selected>Microblogging</option>
+                                            <option value="forum">Forum (Reddit-like)</option>
+                                        </select>
+                                    </div>
                                 </div>
                                 <div class="button-wrap">
                                     <button class="button is-solid primary-button is-fullwidth">
