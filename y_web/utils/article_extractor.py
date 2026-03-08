@@ -7,7 +7,7 @@ Open Graph, Twitter Cards, and standard meta tags with intelligent fallbacks.
 """
 
 import re
-from urllib.parse import urlparse
+from urllib.parse import urljoin, urlparse
 
 import requests
 from bs4 import BeautifulSoup
@@ -49,7 +49,15 @@ def extract_article_info(url):
         # Extract source domain
         source = extract_source(url)
 
-        return {"title": title, "summary": summary, "source": source, "url": url}
+        image = extract_image(soup, url)
+
+        return {
+            "title": title,
+            "summary": summary,
+            "source": source,
+            "url": url,
+            "image": image,
+        }
 
     except Exception as e:
         print(f"Error extracting article info from {url}: {e}")
@@ -59,6 +67,7 @@ def extract_article_info(url):
             "summary": "User shared article",
             "source": urlparse(url).netloc,
             "url": url,
+            "image": None,
         }
 
 
@@ -160,6 +169,46 @@ def extract_description(soup):
             return content
 
     return "User shared article"
+
+
+def extract_image(soup, url):
+    """
+    Extract preview image URL from HTML metadata.
+
+    Prefers Open Graph and Twitter card images with fallback to the first img.
+    """
+
+    def normalize_image(img_url):
+        if not img_url:
+            return ""
+        if img_url.startswith("data:"):
+            return ""
+        if img_url.startswith("//"):
+            parsed = urlparse(url)
+            return f"{parsed.scheme}:{img_url}"
+        if img_url.startswith("/"):
+            return urljoin(url, img_url)
+        return img_url
+
+    og_image = soup.find("meta", property="og:image")
+    if og_image and og_image.get("content"):
+        img = normalize_image(og_image["content"].strip())
+        if img:
+            return img
+
+    twitter_image = soup.find("meta", attrs={"name": "twitter:image"})
+    if twitter_image and twitter_image.get("content"):
+        img = normalize_image(twitter_image["content"].strip())
+        if img:
+            return img
+
+    img_tag = soup.find("img", src=True)
+    if img_tag and img_tag.get("src"):
+        img = normalize_image(img_tag.get("src").strip())
+        if img:
+            return img
+
+    return None
 
 
 def extract_source(url):

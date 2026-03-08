@@ -5554,3 +5554,420 @@ def delete_opinion_distribution(dist_id):
     db.session.delete(dist)
     db.session.commit()
     return jsonify({"success": True})
+
+
+# ============================================================================
+# Image feeds and feed retrieval limits
+# ============================================================================
+
+DEFAULT_FEED_LIMITS = {
+    "rss_entries_per_feed": 100,
+    "reddit_entries_per_feed": 200,
+    "reddit_pages": 2,
+    "reddit_rate_limit_seconds": 2,
+    "db_fallback_limit": 50,
+    "image_entries_per_feed": 100,
+}
+
+
+@experiments.route("/admin/image_feeds/<int:uid>")
+@login_required
+def image_feeds(uid):
+    """Display and edit image feeds for an experiment."""
+    check_privileges(current_user.username)
+
+    from y_web.utils.path_utils import get_writable_path
+
+    base_dir = get_writable_path()
+    experiment = Exps.query.filter_by(idexp=uid).first()
+    if not experiment:
+        flash("Experiment not found", "error")
+        return redirect(url_for("experiments.settings"))
+
+    exp_folder = get_experiment_uid_from_db_name(experiment.db_name)
+    if not exp_folder:
+        flash("Invalid experiment database configuration", "error")
+        return redirect(url_for("experiments.settings"))
+
+    image_feeds_path = os.path.join(
+        base_dir,
+        f"y_web{os.sep}experiments{os.sep}{exp_folder}{os.sep}image_feeds.json",
+    )
+
+    image_feeds_data = []
+    if os.path.exists(image_feeds_path):
+        try:
+            with open(image_feeds_path, "r") as f:
+                image_feeds_data = json.load(f)
+        except (json.JSONDecodeError, IOError):
+            image_feeds_data = []
+
+    available_interests = [
+        "humor",
+        "entertainment",
+        "fun",
+        "memes",
+        "photography",
+        "travel",
+        "nature",
+        "general",
+        "animals",
+        "pets",
+        "wholesome",
+        "cute",
+        "technology",
+        "gaming",
+        "science",
+        "geek",
+        "art",
+        "design",
+        "creative",
+        "music",
+        "sports",
+        "fitness",
+        "food",
+        "cooking",
+        "movies",
+        "tv",
+        "celebrities",
+        "news",
+        "politics",
+        "history",
+        "education",
+        "books",
+    ]
+
+    return render_template(
+        "admin/image_feeds.html",
+        experiment=experiment,
+        image_feeds=image_feeds_data,
+        available_interests=sorted(available_interests),
+    )
+
+
+@experiments.route("/admin/update_image_feeds/<int:uid>", methods=["POST"])
+@login_required
+def update_image_feeds(uid):
+    """Update image feeds for an experiment."""
+    check_privileges(current_user.username)
+
+    from y_web.utils.path_utils import get_writable_path
+
+    base_dir = get_writable_path()
+    experiment = Exps.query.filter_by(idexp=uid).first()
+    if not experiment:
+        flash("Experiment not found", "error")
+        return redirect(url_for("experiments.settings"))
+
+    exp_folder = get_experiment_uid_from_db_name(experiment.db_name)
+    if not exp_folder:
+        flash("Invalid experiment database configuration", "error")
+        return redirect(url_for("experiments.settings"))
+
+    image_feeds_path = os.path.join(
+        base_dir,
+        f"y_web{os.sep}experiments{os.sep}{exp_folder}{os.sep}image_feeds.json",
+    )
+
+    feeds_json = request.form.get("image_feeds_json", "[]")
+    try:
+        feeds = json.loads(feeds_json)
+    except json.JSONDecodeError:
+        flash("Invalid image feeds payload; changes were not saved.", "error")
+        return redirect(request.referrer or url_for("experiments.image_feeds", uid=uid))
+
+    with open(image_feeds_path, "w") as f:
+        json.dump(feeds, f, indent=2)
+
+    return redirect(request.referrer or url_for("experiments.image_feeds", uid=uid))
+
+
+@experiments.route("/admin/upload_image_feeds/<int:uid>", methods=["POST"])
+@login_required
+def upload_image_feeds(uid):
+    """Upload bulk image feeds from a JSON file."""
+    check_privileges(current_user.username)
+
+    from y_web.utils.path_utils import get_writable_path
+
+    base_dir = get_writable_path()
+    experiment = Exps.query.filter_by(idexp=uid).first()
+    if not experiment:
+        return jsonify({"error": "Experiment not found"}), 404
+
+    exp_folder = get_experiment_uid_from_db_name(experiment.db_name)
+    if not exp_folder:
+        return jsonify({"error": "Invalid experiment database configuration"}), 400
+
+    image_feeds_path = os.path.join(
+        base_dir,
+        f"y_web{os.sep}experiments{os.sep}{exp_folder}{os.sep}image_feeds.json",
+    )
+
+    if "file" not in request.files:
+        return jsonify({"error": "No file provided"}), 400
+
+    file = request.files["file"]
+    if file.filename == "":
+        return jsonify({"error": "No file selected"}), 400
+
+    try:
+        content = file.read().decode("utf-8")
+        new_feeds = json.loads(content)
+        if not isinstance(new_feeds, list):
+            return jsonify({"error": "JSON must be an array of image feeds"}), 400
+
+        normalized_feeds = []
+        seen_subreddits = set()
+        for item in new_feeds:
+            if not isinstance(item, dict):
+                continue
+            subreddit = str(item.get("subreddit", "")).strip().lower()
+            subreddit = subreddit[2:] if subreddit.startswith("r/") else subreddit
+            interests = item.get("interests") or []
+            if not subreddit:
+                continue
+            if not isinstance(interests, list):
+                label = str(interests).strip()
+                interests = [label] if label else []
+
+            clean_interests = []
+            seen_interests = set()
+            for interest in interests:
+                label = str(interest).strip()
+                if not label or label in seen_interests:
+                    continue
+                seen_interests.add(label)
+                clean_interests.append(label)
+
+            if subreddit in seen_subreddits:
+                continue
+            seen_subreddits.add(subreddit)
+            normalized_feeds.append(
+                {"subreddit": subreddit, "interests": clean_interests}
+            )
+
+        mode = request.form.get("mode", "replace")
+        if mode == "merge":
+            existing_feeds = []
+            if os.path.exists(image_feeds_path):
+                with open(image_feeds_path, "r") as f:
+                    existing_feeds = json.load(f)
+
+            merged = []
+            by_subreddit = {}
+            for feed in existing_feeds:
+                if not isinstance(feed, dict):
+                    continue
+                subreddit = str(feed.get("subreddit", "")).strip().lower()
+                if not subreddit:
+                    continue
+                merged_feed = {
+                    "subreddit": subreddit,
+                    "interests": list(feed.get("interests") or []),
+                }
+                merged.append(merged_feed)
+                by_subreddit[subreddit] = merged_feed
+
+            for feed in normalized_feeds:
+                subreddit = feed["subreddit"]
+                if subreddit in by_subreddit:
+                    existing = by_subreddit[subreddit]
+                    combined = []
+                    seen = set()
+                    for label in list(existing.get("interests") or []) + list(
+                        feed.get("interests") or []
+                    ):
+                        label = str(label).strip()
+                        if not label or label in seen:
+                            continue
+                        seen.add(label)
+                        combined.append(label)
+                    existing["interests"] = combined
+                else:
+                    merged.append(feed)
+                    by_subreddit[subreddit] = feed
+            normalized_feeds = merged
+
+        with open(image_feeds_path, "w") as f:
+            json.dump(normalized_feeds, f, indent=2)
+
+        return jsonify({"success": True, "count": len(normalized_feeds)})
+    except json.JSONDecodeError:
+        return jsonify({"error": "Invalid JSON format"}), 400
+    except Exception as exc:
+        return jsonify({"error": str(exc)}), 400
+
+
+@experiments.route("/admin/feed_limits/<uid>", methods=["GET"])
+@login_required
+def feed_limits(uid):
+    """Display and edit feed retrieval limits for an experiment."""
+    check_privileges(current_user.username)
+
+    from y_web.utils.path_utils import get_writable_path
+
+    base_dir = get_writable_path()
+    experiment = Exps.query.filter_by(idexp=uid).first()
+    if not experiment:
+        flash("Experiment not found", "error")
+        return redirect(url_for("experiments.settings"))
+
+    exp_folder = get_experiment_uid_from_db_name(experiment.db_name)
+    if not exp_folder:
+        flash("Invalid experiment database configuration", "error")
+        return redirect(url_for("experiments.settings"))
+
+    config_path = os.path.join(
+        base_dir, f"y_web{os.sep}experiments{os.sep}{exp_folder}{os.sep}config.json"
+    )
+
+    feed_limits_data = dict(DEFAULT_FEED_LIMITS)
+    if os.path.exists(config_path):
+        try:
+            with open(config_path, "r") as f:
+                config = json.load(f)
+            if "feed_limits" in config:
+                feed_limits_data.update(config["feed_limits"])
+        except (json.JSONDecodeError, IOError):
+            pass
+
+    return render_template(
+        "admin/feed_limits.html",
+        experiment=experiment,
+        feed_limits=feed_limits_data,
+    )
+
+
+@experiments.route("/admin/update_feed_limits/<uid>", methods=["POST"])
+@login_required
+def update_feed_limits(uid):
+    """Update feed retrieval limits for an experiment."""
+    check_privileges(current_user.username)
+
+    from y_web.utils.path_utils import get_writable_path
+
+    base_dir = get_writable_path()
+    experiment = Exps.query.filter_by(idexp=uid).first()
+    if not experiment:
+        flash("Experiment not found", "error")
+        return redirect(url_for("experiments.settings"))
+
+    exp_folder = get_experiment_uid_from_db_name(experiment.db_name)
+    if not exp_folder:
+        flash("Invalid experiment database configuration", "error")
+        return redirect(url_for("experiments.settings"))
+
+    config_path = os.path.join(
+        base_dir, f"y_web{os.sep}experiments{os.sep}{exp_folder}{os.sep}config.json"
+    )
+
+    config = {}
+    if os.path.exists(config_path):
+        try:
+            with open(config_path, "r") as f:
+                config = json.load(f)
+        except (json.JSONDecodeError, IOError):
+            config = {}
+
+    feed_limits = {
+        "rss_entries_per_feed": int(request.form.get("rss_entries_per_feed", 100)),
+        "reddit_entries_per_feed": int(
+            request.form.get("reddit_entries_per_feed", 200)
+        ),
+        "reddit_pages": int(request.form.get("reddit_pages", 2)),
+        "reddit_rate_limit_seconds": float(
+            request.form.get("reddit_rate_limit_seconds", 2)
+        ),
+        "db_fallback_limit": int(request.form.get("db_fallback_limit", 50)),
+        "image_entries_per_feed": int(request.form.get("image_entries_per_feed", 100)),
+    }
+
+    config["feed_limits"] = feed_limits
+    with open(config_path, "w") as f:
+        json.dump(config, f, indent=2)
+
+    flash("Feed limits updated successfully.", "success")
+    return redirect(request.referrer or f"/admin/feed_limits/{uid}")
+
+
+@experiments.route("/admin/api/parse_image_feed", methods=["POST"])
+@login_required
+def parse_image_feed():
+    """Parse a Reddit subreddit RSS feed and return image info."""
+    import feedparser
+
+    subreddit = request.json.get("subreddit", "").strip().lower()
+    if not subreddit:
+        return jsonify({"error": "No subreddit provided"}), 400
+
+    subreddit = subreddit.lstrip("r/")
+    feed_url = f"https://www.reddit.com/r/{subreddit}.rss"
+
+    try:
+        feed = feedparser.parse(feed_url)
+        if feed.bozo and not feed.entries:
+            return jsonify(
+                {"error": f"Could not parse r/{subreddit} - subreddit may not exist"}
+            ), 400
+
+        if not feed.entries:
+            return jsonify({"error": f"No posts found in r/{subreddit}"}), 400
+
+        image_pattern = re.compile(r"\.(jpg|jpeg|png|gif|webp)(\?.*)?$", re.IGNORECASE)
+        image_hosts = ["i.redd.it", "i.imgur.com", "preview.redd.it"]
+
+        images = []
+        nsfw_count = 0
+
+        for entry in feed.entries[:50]:
+            is_nsfw = False
+            if hasattr(entry, "over_18") and entry.over_18:
+                is_nsfw = True
+            elif "[nsfw]" in entry.get("title", "").lower():
+                is_nsfw = True
+            elif hasattr(entry, "tags"):
+                for tag in entry.tags:
+                    if tag.get("term", "").lower() == "nsfw":
+                        is_nsfw = True
+                        break
+
+            if is_nsfw:
+                nsfw_count += 1
+                continue
+
+            image_url = None
+            link = entry.get("link", "")
+            if image_pattern.search(link) or any(host in link for host in image_hosts):
+                image_url = link
+
+            if not image_url and hasattr(entry, "media_content"):
+                for media in entry.media_content:
+                    url = media.get("url", "")
+                    if image_pattern.search(url) or any(
+                        host in url for host in image_hosts
+                    ):
+                        image_url = url
+                        break
+
+            if not image_url and hasattr(entry, "media_thumbnail"):
+                for thumb in entry.media_thumbnail:
+                    url = thumb.get("url", "")
+                    if url:
+                        image_url = url
+                        break
+
+            if image_url:
+                images.append(image_url)
+
+        return jsonify(
+            {
+                "subreddit": subreddit,
+                "feed_url": feed_url,
+                "image_count": len(images),
+                "nsfw_filtered": nsfw_count,
+                "sample_images": images[:5],
+            }
+        )
+    except Exception as exc:
+        return jsonify({"error": str(exc)}), 400
