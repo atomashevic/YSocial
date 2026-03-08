@@ -11,7 +11,7 @@ CREATE TABLE admin_users (
     username              TEXT,
     email                 TEXT,
     password              TEXT,
-    last_seen             TEXT,
+    last_seen             TEXT NOT NULL DEFAULT '',
     role                  TEXT,
     llm                   TEXT DEFAULT '',
     profile_pic           TEXT DEFAULT '',
@@ -40,7 +40,15 @@ CREATE TABLE exps (
     annotations        TEXT DEFAULT '' NOT NULL,
     server_pid         INTEGER DEFAULT NULL,
     llm_agents_enabled INTEGER DEFAULT 1 NOT NULL,
-    exp_status         VARCHAR(20) DEFAULT 'stopped' NOT NULL
+    exp_status         VARCHAR(20) DEFAULT 'stopped' NOT NULL,
+    llm_default        VARCHAR(100) DEFAULT 'http://127.0.0.1:11434/v1',
+    llm_api_key_default VARCHAR(300) DEFAULT 'NULL',
+    llm_max_tokens_default INTEGER DEFAULT -1,
+    llm_temperature_default REAL DEFAULT 1.5,
+    llm_v_default      VARCHAR(100) DEFAULT 'http://127.0.0.1:11434/v1',
+    llm_v_api_key_default VARCHAR(300) DEFAULT 'NULL',
+    llm_v_max_tokens_default INTEGER DEFAULT 300,
+    llm_v_temperature_default REAL DEFAULT 0.5
 );
 
 CREATE TABLE exp_stats (
@@ -101,6 +109,7 @@ CREATE TABLE population (
     id            SERIAL PRIMARY KEY,
     name          TEXT NOT NULL,
     descr         TEXT NOT NULL,
+    username_type VARCHAR(20) DEFAULT 'microblogging' NOT NULL,
     size          INTEGER DEFAULT 0,
     llm           TEXT,
     age_min       INTEGER,
@@ -170,7 +179,9 @@ CREATE TABLE pages (
     logo             TEXT,
     pg_type          TEXT,
     leaning          TEXT DEFAULT '',
-    activity_profile INTEGER NOT NULL REFERENCES activity_profiles(id) ON DELETE CASCADE
+    activity_profile INTEGER NOT NULL REFERENCES activity_profiles(id) ON DELETE CASCADE,
+    fetch_images_from_url BOOLEAN DEFAULT FALSE,
+    fetch_images_timeout INTEGER DEFAULT 10
 );
 
 CREATE TABLE page_population (
@@ -220,6 +231,10 @@ CREATE TABLE client (
     crecsys                             TEXT,
     frecsys                             TEXT,
     pid                                 INTEGER DEFAULT NULL,
+    reply_probability                   REAL DEFAULT 0.4,
+    max_replies_per_round               INTEGER DEFAULT 2,
+    reply_cooldown_rounds               INTEGER DEFAULT 2,
+    initial_agents                      INTEGER DEFAULT 0,
     archetype_validator                 REAL DEFAULT 0.52,
     archetype_broadcaster               REAL DEFAULT 0.20,
     archetype_explorer                  REAL DEFAULT 0.28,
@@ -240,7 +255,8 @@ CREATE TABLE client_execution (
     client_id                INTEGER NOT NULL REFERENCES client(id) ON DELETE CASCADE,
     expected_duration_rounds INTEGER DEFAULT 0 NOT NULL,
     last_active_hour         INTEGER DEFAULT -1 NOT NULL,
-    last_active_day          INTEGER DEFAULT -1 NOT NULL
+    last_active_day          INTEGER DEFAULT -1 NOT NULL,
+    execution_stage          VARCHAR(20) DEFAULT 'initializing' NOT NULL
 );
 
 -- -----------------------------
@@ -399,7 +415,10 @@ INSERT INTO content_recsys (name, value) VALUES
   ('CommonInterests', '(CI) Common Interests'),
   ('CommonUserInterests', '(CUI) Common User Interests'),
   ('SimilarUsersReactions', '(SIR) Similar Users Reactions'),
-  ('SimilarUsersPosts', '(SIP) Similar Users Posts');
+  ('SimilarUsersPosts', '(SIP) Similar Users Posts'),
+  ('HotRanking', '(Reddit) Hot'),
+  ('TopRanking', '(Reddit) Top'),
+  ('MostCommented', '(Reddit) Most Commented');
 
 INSERT INTO follow_recsys (name, value) VALUES
 ('FollowRecSys', 'Random'),
@@ -738,7 +757,12 @@ CREATE TABLE log_sync_settings (
 CREATE TABLE watchdog_settings (
     id                   SERIAL PRIMARY KEY,
     enabled              BOOLEAN NOT NULL DEFAULT TRUE,
-    run_interval_minutes INTEGER NOT NULL DEFAULT 15,
+    run_interval_minutes INTEGER NOT NULL DEFAULT 1,
+    server_heartbeat_timeout_sec INTEGER NOT NULL DEFAULT 300,
+    client_heartbeat_timeout_sec INTEGER NOT NULL DEFAULT 300,
+    heartbeat_interval_sec INTEGER NOT NULL DEFAULT 60,
+    max_restart_attempts INTEGER NOT NULL DEFAULT 3,
+    restart_cooldown_sec INTEGER NOT NULL DEFAULT 60,
     last_run             TIMESTAMP DEFAULT NULL
 );
 

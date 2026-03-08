@@ -107,7 +107,9 @@ CREATE TABLE websites (
     category     TEXT,
     last_fetched INTEGER,
     country      TEXT,
-    language     TEXT
+    language     TEXT,
+    fetch_images_from_url BOOLEAN DEFAULT FALSE,
+    fetch_images_timeout INTEGER DEFAULT 10
 );
 
 CREATE TABLE articles (
@@ -130,7 +132,21 @@ CREATE TABLE images (
     id          SERIAL PRIMARY KEY,
     url         TEXT,
     description TEXT,
-    article_id  INTEGER REFERENCES articles(id) ON DELETE CASCADE
+    article_id  INTEGER REFERENCES articles(id) ON DELETE CASCADE,
+    remote_article_id INTEGER
+);
+
+CREATE TABLE image_posts (
+    id           SERIAL PRIMARY KEY,
+    url          VARCHAR(500) NOT NULL,
+    source_url   VARCHAR(500),
+    title        VARCHAR(300),
+    subreddit    VARCHAR(100),
+    description  TEXT,
+    fetched_on   VARCHAR(20),
+    used         BOOLEAN DEFAULT FALSE,
+    local_path   VARCHAR(500),
+    high_res_url VARCHAR(500)
 );
 
 -- -----------------------------
@@ -147,6 +163,10 @@ CREATE TABLE post (
     news_id        INTEGER DEFAULT -1 REFERENCES articles(id) ON DELETE CASCADE,
     shared_from    INTEGER DEFAULT -1,
     image_id       INTEGER REFERENCES images(id) ON DELETE CASCADE,
+    image_post_id  INTEGER REFERENCES image_posts(id) ON DELETE CASCADE,
+    dedupe_key     VARCHAR(64),
+    client_action_id VARCHAR(96),
+    created_at     TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     reaction_count INTEGER DEFAULT 0
 );
 
@@ -156,6 +176,11 @@ CREATE TABLE mentions (
     post_id   INTEGER REFERENCES post(id) ON DELETE CASCADE,
     round     INTEGER,
     answered  INTEGER DEFAULT 0
+);
+
+CREATE TABLE reply_inbox_state (
+    user_id INTEGER PRIMARY KEY REFERENCES user_mgmt(id) ON DELETE CASCADE,
+    last_seen_reply_id INTEGER NOT NULL DEFAULT 0
 );
 
 CREATE TABLE post_emotions (
@@ -297,6 +322,12 @@ CREATE INDEX idx_post_toxicity_post_id ON post_toxicity(post_id);
 CREATE INDEX idx_reactions_post_id ON reactions(post_id);
 CREATE INDEX idx_reactions_user_id ON reactions(user_id);
 CREATE INDEX idx_reactions_round ON reactions(round);
+CREATE UNIQUE INDEX idx_post_comment_action_id_uniq
+  ON post (user_id, client_action_id)
+  WHERE client_action_id IS NOT NULL;
+CREATE UNIQUE INDEX idx_post_comment_dedupe_uniq
+  ON post (user_id, comment_to, round, dedupe_key)
+  WHERE comment_to <> -1 AND dedupe_key IS NOT NULL;
 
 -- Indexes for agent_opinion
 CREATE INDEX idx_agent_opinion_agent_id ON agent_opinion(agent_id);
