@@ -163,6 +163,14 @@ def internal_server_error(e):
         "method": request.method if request else None,
     }
 
+    # Ensure the session is usable before telemetry or template rendering
+    try:
+        from y_web import db
+
+        db.session.rollback()
+    except Exception:
+        pass
+
     from y_web.telemetry import Telemetry
 
     telemetry = Telemetry(user=current_user)

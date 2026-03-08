@@ -6,7 +6,7 @@ including posts, users, reactions, follows, and recommendations. Handles
 pagination, filtering, and data formatting for display in the web interface.
 """
 
-from sqlalchemy import desc
+from sqlalchemy import case, desc
 from sqlalchemy.sql.expression import func
 
 from y_web import db

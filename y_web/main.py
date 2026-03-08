@@ -5,14 +5,23 @@ Handles the primary user-facing routes including the home feed, user profiles,
 hashtag pages, post details, and search functionality for the social media platform.
 """
 
-from flask import Blueprint, flash, jsonify, redirect, render_template, request
+from urllib.parse import urlencode, urlparse
+
+from flask import Blueprint, abort, flash, jsonify, redirect, render_template, request
 from flask_login import current_user, login_required
 from werkzeug.security import generate_password_hash
 
 from y_web import db
 from y_web.recsys_support import get_suggested_posts, get_suggested_users
+from y_web.reddit.service import fetch_feed_page
+from y_web.utils.text_utils import (
+    normalize_punctuation_spacing,
+    process_reddit_post,
+    strip_reproduced_article_content,
+)
 
 from .data_access import *
+from .experiment_context import get_current_experiment_id
 from .models import Admin_users, Exps, Images, Page
 
 main = Blueprint("main", __name__)
@@ -76,6 +85,37 @@ def is_admin(username):
     return True
 
 
+def _resolve_feed_user_id(default_user_id=None):
+    """
+    Resolve an experiment user id for feed routes.
+
+    Flask-Login admin sessions can expose ids like "admin_1", which are not valid
+    for feed URLs expecting experiment user ids. In those cases, resolve by username.
+    """
+    try:
+        if str(current_user.id).isdigit():
+            return int(current_user.id)
+    except Exception:
+        pass
+
+    try:
+        exp_user = User_mgmt.query.filter_by(username=current_user.username).first()
+        if exp_user is not None:
+            return int(exp_user.id)
+    except Exception:
+        pass
+
+    return default_user_id
+
+
+def _build_feed_home_url(exp):
+    """Build the canonical page-1 feed URL for an experiment."""
+    if exp.platform_type == "forum":
+        return f"/{exp.idexp}/rfeed/all/feed/rf/1?feed_type=new"
+    feed_user_id = _resolve_feed_user_id(default_user_id="all")
+    return f"/{exp.idexp}/feed/{feed_user_id}/feed/rf/1"
+
+
 @main.route("/")
 def index():
     """
@@ -115,6 +155,8 @@ def profile():
 
     exp = exps[0]
     user_id = current_user.id
+    if exp.platform_type == "forum":
+        return redirect(f"/{exp.idexp}/rfeed/{user_id}/rfeed/rf/1")
     return redirect(f"/{exp.idexp}/profile/{user_id}/rf/1")
 
 
@@ -122,6 +164,9 @@ def profile():
 @login_required
 def profile_logged(exp_id, user_id, page=1, mode="recent"):
     """Handle profile logged operation."""
+    exp = Exps.query.filter_by(idexp=exp_id).first()
+    if exp and exp.platform_type == "forum":
+        return redirect(f"/{exp_id}/rfeed/{current_user.id}/rfeed/rf/1")
     user_id = int(user_id)
     user = User_mgmt.query.get(user_id)
 
@@ -239,6 +284,9 @@ def profile_logged(exp_id, user_id, page=1, mode="recent"):
 @login_required
 def edit_profile(exp_id, user_id):
     """Handle edit profile operation."""
+    exp = Exps.query.filter_by(idexp=exp_id).first()
+    if exp and exp.platform_type == "forum":
+        return redirect(f"/{exp_id}/rfeed/{current_user.id}/rfeed/rf/1")
     user = User_mgmt.query.filter_by(id=user_id).first()
 
     profile_pic = ""
@@ -277,6 +325,9 @@ def edit_profile(exp_id, user_id):
 @login_required
 def update_profile_data(exp_id, user_id):
     """Update profile data."""
+    exp = Exps.query.filter_by(idexp=exp_id).first()
+    if exp and exp.platform_type == "forum":
+        return redirect(f"/{exp_id}/rfeed/{current_user.id}/rfeed/rf/1")
     user = User_mgmt.query.filter_by(id=user_id).first()
 
     user.email = request.form.get("email")
@@ -303,6 +354,9 @@ def update_profile_data(exp_id, user_id):
 @login_required
 def update_password(exp_id, user_id):
     """Update password."""
+    exp = Exps.query.filter_by(idexp=exp_id).first()
+    if exp and exp.platform_type == "forum":
+        return redirect(f"/{exp_id}/rfeed/{current_user.id}/rfeed/rf/1")
     user = User_mgmt.query.filter_by(id=user_id).first()
 
     npassword = request.form.get("new_password")
@@ -324,24 +378,30 @@ def update_password(exp_id, user_id):
 @login_required
 def feeed_logged():
     """
-    Display main feed for logged-in users (microblogging platform).
-    Legacy route - redirects to experiment selection or first active experiment.
+    Display main feed for logged-in users.
+    Legacy route - redirects to current-context experiment feed when available,
+    otherwise to experiment selection or first active experiment.
 
     Returns:
-        Redirect to feed with experiment ID and user ID
+        Redirect to canonical page-1 feed for the active experiment
     """
-    # Get active experiments
-    exps = Exps.query.filter(Exps.status != 0).all()
-    if not exps:
-        flash("No active experiment. Please activate an experiment first.")
-        return redirect("/admin/experiments")
+    exp = None
+    current_exp_id = get_current_experiment_id()
+    if current_exp_id is not None:
+        exp = Exps.query.filter_by(idexp=int(current_exp_id)).first()
 
-    if len(exps) > 1:
-        return redirect("/admin/join_simulation")
+    if exp is None:
+        exps = Exps.query.filter(Exps.status != 0).all()
+        if not exps:
+            flash("No active experiment. Please activate an experiment first.")
+            return redirect("/admin/experiments")
 
-    exp = exps[0]
-    user_id = current_user.id
-    return redirect(f"/{exp.idexp}/feed/{user_id}/feed/rf/1")
+        if len(exps) > 1:
+            return redirect("/admin/join_simulation")
+
+        exp = exps[0]
+
+    return redirect(_build_feed_home_url(exp))
 
 
 @main.get(
@@ -353,6 +413,14 @@ def feed(exp_id, user_id="all", timeline="timeline", mode="rf", page=1):
     if page < 1:
         page = 1
 
+    exp = Exps.query.filter_by(idexp=exp_id).first()
+    if exp and exp.platform_type == "forum":
+        query_string = request.query_string.decode("utf-8")
+        target = f"/{exp_id}/rfeed/{user_id}/{timeline}/{mode}/{page}"
+        if query_string:
+            target = f"{target}?{query_string}"
+        return redirect(target)
+
     max_post_per_page = 10
     username = ""
     posts, additional = None, None
@@ -361,7 +429,17 @@ def feed(exp_id, user_id="all", timeline="timeline", mode="rf", page=1):
         posts, additional = get_suggested_posts("all", "", page, max_post_per_page)
 
     elif user_id != "all":
-        user = User_mgmt.query.filter_by(id=int(user_id)).first()
+        try:
+            parsed_user_id = int(user_id)
+        except (TypeError, ValueError):
+            parsed_user_id = _resolve_feed_user_id(default_user_id=None)
+            if parsed_user_id is None:
+                return redirect(f"/{exp_id}/feed/all/{timeline}/{mode}/1")
+            user_id = str(parsed_user_id)
+
+        user = User_mgmt.query.filter_by(id=parsed_user_id).first()
+        if user is None:
+            return redirect(f"/{exp_id}/feed/all/{timeline}/{mode}/1")
         recsys = user.recsys_type
 
         posts, additional = get_suggested_posts(
@@ -447,6 +525,51 @@ def feed(exp_id, user_id="all", timeline="timeline", mode="rf", page=1):
         is_admin=is_admin(current_user.username),
         sfollow=sfollow,
         spages=spages,
+    )
+
+
+@main.get("/<int:exp_id>/interview")
+@login_required
+def interview(exp_id: int):
+    """
+    Admin interview module for live experiments.
+
+    Lets privileged users (admin/researcher) pick an LLM agent and chat with them,
+    with persona + run-scoped memory injected server-side.
+    """
+    admin_user = Admin_users.query.filter_by(username=current_user.username).first()
+    if not admin_user or admin_user.role not in {"admin", "researcher"}:
+        abort(403)
+
+    exp = Exps.query.filter_by(idexp=int(exp_id)).first()
+    if not exp:
+        abort(404)
+
+    # When admins join experiments, they may still be logged-in as Admin_users.
+    # Resolve the corresponding experiment-side user for header links.
+    exp_user = User_mgmt.query.filter_by(username=current_user.username).first()
+    logged_id = int(exp_user.id) if exp_user else int(getattr(current_user, "id", 0) or 0)
+
+    mentions = []
+    try:
+        mentions = get_unanswered_mentions(logged_id)
+    except Exception:
+        mentions = []
+
+    profile_pic = get_safe_profile_pic(current_user.username, 0)
+
+    template = "interview.html"
+    if exp.platform_type == "forum":
+        template = "reddit/interview.html"
+
+    return render_template(
+        template,
+        logged_username=current_user.username,
+        logged_id=logged_id,
+        profile_pic=profile_pic,
+        mentions=mentions,
+        is_admin=is_admin(current_user.username),
+        exp_id=exp_id,
     )
 
 
@@ -754,7 +877,13 @@ def get_thread(exp_id, post_id):
         day = c.day
         hour = c.hour
 
-    image = Images.query.filter_by(id=posts[0].image_id).first()
+    # Check image_post_id first (standalone images), then fall back to image_id
+    from y_web.reddit.service import _resolve_image_post
+    image = _resolve_image_post(getattr(posts[0], 'image_post_id', None))
+    if not image and posts[0].image_id:
+        img = Images.query.filter_by(id=posts[0].image_id).first()
+        if img and img.url:
+            image = {"url": img.url, "description": getattr(img, "description", "") or ""}
 
     user = User_mgmt.query.filter_by(id=posts[0].user_id).first()
     profile_pic = ""
@@ -807,11 +936,11 @@ def get_thread(exp_id, post_id):
         "is_liked": Reactions.query.filter_by(
             post_id=posts[0].id, user_id=current_user.id, type="like"
         ).first()
-        is None,
+        is not None,
         "is_disliked": Reactions.query.filter_by(
             post_id=posts[0].id, user_id=current_user.id, type="dislike"
         ).first()
-        is None,
+        is not None,
         "is_shared": len(Post.query.filter_by(shared_from=posts[0].id).all()),
         "emotions": get_elicited_emotions(posts[0].id),
         "topics": get_topics(posts[0].id, posts[0].user_id),
@@ -868,11 +997,11 @@ def get_thread(exp_id, post_id):
             "is_liked": Reactions.query.filter_by(
                 post_id=post.id, user_id=current_user.id, type="like"
             ).first()
-            is None,
+            is not None,
             "is_disliked": Reactions.query.filter_by(
                 post_id=post.id, user_id=current_user.id, type="dislike"
             ).first()
-            is None,
+            is not None,
             "is_shared": len(Post.query.filter_by(shared_from=post.id).all()),
             "emotions": get_elicited_emotions(post.id),
             "topics": get_topics(post.id, post.user_id),
@@ -881,11 +1010,17 @@ def get_thread(exp_id, post_id):
         parent = post.comment_to
         reverse_map[post.id] = parent
 
+        # Always register this comment's children list and data
+        post_to_child[post.id] = []
+        post_to_data[post.id] = data
+
         if parent != -1:
             if parent in post_to_child:
+                # Parent exists, add as child of parent
                 post_to_child[parent].append(post.id)
-                post_to_child[post.id] = []
-                post_to_data[post.id] = data
+            else:
+                # Parent is missing (deleted?), attach to root as fallback
+                post_to_child[root].append(post.id)
 
     tree = __expand_tree(post_to_child, post_to_data)
     discussion_tree = tree[root]
@@ -951,6 +1086,9 @@ def recursive_visit(data):
 def __get_discussions(posts, username, page, exp_id):
     """Handle   get discussions operation."""
     res = []
+    seen_ids = set()
+    exp = Exps.query.filter_by(idexp=exp_id).first()
+    is_reddit = bool(exp and exp.platform_type == "forum")
 
     for post in posts.items:
         try:
@@ -958,105 +1096,57 @@ def __get_discussions(posts, username, page, exp_id):
         except:
             pass
 
-        comments = (
-            Post.query.filter(Post.thread_id == post.id, Post.id != post.id)
-            .join(User_mgmt, Post.user_id == User_mgmt.id)
-            .add_columns(User_mgmt.username)
-            .all()
-        )
+        # Skip duplicate posts
+        if post.id in seen_ids:
+            continue
+        seen_ids.add(post.id)
 
-        cms = []
-        for c, author in comments:
-            # get elicited emotions names
-            emotions = get_elicited_emotions(c.id)
-
-            if username == author:
-                text = c.tweet.split(":")[-1].replace(f"@{username}", "")
-            else:
-                text = c.tweet.split(":")[-1]
-
-            profile_pic = ""
-
-            user = User_mgmt.query.filter_by(id=c.user_id).first()
-
-            if user.is_page == 1:
-                pg = Page.query.filter_by(name=user.username).first()
-                if page is not None:
-                    profile_pic = pg.logo
-            else:
-                ag = Agent.query.filter_by(name=user.username).first()
-
-                if ag is None:
-                    continue
-
-                profile_pic = (
-                    ag.profile_pic
-                    if ag is not None and ag.profile_pic is not None
-                    else Admin_users.query.filter_by(username=user.username)
-                    .first()
-                    .profile_pic
-                )
-
-            topics = get_topics(c.id, c.user_id)
-            if len(topics) == 0:
-                topics = []
-
-            cms.append(
-                {
-                    "post_id": c.id,
-                    "profile_pic": profile_pic,
-                    "author": author,
-                    "shared_from": (
-                        -1
-                        if c.shared_from == -1
-                        else (
-                            c.shared_from,
-                            db.session.query(User_mgmt)
-                            .join(Post, User_mgmt.id == Post.user_id)
-                            .filter(Post.id == c.shared_from)
-                            .first()
-                            .username,
-                        )
-                    ),
-                    "author_id": int(c.user_id),
-                    "post": augment_text(text, exp_id),
-                    "round": c.round,
-                    "day": Rounds.query.filter_by(id=c.round).first().day,
-                    "hour": Rounds.query.filter_by(id=c.round).first().hour,
-                    "likes": len(
-                        list(Reactions.query.filter_by(post_id=c.id, type="like"))
-                    ),
-                    "dislikes": len(
-                        list(Reactions.query.filter_by(post_id=c.id, type="dislike"))
-                    ),
-                    "is_liked": Reactions.query.filter_by(
-                        post_id=c.id, user_id=current_user.id, type="like"
-                    ).first()
-                    is None,
-                    "is_disliked": Reactions.query.filter_by(
-                        post_id=c.id, user_id=current_user.id, type="dislike"
-                    ).first()
-                    is None,
-                    "is_shared": len(Post.query.filter_by(shared_from=c.id).all()),
-                    "emotions": emotions,
-                    "topics": topics,
-                }
-            )
+        # Just count comments - feed only needs the count, not full details
+        # Full comment data is loaded in thread view, not feed view
+        comment_count = Post.query.filter(
+            Post.thread_id == post.id,
+            Post.id != post.id
+        ).count()
+        cms = []  # Empty list - comment details not used in feed template
 
         article = Articles.query.filter_by(id=post.news_id).first()
         if article is None:
             art = 0
         else:
-            art = {
-                "title": article.title,
-                "summary": strip_tags(article.summary),
-                "url": article.link,
-                "source": Websites.query.filter_by(id=article.website_id).first().name,
-            }
+            if is_reddit:
+                from y_web.reddit.service import _article_payload, _resolve_article
+                art = _article_payload(_resolve_article(article))
+            else:
+                # Non-Reddit feeds: keep existing behavior
+                article_image = None
+                article_img = Images.query.filter_by(article_id=article.id).first()
+                if article_img and article_img.url:
+                    article_image = {"url": article_img.url, "description": getattr(article_img, "description", "") or ""}
 
-        image = Images.query.filter_by(id=post.image_id).first()
-        if image is None:
-            image = ""
+                art = {
+                    "title": article.title,
+                    "summary": strip_tags(article.summary),
+                    "url": article.link,
+                    "source": (lambda w: w.name if w else "Unknown")(Websites.query.filter_by(id=article.website_id).first()),
+                    "image": article_image,
+                }
+
+        # Check image_post_id first (standalone images from image_posts table)
+        image_post_id = getattr(post, 'image_post_id', None)
+        if image_post_id:
+            from y_web.reddit.service import _resolve_image_post
+            image = _resolve_image_post(image_post_id)
+            if image is None:
+                image = ""
+        else:
+            # Fall back to legacy image_id (from Images table)
+            if is_reddit:
+                from y_web.reddit.service import _resolve_image
+                image = _resolve_image(post.image_id) if post.image_id else ""
+            else:
+                image = Images.query.filter_by(id=post.image_id).first()
+                if image is None:
+                    image = ""
 
         c = Rounds.query.filter_by(id=post.round).first()
         if c is None:
@@ -1066,9 +1156,12 @@ def __get_discussions(posts, username, page, exp_id):
             day = c.day
             hour = c.hour
 
-        # get elicited emotions names
-        emotions = get_elicited_emotions(post.id)
+        # Emotions removed from UI for performance (Phase 4)
+        # Still available in database for analysis scripts
+        emotions = []
         aa = User_mgmt.query.filter_by(id=post.user_id).first()
+        if not aa:
+            continue  # Skip posts with missing users
 
         profile_pic = ""
         if aa.is_page == 1:
@@ -1081,16 +1174,27 @@ def __get_discussions(posts, username, page, exp_id):
                 profile_pic = (
                     ag.profile_pic
                     if ag is not None and ag.profile_pic is not None
-                    else Admin_users.query.filter_by(username=aa.username)
-                    .first()
-                    .profile_pic
+                    else (lambda u: u.profile_pic if u else "")(Admin_users.query.filter_by(username=aa.username).first())
                 )
             except:
                 profile_pic = ""
 
-        topics = get_topics(post.id, post.user_id)
-        if len(topics) == 0:
-            topics = []
+        # Topics removed from UI for performance (Phase 4)
+        # Still available in database for analysis scripts
+        topics = []
+
+        # Process Reddit-style post (extract title and body)
+        post_title, post_body = process_reddit_post(post.tweet)
+
+        # Strip article title from body if it appears at the beginning (avoids duplication)
+        if post_body and art and art != 0:
+            article_title = art.get("title", "").strip()
+            if article_title:
+                body_stripped = post_body.strip()
+                if body_stripped.startswith(f"TITLE: {article_title}"):
+                    post_body = body_stripped[len(f"TITLE: {article_title}"):].lstrip()
+                elif body_stripped.startswith(article_title):
+                    post_body = body_stripped[len(article_title):].lstrip()
 
         res.append(
             {
@@ -1103,17 +1207,19 @@ def __get_discussions(posts, username, page, exp_id):
                     if post.shared_from == -1
                     else (
                         post.shared_from,
-                        db.session.query(User_mgmt)
-                        .join(Post, User_mgmt.id == Post.user_id)
-                        .filter(Post.id == post.shared_from)
-                        .first()
-                        .username,
+                        (lambda u: u.username if u else "Unknown")(
+                            db.session.query(User_mgmt)
+                            .join(Post, User_mgmt.id == Post.user_id)
+                            .filter(Post.id == post.shared_from)
+                            .first()
+                        ),
                     )
                 ),
                 "post_id": post.id,
-                "author": User_mgmt.query.filter_by(id=post.user_id).first().username,
+                "author": aa.username,
                 "author_id": int(post.user_id),
-                "post": augment_text(post.tweet.split(":")[-1], exp_id),
+                "title": post_title,
+                "post": augment_text(post_body, exp_id) if post_body else "",
                 "round": post.round,
                 "day": day,
                 "hour": hour,
@@ -1126,14 +1232,14 @@ def __get_discussions(posts, username, page, exp_id):
                 "is_liked": Reactions.query.filter_by(
                     post_id=post.id, user_id=current_user.id, type="like"
                 ).first()
-                is None,
+                is not None,
                 "is_disliked": Reactions.query.filter_by(
                     post_id=post.id, user_id=current_user.id, type="dislike"
                 ).first()
-                is None,
+                is not None,
                 "is_shared": len(Post.query.filter_by(shared_from=post.id).all()),
                 "comments": cms,
-                "t_comments": len(cms),
+                "t_comments": comment_count,
                 "emotions": emotions,
                 "topics": topics,
             }
@@ -1145,11 +1251,72 @@ def __get_discussions(posts, username, page, exp_id):
 #### Thread
 
 
+@main.get("/rthread/<int:post_id>")
+@login_required
+def get_thread_reddit_redirect(post_id):
+    """
+    Redirect to Reddit thread with experiment ID.
+    Gets the active experiment and redirects to the full URL.
+    """
+    # Get active experiments
+    exps = Exps.query.filter(Exps.status != 0).all()
+    if not exps:
+        flash("No active experiment. Please activate an experiment first.")
+        return redirect("/admin/experiments")
+
+    if len(exps) > 1:
+        # If multiple experiments, use the first one (or could redirect to selection)
+        exp = exps[0]
+    else:
+        exp = exps[0]
+
+    query_string = request.query_string.decode("utf-8")
+    target = f"/{exp.idexp}/rthread/{post_id}"
+    if query_string:
+        target = f"{target}?{query_string}"
+    return redirect(target)
+
+
+def _build_safe_reddit_back_url(exp_id: int) -> str:
+    """
+    Build a safe back URL for Reddit thread pages.
+
+    Priority:
+    1) Explicit ?back=/... if same-origin relative and under this experiment's /rfeed or /rsearch
+    2) Fallback to /<exp_id>/rfeed with optional feed_type query param
+    """
+    fallback_query = {}
+
+    feed_type = (request.args.get("feed_type") or "").strip()
+    if feed_type in {"new", "hot", "top", "most_commented"}:
+        fallback_query["feed_type"] = feed_type
+
+    fallback = f"/{exp_id}/rfeed"
+    if fallback_query:
+        fallback = f"{fallback}?{urlencode(fallback_query)}"
+
+    candidate = (request.args.get("back") or "").strip()
+    if not candidate:
+        return fallback
+
+    parsed = urlparse(candidate)
+    if parsed.scheme or parsed.netloc:
+        return fallback
+    if not (
+        parsed.path.startswith(f"/{exp_id}/rfeed")
+        or parsed.path.startswith(f"/{exp_id}/rsearch")
+    ):
+        return fallback
+
+    return candidate
+
+
 @main.get("/<int:exp_id>/rthread/<int:post_id>")
 @login_required
 def get_thread_reddit(exp_id, post_id):
     # get thread_id for post_id
     """Get thread reddit."""
+    back_url = _build_safe_reddit_back_url(exp_id)
     thread_id = Post.query.filter_by(id=post_id).first().thread_id
 
     # get all posts with the specified thread id
@@ -1165,7 +1332,12 @@ def get_thread_reddit(exp_id, post_id):
         day = c.day
         hour = c.hour
 
-    image = Images.query.filter_by(id=posts[0].image_id).first()
+    # Check image_post_id first (standalone images), then fall back to image_id
+    from y_web.reddit.service import _resolve_image_post
+    image = _resolve_image_post(getattr(posts[0], 'image_post_id', None))
+    if not image and posts[0].image_id:
+        from y_web.reddit.service import _resolve_image
+        image = _resolve_image(posts[0].image_id)
 
     user = User_mgmt.query.filter_by(id=posts[0].user_id).first()
     profile_pic = ""
@@ -1186,21 +1358,35 @@ def get_thread_reddit(exp_id, post_id):
         except:
             profile_pic = ""
 
+    # Get article for main post (needed for content stripping)
+    article = Articles.query.filter_by(id=posts[0].news_id).first()
+
     # Process post content for Reddit-style display
     title, content = process_reddit_post(posts[0].tweet)
-    processed_content = augment_text(content, exp_id) if content else ""
 
-    # Get article for main post
-    article = Articles.query.filter_by(id=posts[0].news_id).first()
+    # Strip reproduced article content from body (catches LLM copying summary)
+    if article and article.summary and content:
+        content, _ = strip_reproduced_article_content(content, article.summary)
+
+    is_agent_or_page_author = bool(
+        user is not None
+        and (
+            user.is_page == 1
+            or Agent.query.filter_by(name=user.username).first() is not None
+        )
+    )
+    if is_agent_or_page_author:
+        if title:
+            title = normalize_punctuation_spacing(title)
+        if content:
+            content = normalize_punctuation_spacing(content)
+
+    processed_content = augment_text(content, exp_id) if content else ""
     if article is None:
         art = 0
     else:
-        art = {
-            "title": article.title,
-            "summary": strip_tags(article.summary),
-            "url": article.link,
-            "source": Websites.query.filter_by(id=article.website_id).first().name,
-        }
+        from y_web.reddit.service import _article_payload, _resolve_article
+        art = _article_payload(_resolve_article(article))
 
     discussion_tree = {
         "title": title,
@@ -1279,23 +1465,39 @@ def get_thread_reddit(exp_id, post_id):
             except:
                 profile_pic = ""
 
+        # Get article for comment (needed for content stripping)
+        article = Articles.query.filter_by(id=post.news_id).first()
+
         # Process comment content for Reddit-style display
-        comment_title, comment_content = process_reddit_post(post.tweet)
+        comment_title, comment_content = process_reddit_post(
+            post.tweet, allow_legacy_blankline_title=False
+        )
+
+        # Strip reproduced article content from body (catches LLM copying summary)
+        if article and article.summary and comment_content:
+            comment_content, _ = strip_reproduced_article_content(comment_content, article.summary)
+
+        is_agent_or_page_comment_author = bool(
+            user is not None
+            and (
+                user.is_page == 1
+                or Agent.query.filter_by(name=user.username).first() is not None
+            )
+        )
+        if is_agent_or_page_comment_author:
+            if comment_title:
+                comment_title = normalize_punctuation_spacing(comment_title)
+            if comment_content:
+                comment_content = normalize_punctuation_spacing(comment_content)
+
         processed_comment = (
             augment_text(comment_content, exp_id) if comment_content else ""
         )
-
-        # Get article for comment (if any)
-        article = Articles.query.filter_by(id=post.news_id).first()
         if article is None:
             art = 0
         else:
-            art = {
-                "title": article.title,
-                "summary": strip_tags(article.summary),
-                "url": article.link,
-                "source": Websites.query.filter_by(id=article.website_id).first().name,
-            }
+            from y_web.reddit.service import _article_payload, _resolve_article
+            art = _article_payload(_resolve_article(article))
         data = {
             "title": comment_title,
             "post": processed_comment,
@@ -1316,11 +1518,11 @@ def get_thread_reddit(exp_id, post_id):
             "is_liked": Reactions.query.filter_by(
                 post_id=post.id, user_id=current_user.id, type="like"
             ).first()
-            is None,
+            is not None,
             "is_disliked": Reactions.query.filter_by(
                 post_id=post.id, user_id=current_user.id, type="dislike"
             ).first()
-            is None,
+            is not None,
             "is_shared": len(Post.query.filter_by(shared_from=post.id).all()),
             "emotions": get_elicited_emotions(post.id),
             "topics": get_topics(post.id, post.user_id),
@@ -1329,11 +1531,17 @@ def get_thread_reddit(exp_id, post_id):
         parent = post.comment_to
         reverse_map[post.id] = parent
 
+        # Always register this comment's children list and data
+        post_to_child[post.id] = []
+        post_to_data[post.id] = data
+
         if parent != -1:
             if parent in post_to_child:
+                # Parent exists, add as child of parent
                 post_to_child[parent].append(post.id)
-                post_to_child[post.id] = []
-                post_to_data[post.id] = data
+            else:
+                # Parent is missing (deleted?), attach to root as fallback
+                post_to_child[root].append(post.id)
 
     tree = __expand_tree(post_to_child, post_to_data)
     discussion_tree = tree[root]
@@ -1363,6 +1571,7 @@ def get_thread_reddit(exp_id, post_id):
     return render_template(
         "reddit/thread.html",
         thread=discussion_tree,
+        back_url=back_url,
         profile_pic=profile_pic,
         user_id=current_user.id,
         username=current_user.username,
@@ -1375,6 +1584,7 @@ def get_thread_reddit(exp_id, post_id):
         len=len,
         mentions=mentions,
         is_admin=is_admin(current_user.username),
+        exp_id=exp_id,
     )
 
 
@@ -1398,8 +1608,178 @@ def feeed_logged_reddit():
         return redirect("/admin/join_simulation")
 
     exp = exps[0]
-    user_id = "all"  # Show all posts including user's own posts
-    return redirect(f"/{exp.idexp}/feed/{user_id}/feed/rf/1")
+    return redirect(f"/{exp.idexp}/rfeed/all/feed/rf/1")
+
+
+@main.get("/rnotifications")
+@login_required
+def rnotifications_logged():
+    """
+    Display Reddit-style notifications for logged-in users.
+
+    Legacy route - redirects to experiment selection or first active experiment.
+    """
+    exps = Exps.query.filter(Exps.status != 0).all()
+    if not exps:
+        flash("No active experiment. Please activate an experiment first.")
+        return redirect("/admin/experiments")
+
+    if len(exps) > 1:
+        return redirect("/admin/join_simulation")
+
+    exp = exps[0]
+    return redirect(f"/{exp.idexp}/rnotifications")
+
+
+@main.get("/<int:exp_id>/rnotifications")
+@login_required
+def rnotifications(exp_id):
+    """
+    Reddit-style notifications inbox.
+
+    Lists replies to the current user's posts/comments, highlights items that were
+    unread on page open, and marks all as read after rendering state is computed.
+    """
+    exp = Exps.query.filter_by(idexp=exp_id).first()
+    if not exp:
+        flash("Experiment not found.")
+        return redirect("/admin/experiments")
+
+    if exp.platform_type != "forum":
+        return redirect(f"/{exp_id}/feed/{current_user.id}/feed/rf/1")
+
+    try:
+        page = int(request.args.get("page", 1))
+    except Exception:
+        page = 1
+    if page < 1:
+        page = 1
+    per_page = 25
+    offset = (page - 1) * per_page
+
+    from sqlalchemy import func
+    from sqlalchemy.orm import aliased
+
+    from y_web.models import Post, ReplyInboxState, User_mgmt
+    from y_web.reddit.service import _get_profile_pic
+
+    # Load (or create) inbox state
+    state = ReplyInboxState.query.filter_by(user_id=current_user.id).first()
+    if not state:
+        state = ReplyInboxState(user_id=current_user.id, last_seen_reply_id=0)
+        db.session.add(state)
+        db.session.commit()
+
+    cutoff = int(state.last_seen_reply_id or 0)
+
+    Reply = aliased(Post)
+    Parent = aliased(Post)
+    Author = aliased(User_mgmt)
+
+    base_filters = (
+        Parent.user_id == current_user.id,
+        Reply.user_id != current_user.id,
+        Reply.comment_to != -1,
+    )
+
+    # Unread count before marking as read
+    unread_before_open = (
+        db.session.query(func.count(Reply.id))
+        .join(Parent, Reply.comment_to == Parent.id)
+        .filter(*base_filters, Reply.id > cutoff)
+        .scalar()
+    )
+    unread_before_open = int(unread_before_open or 0)
+
+    # Fetch current page (+1 to determine has_more)
+    rows = (
+        db.session.query(Reply, Parent, Author)
+        .join(Parent, Reply.comment_to == Parent.id)
+        .join(Author, Author.id == Reply.user_id)
+        .filter(*base_filters)
+        .order_by(Reply.id.desc())
+        .limit(per_page + 1)
+        .offset(offset)
+        .all()
+    )
+
+    has_more = len(rows) > per_page
+    rows = rows[:per_page]
+
+    def _excerpt(text: str, max_len: int = 140) -> str:
+        if not text:
+            return ""
+        cleaned = " ".join(str(text).strip().split())
+        if len(cleaned) <= max_len:
+            return cleaned
+        return cleaned[: max_len - 1].rstrip() + "…"
+
+    items = []
+    for reply_post, parent_post, author in rows:
+        items.append(
+            {
+                "reply_id": reply_post.id,
+                "thread_url": f"/{exp_id}/rthread/{reply_post.id}",
+                "author_id": author.id,
+                "author_username": author.username,
+                "author_profile_pic": _get_profile_pic(author) if author else "",
+                "reply_excerpt": _excerpt(getattr(reply_post, "tweet", "")),
+                "parent_excerpt": _excerpt(getattr(parent_post, "tweet", "")),
+                "parent_is_root": bool(getattr(parent_post, "comment_to", -1) == -1),
+                "was_unread": bool(reply_post.id > cutoff),
+            }
+        )
+
+    # Mark all as read: advance last_seen_reply_id to newest reply id.
+    max_reply_id = (
+        db.session.query(func.max(Reply.id))
+        .join(Parent, Reply.comment_to == Parent.id)
+        .filter(*base_filters)
+        .scalar()
+    )
+    max_reply_id = int(max_reply_id or 0)
+
+    if max_reply_id > cutoff:
+        state.last_seen_reply_id = max_reply_id
+        db.session.commit()
+
+    # Header vars
+    mentions = get_unanswered_mentions(current_user.id)
+    profile_pic = get_safe_profile_pic(current_user.username, 0)
+
+    return render_template(
+        "reddit/notifications.html",
+        items=items,
+        page=page,
+        has_more=has_more,
+        unread_before_open=unread_before_open,
+        profile_pic=profile_pic,
+        logged_username=current_user.username,
+        logged_id=current_user.id,
+        mentions=mentions,
+        is_admin=is_admin(current_user.username),
+        exp_id=exp_id,
+        len=len,
+        str=str,
+        bool=bool,
+        enumerate=enumerate,
+    )
+
+
+@main.get("/<int:exp_id>/rfeed")
+@login_required
+def rfeed_redirect(exp_id):
+    """
+    Redirect short Reddit feed URL to the full URL.
+
+    Returns:
+        Redirect to Reddit feed with all parameters
+    """
+    query_string = request.query_string.decode("utf-8")
+    target = f"/{exp_id}/rfeed/all/feed/rf/1"
+    if query_string:
+        target = f"{target}?{query_string}"
+    return redirect(target)
 
 
 @main.get(
@@ -1412,101 +1792,22 @@ def feed_reddit(exp_id, user_id="all", timeline="timeline", mode="rf", page=1):
         page = 1
 
     max_post_per_page = 10
-    username = ""
-    posts, additional = None, None
-
     feed_type = request.args.get("feed_type", "new")
 
-    if user_id == "all":
-        if feed_type == "top":
-            # Top: all time, by upvotes - downvotes
-            posts_query = (
-                Post.query.filter_by(comment_to=-1)
-                .outerjoin(Reactions, Post.id == Reactions.post_id)
-                .add_columns(
-                    Post,
-                    func.sum(
-                        (Reactions.type == "like").cast(db.Integer)
-                        - (Reactions.type == "dislike").cast(db.Integer)
-                    ).label("score"),
-                )
-                .group_by(Post.id)
-                .order_by(desc("score"), desc(Post.id))
-            )
-            posts = posts_query.paginate(
-                page=page, per_page=max_post_per_page, error_out=False
-            )
-
-            additional = None
-        elif feed_type == "most_commented":
-            # Fallback to slow subquery version or remove this option for now
-            posts = (
-                Post.query.filter_by(comment_to=-1)
-                .order_by(desc(Post.id))
-                .paginate(page=page, per_page=max_post_per_page, error_out=False)
-            )
-            additional = None
-        else:
-            # New: enforce reverse chronological order
-            posts = (
-                Post.query.filter_by(comment_to=-1)
-                .order_by(desc(Post.id))
-                .paginate(page=page, per_page=max_post_per_page, error_out=False)
-            )
-            additional = None
-
-    elif user_id != "all":
-        user = User_mgmt.query.filter_by(id=int(user_id)).first()
-        recsys = user.recsys_type
-        if feed_type == "top":
-            posts_query = (
-                Post.query.filter(Post.user_id != user_id, Post.comment_to == -1)
-                .outerjoin(Reactions, Post.id == Reactions.post_id)
-                .add_columns(
-                    Post,
-                    func.sum(
-                        (Reactions.type == "like").cast(db.Integer)
-                        - (Reactions.type == "dislike").cast(db.Integer)
-                    ).label("score"),
-                )
-                .group_by(Post.id)
-                .order_by(desc("score"), desc(Post.id))
-            )
-            posts = posts_query.paginate(
-                page=page, per_page=max_post_per_page, error_out=False
-            )
-            additional = None
-        elif feed_type == "most_commented":
-            posts = (
-                Post.query.filter(Post.comment_to == -1)
-                .order_by(desc(Post.id))
-                .paginate(page=page, per_page=max_post_per_page, error_out=False)
-            )
-            additional = None
-        else:
-            posts = (
-                Post.query.filter(Post.comment_to == -1)
-                .order_by(desc(Post.id))
-                .paginate(page=page, per_page=max_post_per_page, error_out=False)
-            )
-            additional = None
-        username = user.username
-
-    res, res_additional = [], []
-
-    if posts is not None:
-        res = __get_discussions(posts, username, page, exp_id)
-    if additional is not None:
-        res_additional = __get_discussions(additional, username, page, exp_id)
-
-    # combine the posts and additional posts
-    if len(res_additional) > 0:
-        for add in res_additional:
-            res.append(add)
+    page_obj = fetch_feed_page(
+        viewer_id=current_user.id,
+        page=page,
+        per_page=max_post_per_page,
+        feed_type=feed_type,
+        search_query="",
+    )
+    res = [post.to_dict() for post in page_obj.posts]
 
     # not enough posts to display
     if len(res) == 0 and page > 1:
-        return redirect(f"/rfeed/{user_id}/{timeline}/{mode}/{page - 1}")
+        return redirect(
+            f"/{exp_id}/rfeed/{user_id}/{timeline}/{mode}/{page - 1}?feed_type={feed_type}"
+        )
 
     trending_ht = get_trending_hashtags()
     mentions = get_unanswered_mentions(current_user.id)
@@ -1552,12 +1853,13 @@ def feed_reddit(exp_id, user_id="all", timeline="timeline", mode="rf", page=1):
     return render_template(
         "reddit/feed.html",
         items=res,
-        page=page,
+        page=page_obj.page,
         profile_pic=profile_pic,
         profile_pic_feed=profile_pic_feed,
         user_id=user_id,
+        feed_user_id=None,
         timeline=timeline,
-        username=username,
+        username="",
         mode=mode,
         enumerate=enumerate,
         len=len,
@@ -1571,6 +1873,102 @@ def feed_reddit(exp_id, user_id="all", timeline="timeline", mode="rf", page=1):
         sfollow=sfollow,
         spages=spages,
         feed_type=feed_type,
+        search_query="",
+        view_mode="feed",
+        search_total=None,
+        per_page=max_post_per_page,
+        has_more=(page_obj.page * page_obj.per_page) < page_obj.total,
+        exp_id=exp_id,
+    )
+
+
+@main.get("/<int:exp_id>/rsearch")
+@login_required
+def search_reddit(exp_id: int):
+    """Render dedicated Reddit search results page."""
+    page = max(request.args.get("page", type=int, default=1), 1)
+    per_page = 10
+    feed_type = (request.args.get("feed_type") or "new").strip()
+    if feed_type not in {"new", "hot", "top", "most_commented"}:
+        feed_type = "new"
+    search_query = (request.args.get("q") or "").strip()
+    if search_query:
+        page_obj = fetch_feed_page(
+            viewer_id=current_user.id,
+            page=page,
+            per_page=per_page,
+            feed_type=feed_type,
+            search_query=search_query,
+        )
+        res = [post.to_dict() for post in page_obj.posts]
+        has_more = (page_obj.page * page_obj.per_page) < page_obj.total
+        current_page = page_obj.page
+        total_results = page_obj.total
+    else:
+        res = []
+        has_more = False
+        current_page = 1
+        total_results = 0
+
+    # If page is out of bounds for results, step back.
+    if not res and page > 1:
+        query = {"q": search_query, "feed_type": feed_type, "page": page - 1}
+        return redirect(f"/{exp_id}/rsearch?{urlencode(query)}")
+
+    mentions = get_unanswered_mentions(current_user.id)
+    sfollow = get_suggested_users(current_user.id, pages=False)
+    spages = get_suggested_users(current_user.id, pages=True)
+
+    user = User_mgmt.query.filter_by(id=current_user.id).first()
+    profile_pic = ""
+    if user and user.is_page == 1:
+        pg = Page.query.filter_by(name=user.username).first()
+        if pg is not None:
+            profile_pic = pg.logo
+    else:
+        try:
+            ag = Agent.query.filter_by(name=current_user.username).first()
+            profile_pic = (
+                ag.profile_pic
+                if ag is not None and ag.profile_pic is not None
+                else Admin_users.query.filter_by(username=current_user.username)
+                .first()
+                .profile_pic
+            )
+        except:
+            profile_pic = ""
+
+    profile_pic_feed = profile_pic
+
+    return render_template(
+        "reddit/feed.html",
+        items=res,
+        page=current_page,
+        profile_pic=profile_pic,
+        profile_pic_feed=profile_pic_feed,
+        user_id="all",
+        feed_user_id=None,
+        timeline="feed",
+        username="",
+        mode="rf",
+        enumerate=enumerate,
+        len=len,
+        logged_username=current_user.username,
+        logged_id=current_user.id,
+        trending_ht=[],
+        str=str,
+        bool=bool,
+        mentions=mentions,
+        is_admin=is_admin(current_user.username),
+        sfollow=sfollow,
+        spages=spages,
+        feed_type=feed_type,
+        search_query=search_query,
+        view_mode="search",
+        search_total=total_results,
+        per_page=per_page,
+        has_more=has_more,
+        exp_id=exp_id,
     )
 
 
@@ -1666,11 +2064,55 @@ def api_feed_reddit(exp_id, user_id="all", timeline="timeline", mode="rf", page=
                 page=page, per_page=max_post_per_page, error_out=False
             )
             additional = None
-        elif feed_type == "most_commented":
-            posts = (
+        elif feed_type == "hot":
+            # Reddit-style hot scoring: log10(max(|score|, 1)) + sign(score) * round / round_decay
+            round_decay = 12
+            reaction_sub = (
+                db.session.query(
+                    Reactions.post_id.label("post_id"),
+                    func.sum(case((Reactions.type == "like", 1), else_=0)).label("like_count"),
+                    func.sum(case((Reactions.type == "dislike", 1), else_=0)).label("dislike_count"),
+                )
+                .group_by(Reactions.post_id)
+                .subquery()
+            )
+            net_score = func.coalesce(reaction_sub.c.like_count, 0) - func.coalesce(reaction_sub.c.dislike_count, 0)
+            sign_expr = case((net_score > 0, 1), (net_score < 0, -1), else_=0)
+            abs_score = func.abs(net_score)
+            max_score = case((abs_score >= 1, abs_score), else_=1)
+            log_order = func.log(max_score) / func.log(10)
+            hot_score = log_order + sign_expr * Post.round / round_decay
+
+            posts_query = (
                 Post.query.filter_by(comment_to=-1)
-                .order_by(desc(Post.id))
-                .paginate(page=page, per_page=max_post_per_page, error_out=False)
+                .outerjoin(reaction_sub, reaction_sub.c.post_id == Post.id)
+                .order_by(hot_score.desc(), desc(Post.id))
+            )
+            posts = posts_query.paginate(
+                page=page, per_page=max_post_per_page, error_out=False
+            )
+            additional = None
+        elif feed_type == "most_commented":
+            # Subquery: count comments (posts where comment_to != -1) per thread_id
+            comment_sub = (
+                db.session.query(
+                    Post.thread_id.label("thread_id"),
+                    func.count(Post.id).label("comment_count"),
+                )
+                .filter(Post.comment_to != -1)
+                .group_by(Post.thread_id)
+                .subquery()
+            )
+            comment_expr = func.coalesce(comment_sub.c.comment_count, 0)
+            posts_query = (
+                Post.query.filter_by(comment_to=-1)
+                .outerjoin(comment_sub, comment_sub.c.thread_id == Post.id)
+                .add_columns(Post, comment_expr.label("comment_count"))
+                .group_by(Post.id)
+                .order_by(desc("comment_count"), desc(Post.id))
+            )
+            posts = posts_query.paginate(
+                page=page, per_page=max_post_per_page, error_out=False
             )
             additional = None
         else:
@@ -1701,11 +2143,55 @@ def api_feed_reddit(exp_id, user_id="all", timeline="timeline", mode="rf", page=
                 page=page, per_page=max_post_per_page, error_out=False
             )
             additional = None
+        elif feed_type == "hot":
+            # Reddit-style hot scoring: log10(max(|score|, 1)) + sign(score) * round / round_decay
+            round_decay = 12
+            reaction_sub = (
+                db.session.query(
+                    Reactions.post_id.label("post_id"),
+                    func.sum(case((Reactions.type == "like", 1), else_=0)).label("like_count"),
+                    func.sum(case((Reactions.type == "dislike", 1), else_=0)).label("dislike_count"),
+                )
+                .group_by(Reactions.post_id)
+                .subquery()
+            )
+            net_score = func.coalesce(reaction_sub.c.like_count, 0) - func.coalesce(reaction_sub.c.dislike_count, 0)
+            sign_expr = case((net_score > 0, 1), (net_score < 0, -1), else_=0)
+            abs_score = func.abs(net_score)
+            max_score = case((abs_score >= 1, abs_score), else_=1)
+            log_order = func.log(max_score) / func.log(10)
+            hot_score = log_order + sign_expr * Post.round / round_decay
+
+            posts_query = (
+                Post.query.filter(Post.user_id != user_id, Post.comment_to == -1)
+                .outerjoin(reaction_sub, reaction_sub.c.post_id == Post.id)
+                .order_by(hot_score.desc(), desc(Post.id))
+            )
+            posts = posts_query.paginate(
+                page=page, per_page=max_post_per_page, error_out=False
+            )
+            additional = None
         elif feed_type == "most_commented":
-            posts = (
+            # Subquery: count comments (posts where comment_to != -1) per thread_id
+            comment_sub = (
+                db.session.query(
+                    Post.thread_id.label("thread_id"),
+                    func.count(Post.id).label("comment_count"),
+                )
+                .filter(Post.comment_to != -1)
+                .group_by(Post.thread_id)
+                .subquery()
+            )
+            comment_expr = func.coalesce(comment_sub.c.comment_count, 0)
+            posts_query = (
                 Post.query.filter(Post.comment_to == -1)
-                .order_by(desc(Post.id))
-                .paginate(page=page, per_page=max_post_per_page, error_out=False)
+                .outerjoin(comment_sub, comment_sub.c.thread_id == Post.id)
+                .add_columns(Post, comment_expr.label("comment_count"))
+                .group_by(Post.id)
+                .order_by(desc("comment_count"), desc(Post.id))
+            )
+            posts = posts_query.paginate(
+                page=page, per_page=max_post_per_page, error_out=False
             )
             additional = None
         else:

@@ -21,7 +21,7 @@
                 </div>
                 <div class="user-info">
                     <a href="/{{exp_id}}/profile/{{ item['author_id'] }}/recent/1">{{ item["author"] }}</a>
-                    <span class="time">Day {{ item["day"] }} - {{item["hour"]}}:00</span>
+                    <span class="time">{{ item.get("display_time", "") }}</span>
                 </div>
             </div>
             <!-- Right side dropdown -->
@@ -198,7 +198,7 @@
             <div class="original-post">
                 <div class="media-content">
                     <a href="/{{exp_id}}/profile/{{ item['author_id'] }}/recent/1">{{ item["author"] }}</a><br/>
-                    <span class="time">Day {{ item["day"] }} - {{item["hour"]}}:00</span>
+                    <span class="time">{{ item.get("display_time", "") }}</span>
                     <div class="post-text">
                         <p> {{ item["post"]|safe }}</p>
                     </div>
@@ -267,7 +267,7 @@
                 <!-- Content -->
                 <div class="media-content">
                     <a href="/{{exp_id}}/profile/{{ cm['author_id'] }}/recent/1">{{ cm["author"] }}</a>
-                    <span class="time">Day {{ cm["day"] }} - {{cm["hour"]}}:00</span>
+                    <span class="time">{{ cm.get("display_time", "") }}</span>
                     <p>
                         {{ cm["post"]|safe }}
                     </p>

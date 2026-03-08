@@ -25145,7 +25145,7 @@ body.is-dark .error-container .error-wrapper .error-inner h3 {
     stroke: #757a91
 }
 
-.card.is-new-content .compose .feed-upload .upload-wrap img,.shop-wrapper .cart-container .cart-content .cart-summary .is-new-content.summary-card .compose .feed-upload .upload-wrap img {
+.card.is-new-content .compose .feed-upload .upload-wrap img,.shop-wrapper .cart-container .cart-content .cart-summary .is-new-content.summary-card .compose .feed-upload .upload-wrap img,.card.is-new-content .compose .feed-upload .upload-wrap video,.shop-wrapper .cart-container .cart-content .cart-summary .is-new-content.summary-card .compose .feed-upload .upload-wrap video {
     display: inline-block;
     width: 100%;
     height: auto;

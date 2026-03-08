@@ -21,7 +21,7 @@
 
                 <div class="media-content">
                     <a href="/{{exp_id}}/profile/{{ thread['author_id'] }}/recent/1">{{ thread["author"] }}</a>
-                    <span class="time">Day {{ thread["day"] }} - {{thread["hour"]}}:00</span>
+                    <span class="time">{{ thread.get("display_time", "") }}</span>
                     <p>
                         {{ thread["post"]|safe }}
                     </p>
@@ -72,7 +72,7 @@
             </div>
             <p id="message-{{ thread['post_id'] }}"></p>
             <form class="comment_form" id="comment_form-{{ thread['post_id'] }}" style="margin-top: 1rem;">
-            <textarea rows="3" class="reply_comment" id="comment-{{ thread['post_id'] }}" style="width: 100%; padding: 0.75rem; border: 1px solid #e0e0e0; border-radius: 8px; font-size: 0.95rem; resize: vertical; margin-bottom: 0.75rem;">@{{ thread["author"] }} </textarea>
+            <textarea rows="3" class="reply_comment" id="comment-{{ thread['post_id'] }}" style="width: 100%; padding: 0.75rem; border: 1px solid #e0e0e0; border-radius: 8px; font-size: 0.95rem; resize: vertical; margin-bottom: 0.75rem;"></textarea>
             <button
                     id="add_comment"
                     type="button"
