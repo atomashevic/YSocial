@@ -21,7 +21,9 @@ def stable_uniform_0_1(*parts: object, salt: str = "forum-hot-longtail-v1") -> f
     return x / float(2**64)
 
 
-def base_hot_score(net_score: int, post_round: int, *, round_decay: float = 12.0) -> float:
+def base_hot_score(
+    net_score: int, post_round: int, *, round_decay: float = 12.0
+) -> float:
     """
     Match the current forum Hot base used in `reddit/service.py`:
       log10(abs(net)+1) + sign(net) * (post_round / round_decay)
@@ -32,7 +34,9 @@ def base_hot_score(net_score: int, post_round: int, *, round_decay: float = 12.0
         sign = -1.0
     else:
         sign = 0.0
-    return math.log10(abs(net_score) + 1.0) + sign * (float(post_round) / float(round_decay))
+    return math.log10(abs(net_score) + 1.0) + sign * (
+        float(post_round) / float(round_decay)
+    )
 
 
 def longtail_boost(

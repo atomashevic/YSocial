@@ -49,7 +49,6 @@ class User_mgmt(UserMixin, db.Model):
     daily_activity_level = db.Column(db.Integer(), default=1)
     profession = db.Column(db.String(50), default="")
     activity_profile = db.Column(db.String(50), default="Always On")
-    archetype = db.Column(db.String(50), nullable=True, default=None)
 
     posts = db.relationship("Post", backref="author", lazy=True)
     liked = db.relationship("Reactions", backref="liked_by", lazy=True)
@@ -73,7 +72,10 @@ class Post(db.Model):
     thread_id = db.Column(db.Integer)
     news_id = db.Column(db.String(50), db.ForeignKey("articles.id"), default=None)
     image_id = db.Column(db.Integer(), db.ForeignKey("images.id"), default=None)
-    image_post_id = db.Column(db.Integer(), db.ForeignKey("image_posts.id"), default=None)
+    image_post_id = db.Column(
+        db.Integer(), db.ForeignKey("image_posts.id"), default=None
+    )
+    # Dedupe controls for idempotent comment creation.
     dedupe_key = db.Column(db.String(64), nullable=True, default=None)
     client_action_id = db.Column(db.String(96), nullable=True, default=None)
     created_at = db.Column(db.DateTime, nullable=False, default=db.func.now())
@@ -133,7 +135,12 @@ class Mentions(db.Model):
 
 
 class ReplyInboxState(db.Model):
-    """Tracks the last seen reply notification for a user."""
+    """
+    Tracks the last seen reply notification for a user.
+
+    This provides Reddit-style "unread" notifications without storing a row per
+    notification: a reply is unread if its Post.id > last_seen_reply_id.
+    """
 
     __bind_key__ = "db_exp"
     __tablename__ = "reply_inbox_state"
@@ -302,7 +309,12 @@ class Images(db.Model):
 
 
 class ImagePosts(db.Model):
-    """Standalone image posts available to experiment users."""
+    """
+    Standalone image posts for agent sharing.
+
+    Stores pre-fetched images from external sources (e.g., Reddit) that agents
+    can select and share. Includes metadata like source, description, and usage tracking.
+    """
 
     __tablename__ = "image_posts"
     __bind_key__ = "db_exp"
@@ -375,35 +387,6 @@ class Post_Toxicity(db.Model):
     flirtation = db.Column(db.REAL, default=0)
 
 
-class Agent_Opinion(db.Model):
-    """
-    Agent opinion tracking for interactions.
-
-    Stores opinions that agents form about topics, posts, and other agents
-    during their interactions in the simulation. The opinion is stored as
-    a float value representing the agent's sentiment or stance.
-
-    Fields:
-        id: Primary key
-        agent_id: ID of the agent forming the opinion
-        tid: Transaction/interaction ID for this opinion event
-        topic_id: ID of the topic being discussed (FK to interests)
-        id_interacted_with: ID of the user/agent being interacted with
-        id_post: ID of the post that triggered this opinion (FK to post)
-        opinion: Numerical opinion value (float) indicating sentiment/stance
-    """
-
-    __bind_key__ = "db_exp"
-    __tablename__ = "agent_opinion"
-    id = db.Column(db.Integer, primary_key=True)
-    agent_id = db.Column(db.Integer, nullable=False)
-    tid = db.Column(db.Integer, nullable=False)
-    topic_id = db.Column(db.Integer, db.ForeignKey("interests.iid"), nullable=False)
-    id_interacted_with = db.Column(db.Integer, nullable=False)
-    id_post = db.Column(db.Integer, db.ForeignKey("post.id"), nullable=False)
-    opinion = db.Column(db.REAL, nullable=False)
-
-
 ############################################################################################################
 
 
@@ -437,6 +420,69 @@ class Admin_users(UserMixin, db.Model):
         return f"admin_{self.id}"
 
 
+class AdminInterviewSession(db.Model):
+    """
+    Stores an admin interview session for a specific experiment + agent.
+
+    Sessions are stored in the dashboard DB so they survive navigation and can be
+    inspected later. Memory is run-scoped and may be missing early in a live run.
+    """
+
+    __bind_key__ = "db_admin"
+    __tablename__ = "admin_interview_sessions"
+
+    id = db.Column(db.Integer, primary_key=True)
+    exp_id = db.Column(db.Integer, nullable=False, index=True)
+    admin_username = db.Column(db.String(50), nullable=False, index=True)
+
+    agent_user_id = db.Column(db.Integer, nullable=False)
+    agent_username = db.Column(db.String(50), nullable=False)
+
+    run_id = db.Column(db.Text, nullable=True, index=True)
+
+    backend_mode = db.Column(db.String(20), nullable=False, default="agent_runtime")
+    llm_model = db.Column(db.String(200), nullable=True)
+    llm_base_url = db.Column(db.String(300), nullable=True)
+
+    persona_snapshot = db.Column(db.Text, nullable=True)
+    interests_snapshot_json = db.Column(db.Text, nullable=True)
+    memory_snapshot_json = db.Column(db.Text, nullable=True)
+
+    created_at = db.Column(db.DateTime, nullable=False, default=db.func.now())
+    updated_at = db.Column(
+        db.DateTime,
+        nullable=False,
+        default=db.func.now(),
+        onupdate=db.func.now(),
+    )
+
+    messages = db.relationship(
+        "AdminInterviewMessage",
+        backref="session",
+        lazy=True,
+        cascade="all, delete-orphan",
+    )
+
+
+class AdminInterviewMessage(db.Model):
+    """Stores one message in an AdminInterviewSession."""
+
+    __bind_key__ = "db_admin"
+    __tablename__ = "admin_interview_messages"
+
+    id = db.Column(db.Integer, primary_key=True)
+    session_id = db.Column(
+        db.Integer,
+        db.ForeignKey("admin_interview_sessions.id"),
+        nullable=False,
+        index=True,
+    )
+    role = db.Column(db.String(12), nullable=False)  # admin | agent | system
+    content = db.Column(db.Text, nullable=False)
+    meta_json = db.Column(db.Text, nullable=True)
+    created_at = db.Column(db.DateTime, nullable=False, default=db.func.now())
+
+
 class Exps(db.Model):
     """
     Experiment configuration and metadata.
@@ -467,6 +513,7 @@ class Exps(db.Model):
     server_pid = db.Column(db.Integer, nullable=True, default=None)
     llm_agents_enabled = db.Column(db.Integer, nullable=False, default=1)
     exp_status = db.Column(db.String(20), nullable=False, default="stopped")
+    # Experiment-wide LLM defaults
     llm_default = db.Column(db.String(100), default="http://127.0.0.1:11434/v1")
     llm_api_key_default = db.Column(db.String(300), default="NULL")
     llm_max_tokens_default = db.Column(db.Integer, default=-1)
@@ -576,6 +623,8 @@ class Population(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(50), nullable=False)
     descr = db.Column(db.String(200), nullable=False)
+    # Distinguishes populations intended for microblogging vs forum (Reddit-like) experiments.
+    # Enforced at client creation time.
     username_type = db.Column(db.String(20), nullable=False, default="microblogging")
     size = db.Column(db.Integer)
     llm = db.Column(db.String(50))
@@ -627,7 +676,6 @@ class Agent(db.Model):
     activity_profile = db.Column(
         db.Integer, db.ForeignKey("activity_profiles.id"), nullable=True
     )
-    archetype = db.Column(db.String(50), nullable=True, default=None)
 
 
 class Agent_Population(db.Model):
@@ -760,28 +808,15 @@ class Client(db.Model):
     population_id = db.Column(
         db.Integer, db.ForeignKey("population.id"), nullable=False
     )
+    initial_agents = db.Column(db.Integer, nullable=True, default=None)
     network_type = db.Column(db.String(50), default="")
     crecsys = db.Column(db.String(50))
     frecsys = db.Column(db.String(50))
     pid = db.Column(db.Integer, nullable=True, default=None)
+    # Reply behavior controls
     reply_probability = db.Column(db.REAL, default=0.4)
     max_replies_per_round = db.Column(db.Integer, default=2)
     reply_cooldown_rounds = db.Column(db.Integer, default=2)
-    initial_agents = db.Column(db.Integer, nullable=True, default=None)
-    # Agent archetype percentages
-    archetype_validator = db.Column(db.REAL, default=0.52)
-    archetype_broadcaster = db.Column(db.REAL, default=0.20)
-    archetype_explorer = db.Column(db.REAL, default=0.28)
-    # Transition probabilities (3x3 matrix)
-    trans_val_val = db.Column(db.REAL, default=0.853)
-    trans_val_broad = db.Column(db.REAL, default=0.081)
-    trans_val_expl = db.Column(db.REAL, default=0.066)
-    trans_broad_broad = db.Column(db.REAL, default=0.729)
-    trans_broad_val = db.Column(db.REAL, default=0.195)
-    trans_broad_expl = db.Column(db.REAL, default=0.075)
-    trans_expl_expl = db.Column(db.REAL, default=0.490)
-    trans_expl_val = db.Column(db.REAL, default=0.364)
-    trans_expl_broad = db.Column(db.REAL, default=0.146)
 
 
 class Client_Execution(db.Model):
@@ -800,6 +835,8 @@ class Client_Execution(db.Model):
     expected_duration_rounds = db.Column(db.Integer, default=0)
     last_active_hour = db.Column(db.Integer, default=-1)
     last_active_day = db.Column(db.Integer, default=-1)
+    # Execution stage tracking: "initializing" -> "agents_loaded" -> "running"
+    # Used to detect failed runs during agent loading and restart fresh
     execution_stage = db.Column(db.String(20), default="initializing")
 
 
@@ -1181,41 +1218,19 @@ class WatchdogSettings(db.Model):
     run_interval_minutes = db.Column(
         db.Integer, nullable=False, default=1
     )  # Default 1 minute
-    server_heartbeat_timeout_sec = db.Column(db.Integer, nullable=False, default=300)
-    client_heartbeat_timeout_sec = db.Column(db.Integer, nullable=False, default=300)
-    heartbeat_interval_sec = db.Column(db.Integer, nullable=False, default=60)
-    max_restart_attempts = db.Column(db.Integer, nullable=False, default=3)
-    restart_cooldown_sec = db.Column(db.Integer, nullable=False, default=60)
+    server_heartbeat_timeout_sec = db.Column(
+        db.Integer, nullable=False, default=300
+    )  # Server stale heartbeat timeout
+    client_heartbeat_timeout_sec = db.Column(
+        db.Integer, nullable=False, default=300
+    )  # Client stale heartbeat timeout
+    heartbeat_interval_sec = db.Column(
+        db.Integer, nullable=False, default=60
+    )  # Expected heartbeat write interval
+    max_restart_attempts = db.Column(
+        db.Integer, nullable=False, default=3
+    )  # Max retries per unhealthy incident
+    restart_cooldown_sec = db.Column(
+        db.Integer, nullable=False, default=60
+    )  # Cooldown between restart attempts
     last_run = db.Column(db.DateTime, nullable=True)  # Last time watchdog ran
-
-
-class OpinionGroup(db.Model):
-    """
-    Opinion group definitions for opinion dynamics simulations.
-
-    Defines groups of opinions with a name and value range [lower_bound, upper_bound]
-    where bounds are in the interval [0, 1].
-    """
-
-    __bind_key__ = "db_admin"
-    __tablename__ = "opinion_groups"
-    id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(100), nullable=False)
-    lower_bound = db.Column(db.Float, nullable=False)
-    upper_bound = db.Column(db.Float, nullable=False)
-
-
-class OpinionDistribution(db.Model):
-    """
-    Opinion distribution configurations for opinion dynamics simulations.
-
-    Stores distribution types (uniform, beta, etc.) and their parameters
-    as a JSON string for flexible configuration of opinion initialization.
-    """
-
-    __bind_key__ = "db_admin"
-    __tablename__ = "opinion_distributions"
-    id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(100), nullable=False)
-    distribution_type = db.Column(db.String(50), nullable=False)
-    parameters = db.Column(db.Text, nullable=False)  # JSON string

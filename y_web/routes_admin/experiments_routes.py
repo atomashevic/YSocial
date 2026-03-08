@@ -53,8 +53,6 @@ from y_web.models import (
     LogSyncSettings,
     Nationalities,
     Ollama_Pull,
-    OpinionDistribution,
-    OpinionGroup,
     Page,
     Page_Population,
     Population,
@@ -75,7 +73,17 @@ from y_web.utils import (
     terminate_server_process,
 )
 from y_web.utils.desktop_file_handler import send_file_desktop
+from y_web.utils.experiment_clock import (
+    apply_clock_to_client_simulation,
+    default_clock_config,
+    ensure_experiment_clock,
+)
+from y_web.utils.experiment_helpers import get_experiment_uid_from_db_name
 from y_web.utils.jupyter_utils import stop_process
+from y_web.utils.memory_run_id import (
+    build_memory_run_seed,
+    normalize_client_config_memory_run_id,
+)
 from y_web.utils.miscellanea import (
     check_privileges,
     llm_backend_status,
@@ -86,32 +94,145 @@ from y_web.utils.path_utils import get_resource_path
 
 experiments = Blueprint("experiments", __name__)
 
+DEFAULT_OLLAMA_MAX_TOKENS = 768
 
-def get_experiment_uid_from_db_name(db_name):
+
+def _normalize_llm_max_tokens(raw_value):
+    try:
+        parsed = int(raw_value)
+    except (TypeError, ValueError):
+        return DEFAULT_OLLAMA_MAX_TOKENS
+    if parsed <= 0:
+        return DEFAULT_OLLAMA_MAX_TOKENS
+    return parsed
+
+
+def _normalize_username_type(raw_value, default="microblogging"):
+    """Normalize population username_type to supported values."""
+    value = str(raw_value or default).strip().lower()
+    return value if value in {"microblogging", "forum"} else default
+
+
+def _ensure_experiment_prompts_file(base_dir, exp_folder, platform_type):
+    """Ensure prompts.json exists for an experiment, creating it from defaults if needed."""
+    prompts_path = os.path.join(
+        base_dir, f"y_web{os.sep}experiments{os.sep}{exp_folder}{os.sep}prompts.json"
+    )
+    if os.path.exists(prompts_path):
+        return prompts_path
+
+    if platform_type == "microblogging":
+        prompts_src = get_resource_path(os.path.join("data_schema", "prompts.json"))
+    elif platform_type == "forum":
+        prompts_src = get_resource_path(
+            os.path.join("data_schema", "prompts_forum.json")
+        )
+    else:
+        raise ValueError(f"unsupported platform: {platform_type}")
+
+    os.makedirs(os.path.dirname(prompts_path), exist_ok=True)
+    shutil.copyfile(prompts_src, prompts_path)
+    return prompts_path
+
+
+def _repair_population_file_activity_fields(population_file_path, population_id):
     """
-    Extract the experiment UID from the db_name field.
+    Ensure runtime population JSON includes activity fields from admin DB.
 
-    This function handles both SQLite and PostgreSQL formats, and correctly
-    parses paths regardless of which path separator was used when storing.
-
-    Args:
-        db_name: The db_name field from an experiment record
-                 SQLite format: "experiments/uid/database_server.db" or "experiments\\uid\\database_server.db"
-                 PostgreSQL format: "experiments_uid"
-
-    Returns:
-        str: The experiment UID, or None if unable to extract
+    Copy-experiment can carry stale population files; this aligns agent/page
+    activity_profile (by name) and daily_activity_level with current DB records.
     """
-    if db_name.startswith("experiments_"):
-        # PostgreSQL format - UUID is after the underscore
-        return db_name.replace("experiments_", "")
-    elif db_name.startswith("experiments/") or db_name.startswith("experiments\\"):
-        # SQLite format - split using both possible separators
-        # Use regex to split on either forward slash or backslash
-        parts = re.split(r"[/\\]", db_name)
-        if len(parts) >= 2:
-            return parts[1]
-    return None
+    if not os.path.exists(population_file_path):
+        return
+
+    try:
+        with open(population_file_path, "r") as f:
+            data = json.load(f)
+    except Exception as exc:
+        current_app.logger.warning(
+            "Could not read population file %s while repairing activity fields: %s",
+            population_file_path,
+            exc,
+        )
+        return
+
+    agents_payload = data.get("agents")
+    if not isinstance(agents_payload, list):
+        return
+
+    # Build lookup tables from DB for this population.
+    profile_name_by_id = {
+        p.id: p.name for p in db.session.query(ActivityProfile).all() if p and p.name
+    }
+    agent_rows = (
+        db.session.query(Agent)
+        .join(Agent_Population, Agent_Population.agent_id == Agent.id)
+        .filter(Agent_Population.population_id == population_id)
+        .all()
+    )
+    page_rows = (
+        db.session.query(Page)
+        .join(Page_Population, Page_Population.page_id == Page.id)
+        .filter(Page_Population.population_id == population_id)
+        .all()
+    )
+
+    # Agent/page names are expected to be unique per population.
+    agent_lookup = {
+        a.name: (
+            profile_name_by_id.get(a.activity_profile),
+            int(a.daily_activity_level) if a.daily_activity_level is not None else 1,
+        )
+        for a in agent_rows
+        if a and a.name
+    }
+    page_lookup = {
+        p.name: profile_name_by_id.get(p.activity_profile)
+        for p in page_rows
+        if p and p.name
+    }
+
+    changed = False
+    repaired_activity_profile = 0
+    repaired_daily_activity = 0
+
+    for item in agents_payload:
+        if not isinstance(item, dict):
+            continue
+        name = str(item.get("name") or "").strip()
+        is_page = int(item.get("is_page", 0) or 0) == 1
+
+        if is_page:
+            db_profile_name = page_lookup.get(name)
+            if db_profile_name and item.get("activity_profile") != db_profile_name:
+                item["activity_profile"] = db_profile_name
+                repaired_activity_profile += 1
+                changed = True
+            continue
+
+        db_profile_name, db_daily_activity = agent_lookup.get(name, (None, None))
+        if db_profile_name and item.get("activity_profile") != db_profile_name:
+            item["activity_profile"] = db_profile_name
+            repaired_activity_profile += 1
+            changed = True
+
+        if (
+            db_daily_activity is not None
+            and item.get("daily_activity_level") != db_daily_activity
+        ):
+            item["daily_activity_level"] = db_daily_activity
+            repaired_daily_activity += 1
+            changed = True
+
+    if changed:
+        with open(population_file_path, "w") as f:
+            json.dump(data, f, indent=4)
+        current_app.logger.info(
+            "Repaired activity fields in %s (activity_profile=%s, daily_activity_level=%s)",
+            population_file_path,
+            repaired_activity_profile,
+            repaired_daily_activity,
+        )
 
 
 def get_suggested_port():
@@ -509,6 +630,7 @@ def upload_experiment():
 
         with open(config_path, "r") as f:
             experiment_config = json.load(f)
+        experiment_clock = ensure_experiment_clock(experiment_config)
 
         # Use override name if provided, otherwise use name from config
         name = exp_name_override if exp_name_override else experiment_config["name"]
@@ -638,16 +760,14 @@ def upload_experiment():
                     # Insert initial admin user
                     hashed_pw = generate_password_hash("admin", method="pbkdf2:sha256")
 
-                    stmt = text(
-                        """
+                    stmt = text("""
                         INSERT INTO user_mgmt (username, email, password, user_type, leaning, age,
                                                language, owner, joined_on, frecsys_type,
                                                round_actions, toxicity, is_page, daily_activity_level)
                         VALUES (:username, :email, :password, :user_type, :leaning, :age,
                                 :language, :owner, :joined_on, :frecsys_type,
                                 :round_actions, :toxicity, :is_page, :daily_activity_level)
-                        """
-                    )
+                        """)
 
                     dummy_conn.execute(
                         stmt,
@@ -700,6 +820,25 @@ def upload_experiment():
                     flash(f"Warning: Failed to read client config {item}: {str(e)}")
                     continue
 
+                if isinstance(client_config.get("simulation"), dict):
+                    apply_clock_to_client_simulation(
+                        client_config["simulation"], experiment_clock
+                    )
+                normalize_client_config_memory_run_id(
+                    client_config,
+                    fallback_seed=build_memory_run_seed(
+                        uid,
+                        str(
+                            (client_config.get("simulation") or {}).get("name")
+                            or item.removeprefix("client_").rsplit("-", 1)[0]
+                        ),
+                        str(
+                            (client_config.get("simulation") or {}).get("population")
+                            or item.rsplit("-", 1)[-1].removesuffix(".json")
+                        ),
+                    ),
+                )
+
                 # Update the API endpoint in servers section
                 if "servers" in client_config and "api" in client_config["servers"]:
                     try:
@@ -713,17 +852,21 @@ def upload_experiment():
                             r":(\d+)(/|$)", f":{suggested_port}\\2", old_api
                         )
                         client_config["servers"]["api"] = new_api
-
-                        with open(client_config_path, "w") as f:
-                            json.dump(client_config, f, indent=4)
                     except IOError as e:
                         flash(
-                            f"Warning: Failed to write updated client config {item}: {str(e)}"
+                            f"Warning: Failed to update port in client config {item}: {str(e)}"
                         )
                     except Exception as e:
                         flash(
                             f"Warning: Failed to update port in client config {item}: {str(e)}"
                         )
+                try:
+                    with open(client_config_path, "w") as f:
+                        json.dump(client_config, f, indent=4)
+                except IOError as e:
+                    flash(
+                        f"Warning: Failed to write updated client config {item}: {str(e)}"
+                    )
 
         exp = Exps(
             exp_name=name,
@@ -748,7 +891,7 @@ def upload_experiment():
 
         # Create Jupyter instance record
         jupyter_instance = Jupyter_instances(
-            port=-1, notebook_dir="", exp_id=exp.idexp, status="stopped"
+            port=-1, notebook_dir="", exp_id=exp.idexp, status="stopped", process=-1
         )
         db.session.add(jupyter_instance)
         db.session.commit()
@@ -800,12 +943,27 @@ def upload_experiment():
                 f"{BASE_DIR}{os.sep}y_web{os.sep}experiments{os.sep}{uid}{os.sep}{population_file}"
             )
         )
+        raw_population_username_type = pop.get("username_type")
+        if not raw_population_username_type and isinstance(
+            pop.get("population_data"), dict
+        ):
+            raw_population_username_type = pop["population_data"].get("username_type")
+        population_username_type = _normalize_username_type(
+            raw_population_username_type or exp.platform_type
+        )
 
         # check if the population already exists
         existing_population = Population.query.filter_by(name=original_name).first()
         population_created_or_reused = None  # Track if we need to create agents
 
         if existing_population:
+            existing_username_type = _normalize_username_type(
+                getattr(existing_population, "username_type", "microblogging")
+            )
+            username_type_compatible = (
+                existing_username_type == population_username_type
+            )
+
             # Population exists - need to check if agents are the same
             # Get agent names from uploaded config
             uploaded_agent_names = set()
@@ -833,7 +991,10 @@ def upload_experiment():
                     existing_agent_names.add(page.name)
 
             # Check if agents are the same
-            if uploaded_agent_names == existing_agent_names:
+            if (
+                uploaded_agent_names == existing_agent_names
+                and username_type_compatible
+            ):
                 # Agents are the same - just link existing population to experiment
                 population = existing_population
                 pop_exp = Population_Experiment(
@@ -880,7 +1041,11 @@ def upload_experiment():
                             os.rename(old_client_file, new_client_file)
 
                 # Create new population with unique name
-                population = Population(name=new_name, descr="")
+                population = Population(
+                    name=new_name,
+                    descr="",
+                    username_type=population_username_type,
+                )
                 db.session.add(population)
                 db.session.commit()
 
@@ -894,7 +1059,11 @@ def upload_experiment():
                 population_created_or_reused = None
         else:
             # Create new population and its agents
-            population = Population(name=original_name, descr="")
+            population = Population(
+                name=original_name,
+                descr="",
+                username_type=population_username_type,
+            )
             db.session.add(population)
             db.session.commit()
 
@@ -1112,6 +1281,12 @@ def upload_database():
                 f"{BASE_DIR}{os.sep}y_web{os.sep}experiments{os.sep}{uid}{os.sep}config_server.json"
             )
         )
+        ensure_experiment_clock(experiment)
+        with open(
+            f"{BASE_DIR}{os.sep}y_web{os.sep}experiments{os.sep}{uid}{os.sep}config_server.json",
+            "w",
+        ) as config_file:
+            json.dump(experiment, config_file, indent=4)
         experiment = experiment["name"]
 
         # check if the experiment already exists
@@ -1179,7 +1354,18 @@ def create_experiment():
 
     # Get LLM agents setting (convert to integer for database compatibility)
     llm_agents_enabled = 1 if request.form.get("llm_agents_enabled") == "true" else 0
-    opinions_enabled = request.form.get("opinion_annotation") == "true"
+
+    # Get experiment-wide LLM defaults
+    llm_default = request.form.get("llm_default", "http://127.0.0.1:11434/v1")
+    llm_api_key_default = request.form.get("llm_api_key_default", "NULL")
+    llm_max_tokens_default = request.form.get(
+        "llm_max_tokens_default", DEFAULT_OLLAMA_MAX_TOKENS
+    )
+    llm_temperature_default = request.form.get("llm_temperature_default", 1.5)
+    llm_v_default = request.form.get("llm_v_default", "http://127.0.0.1:11434/v1")
+    llm_v_api_key_default = request.form.get("llm_v_api_key_default", "NULL")
+    llm_v_max_tokens_default = request.form.get("llm_v_max_tokens_default", 300)
+    llm_v_temperature_default = request.form.get("llm_v_temperature_default", 0.5)
 
     # Get annotation settings
     toxicity_annotation = request.form.get("toxicity_annotation") == "true"
@@ -1273,16 +1459,14 @@ def create_experiment():
                     # Insert initial admin user
                     hashed_pw = generate_password_hash("admin", method="pbkdf2:sha256")
 
-                    stmt = text(
-                        """
+                    stmt = text("""
                                 INSERT INTO user_mgmt (username, email, password, user_type, leaning, age,
                                                        language, owner, joined_on, frecsys_type,
                                                        round_actions, toxicity, is_page, daily_activity_level)
                                 VALUES (:username, :email, :password, :user_type, :leaning, :age,
                                         :language, :owner, :joined_on, :frecsys_type,
                                         :round_actions, :toxicity, :is_page, :daily_activity_level)
-                                """
-                    )
+                                """)
 
                     dummy_conn.execute(
                         stmt,
@@ -1326,9 +1510,9 @@ def create_experiment():
         ),
         "sentiment_annotation": sentiment_annotation,
         "emotion_annotation": emotion_annotation,
-        "opinions_enabled": opinions_enabled,
         "database_uri": db_uri,
         "topics": [t.strip() for t in topics if t.strip()],
+        "clock": default_clock_config(),
     }
 
     with open(
@@ -1336,6 +1520,8 @@ def create_experiment():
         "w",
     ) as f:
         json.dump(config, f, indent=4)
+
+    _ensure_experiment_prompts_file(BASE_DIR, uid, platform_type)
 
     # add the experiment to the database
 
@@ -1346,8 +1532,6 @@ def create_experiment():
         annotations += "sentiment,"
     if emotion_annotation:
         annotations += "emotion,"
-    if opinions_enabled:
-        annotations += "opinions,"
     # remove trailing comma
     annotations = annotations.rstrip(",")
 
@@ -1366,6 +1550,20 @@ def create_experiment():
         server=host,
         annotations=annotations,
         llm_agents_enabled=llm_agents_enabled,
+        llm_default=llm_default,
+        llm_api_key_default=llm_api_key_default,
+        llm_max_tokens_default=_normalize_llm_max_tokens(llm_max_tokens_default),
+        llm_temperature_default=(
+            float(llm_temperature_default) if llm_temperature_default else 1.5
+        ),
+        llm_v_default=llm_v_default,
+        llm_v_api_key_default=llm_v_api_key_default,
+        llm_v_max_tokens_default=(
+            int(llm_v_max_tokens_default) if llm_v_max_tokens_default else 300
+        ),
+        llm_v_temperature_default=(
+            float(llm_v_temperature_default) if llm_v_temperature_default else 0.5
+        ),
     )
 
     db.session.add(exp)
@@ -1378,11 +1576,32 @@ def create_experiment():
     db.session.add(exp_stats)
     db.session.commit()
 
-    # add first round to the simulation
-    rnd = Rounds(day=0, hour=0)
+    # add first round to the simulation in the experiment DB
+    from y_web.experiment_context import register_experiment_database
 
-    db.session.add(rnd)
-    db.session.commit()
+    register_experiment_database(current_app, exp.idexp, exp.db_name)
+    bind_key = f"db_exp_{exp.idexp}"
+    old_bind = current_app.config["SQLALCHEMY_BINDS"].get("db_exp")
+    current_app.config["SQLALCHEMY_BINDS"]["db_exp"] = current_app.config[
+        "SQLALCHEMY_BINDS"
+    ][bind_key]
+    try:
+        rnd = Rounds(day=0, hour=0)
+        db.session.add(rnd)
+        db.session.commit()
+    except Exception as exc:
+        db.session.rollback()
+        current_app.logger.error(
+            "Failed to create initial round for experiment %s: %s",
+            exp.idexp,
+            exc,
+            exc_info=True,
+        )
+        flash("Failed to initialize experiment database. Please retry.", "error")
+        return redirect(url_for("experiments.settings"))
+    finally:
+        if old_bind is not None:
+            current_app.config["SQLALCHEMY_BINDS"]["db_exp"] = old_bind
 
     for topic in topics:
         # check if the topic already exists in Topics
@@ -1400,7 +1619,7 @@ def create_experiment():
             db.session.commit()
 
     jn_instance = Jupyter_instances(
-        port=-1, notebook_dir="", exp_id=exp.idexp, status="stopped"
+        port=-1, notebook_dir="", exp_id=exp.idexp, status="stopped", process=-1
     )
     db.session.add(jn_instance)
     db.session.commit()
@@ -1426,36 +1645,27 @@ def create_experiment():
 @experiments.route("/admin/delete_simulation/<int:exp_id>")
 @login_required
 def delete_simulation(exp_id):
-    # get the experiment
     """Delete simulation."""
+    # get the experiment
     exp = Exps.query.filter_by(idexp=exp_id).first()
     if exp:
-        # remove the experiment folder
-        # check database type
-        if current_app.config["SQLALCHEMY_BINDS"]["db_exp"].startswith("sqlite"):
-            from y_web.utils.path_utils import get_writable_path
+        from y_web.utils.path_utils import get_writable_path
 
-            BASE_DIR = get_writable_path()
+        BASE_DIR = get_writable_path()
+
+        # Extract experiment folder using helper function
+        exp_folder = get_experiment_uid_from_db_name(exp.db_name)
+        if exp_folder:
             shutil.rmtree(
                 os.path.join(
                     BASE_DIR,
-                    f"y_web{os.sep}experiments{os.sep}{exp.db_name.split(os.sep)[1]}",
-                ),
-                ignore_errors=True,
-            )
-        elif current_app.config["SQLALCHEMY_BINDS"]["db_exp"].startswith("postgresql"):
-            # Remove experiment folder
-            from y_web.utils.path_utils import get_writable_path
-
-            BASE_DIR = get_writable_path()
-            shutil.rmtree(
-                os.path.join(
-                    BASE_DIR,
-                    f"y_web{os.sep}experiments{os.sep}{exp.db_name.removeprefix('experiments_')}",
+                    f"y_web{os.sep}experiments{os.sep}{exp_folder}",
                 ),
                 ignore_errors=True,
             )
 
+        # Drop the PostgreSQL database if using PostgreSQL
+        if current_app.config["SQLALCHEMY_BINDS"]["db_exp"].startswith("postgresql"):
             # Drop the PostgreSQL database
             try:
                 from urllib.parse import urlparse
@@ -1481,14 +1691,12 @@ def delete_simulation(exp_id):
                 ) as conn:
                     # Terminate existing connections to the database
                     conn.execute(
-                        text(
-                            f"""
+                        text(f"""
                             SELECT pg_terminate_backend(pg_stat_activity.pid)
                             FROM pg_stat_activity
                             WHERE pg_stat_activity.datname = :dbname
                             AND pid <> pg_backend_pid()
-                            """
-                        ),
+                            """),
                         {"dbname": exp.db_name},
                     )
                     # Drop the database
@@ -1501,43 +1709,37 @@ def delete_simulation(exp_id):
                     f"Error dropping PostgreSQL database: {str(e)}", exc_info=True
                 )
 
-        # delete the experiment
-        db.session.delete(exp)
-        db.session.commit()
-
-        # Delete log metrics and offsets (should cascade but we do it explicitly for safety)
+        # Delete dependents before experiment to satisfy FK constraints
         db.session.query(LogFileOffset).filter_by(exp_id=exp_id).delete()
         db.session.query(ServerLogMetrics).filter_by(exp_id=exp_id).delete()
         db.session.query(ClientLogMetrics).filter_by(exp_id=exp_id).delete()
-        db.session.commit()
-
-        # remove populaiton_experiment
         db.session.query(Population_Experiment).filter_by(id_exp=exp_id).delete()
-        db.session.commit()
-
-        # delete user experiment
         db.session.query(User_Experiment).filter_by(exp_id=exp_id).delete()
+        db.session.query(ExperimentScheduleItem).filter_by(
+            experiment_id=exp_id
+        ).delete()
         db.session.commit()
 
         # get clients ids for the experiment
         clients = db.session.query(Client).filter_by(id_exp=exp_id).all()
         cids = [c.id for c in clients]
 
-        # delete the clients
-        db.session.query(Client).filter_by(id_exp=exp_id).delete()
-        db.session.commit()
-
         # delete exp stats
         db.session.query(Exp_stats).filter_by(exp_id=exp_id).delete()
         db.session.commit()
 
-        for cid in cids:
-            # delete the client executions
-            db.session.query(Client_Execution).filter_by(client_id=cid).delete()
+        # Delete client execution records first (FK constraint)
+        if cids:
+            db.session.query(Client_Execution).filter(
+                Client_Execution.client_id.in_(cids)
+            ).delete(synchronize_session=False)
             db.session.commit()
 
-            db.session.query(Client).filter_by(id=cid).delete()
-            db.session.commit()
+        # Delete clients
+        db.session.query(Client).filter_by(id_exp=exp_id).delete(
+            synchronize_session=False
+        )
+        db.session.commit()
 
         # delete experiment topics
         db.session.query(Exp_Topic).filter_by(exp_id=exp_id).delete()
@@ -1545,11 +1747,16 @@ def delete_simulation(exp_id):
 
         # delete jupyter instances
         instances = db.session.query(Jupyter_instances).filter_by(exp_id=exp_id).all()
-        try:
-            stop_process(instances.process, instances.exp_id)
-        except Exception:
-            pass
+        for instance in instances:
+            try:
+                stop_process(instance.process, instance.exp_id)
+            except Exception:
+                pass
         db.session.query(Jupyter_instances).filter_by(exp_id=exp_id).delete()
+        db.session.commit()
+
+        # delete the experiment last
+        db.session.delete(exp)
         db.session.commit()
 
     return settings()
@@ -1718,6 +1925,9 @@ def experiment_details(uid):
 
     # get experiment details
     experiment = Exps.query.filter_by(idexp=uid).first()
+    if not experiment:
+        flash("Experiment not found", "error")
+        return redirect(url_for("experiments.settings"))
 
     # get experiment populations along with population names and ids
     experiment_populations = (
@@ -1777,6 +1987,45 @@ def experiment_details(uid):
     )
 
 
+@experiments.route("/admin/update_experiment_descr/<int:uid>", methods=["POST"])
+@login_required
+def update_experiment_descr(uid: int):
+    """Update an experiment's description (used as forum "subreddit_vibe")."""
+    priv = check_privileges(current_user.username)
+    if priv is not None:
+        return priv
+
+    user = Admin_users.query.filter_by(username=current_user.username).first()
+    if not user:
+        return jsonify({"success": False, "message": "Forbidden"}), 403
+
+    exp = Exps.query.filter_by(idexp=uid).first()
+    if not exp:
+        return jsonify({"success": False, "message": "Experiment not found"}), 404
+
+    # Keep behavior consistent with experiments_data: researchers only edit their own experiments.
+    if user and user.role == "researcher" and exp.owner != user.username:
+        return jsonify({"success": False, "message": "Forbidden"}), 403
+
+    data = request.get_json(silent=True) or {}
+    exp_descr = (data.get("exp_descr") or request.form.get("exp_descr") or "").strip()
+    exp_descr = exp_descr[:200]  # DB column is String(200)
+
+    try:
+        exp.exp_descr = exp_descr
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        return (
+            jsonify(
+                {"success": False, "message": f"Failed to update description: {e}"}
+            ),
+            500,
+        )
+
+    return jsonify({"success": True, "exp_descr": exp_descr}), 200
+
+
 @experiments.route("/admin/submit_experiment_logs/<int:exp_id>", methods=["POST"])
 @login_required
 def submit_experiment_logs(exp_id):
@@ -1811,15 +2060,13 @@ def submit_experiment_logs(exp_id):
     # Get experiment folder path
     BASE_DIR = get_writable_path()
 
-    # Extract experiment folder name from db_name
-    # db_name format: "experiments{sep}{folder}{sep}database_server.db"
-    db_name_parts = experiment.db_name.split(os.sep)
-    if len(db_name_parts) < 2:
+    # Extract experiment folder using helper function
+    experiment_folder_name = get_experiment_uid_from_db_name(experiment.db_name)
+    if not experiment_folder_name:
         return jsonify(
             {"success": False, "message": "Invalid experiment database path format."}
         )
 
-    experiment_folder_name = db_name_parts[1]
     experiment_folder = (
         f"{BASE_DIR}{os.sep}y_web{os.sep}experiments{os.sep}{experiment_folder_name}"
     )
@@ -2173,14 +2420,33 @@ def client_logs(client_id):
 
         # Client log file name format: {client_name}_client.log
         log_file = os.path.join(exp_folder, f"{client.name}_client.log")
+        stderr_file = os.path.join(exp_folder, f"{client.name}_client_stderr.log")
 
-        # Check if log file exists
-        if not os.path.exists(log_file):
+        # Check if main log file exists and has content
+        log_file_exists = os.path.exists(log_file) and os.path.getsize(log_file) > 0
+
+        # If main log is empty/missing, try to get recent stderr output
+        raw_log_lines = []
+        if not log_file_exists and os.path.exists(stderr_file):
+            try:
+                with open(stderr_file, "r") as f:
+                    # Read last 100 lines from stderr
+                    lines = f.readlines()
+                    raw_log_lines = [line.rstrip() for line in lines[-100:]]
+            except Exception as e:
+                current_app.logger.warning(f"Could not read stderr log: {e}")
+
+        if not log_file_exists:
             return jsonify(
                 {
                     "call_volume": {},
                     "mean_execution_time": {},
-                    "error": "Log file not found",
+                    "raw_log": raw_log_lines,
+                    "error": (
+                        "Structured log data not available"
+                        if raw_log_lines
+                        else "Log file not found"
+                    ),
                 }
             )
 
@@ -2245,10 +2511,15 @@ def start_experiment(uid):
 
     # get experiment
     exp = Exps.query.filter_by(idexp=uid).first()
+    if not exp:
+        flash("Experiment not found", "error")
+        return redirect(url_for("experiments.settings"))
 
     # check if the experiment is already running
     if exp.running == 1:
         return experiment_details(uid)
+
+    previous_status = exp.exp_status
 
     # update the experiment status
     db.session.query(Exps).filter_by(idexp=uid).update(
@@ -2257,7 +2528,29 @@ def start_experiment(uid):
     db.session.commit()
 
     # start the yserver
-    start_server(exp)
+    try:
+        start_server(exp)
+    except Exception as e:
+        current_app.logger.error(
+            "Failed to start experiment %s server: %s",
+            uid,
+            e,
+            exc_info=True,
+        )
+        restored_status = (
+            previous_status
+            if previous_status and previous_status != "active"
+            else "stopped"
+        )
+        db.session.query(Exps).filter_by(idexp=uid).update(
+            {Exps.running: 0, Exps.exp_status: restored_status}
+        )
+        db.session.commit()
+        flash(
+            "Failed to start experiment server. Please check server logs and try again.",
+            "error",
+        )
+        return redirect(url_for("experiments.experiment_details", uid=uid))
 
     return experiment_details(uid)
 
@@ -2280,6 +2573,9 @@ def stop_experiment(uid):
 
     # get experiment
     exp = Exps.query.filter_by(idexp=uid).first()
+    if not exp:
+        flash("Experiment not found", "error")
+        return redirect(url_for("experiments.settings"))
 
     # check if the experiment is already running
     if exp.running == 0:
@@ -2331,14 +2627,25 @@ def prompts(uid):
 
     # get experiment details
     experiment = Exps.query.filter_by(idexp=uid).first()
-    # get the prompts file for the experiment
-    prompts = os.path.join(
-        BASE_DIR,
-        f"y_web{os.sep}experiments{os.sep}{experiment.db_name.split(os.sep)[1]}{os.sep}prompts.json",
-    )
+    if not experiment:
+        flash("Experiment not found", "error")
+        return redirect(url_for("experiments.settings"))
 
-    # read the prompts file
-    prompts = json.load(open(prompts))
+    # Extract experiment folder using helper function
+    exp_folder = get_experiment_uid_from_db_name(experiment.db_name)
+    if not exp_folder:
+        flash("Invalid experiment database configuration", "error")
+        return redirect(url_for("experiments.settings"))
+
+    try:
+        prompts_path = _ensure_experiment_prompts_file(
+            BASE_DIR, exp_folder, experiment.platform_type
+        )
+        with open(prompts_path, "r") as prompts_file:
+            prompts = json.load(prompts_file)
+    except Exception as e:
+        flash(f"Could not load prompts file: {e}", "error")
+        return redirect(url_for("experiments.experiment_details", uid=uid))
 
     return render_template("admin/prompts.html", experiment=experiment, prompts=prompts)
 
@@ -2355,23 +2662,789 @@ def update_prompts(uid):
 
     # get experiment details
     experiment = Exps.query.filter_by(idexp=uid).first()
-    # get the prompts file for the experiment
-    prompts_filename = os.path.join(
-        BASE_DIR,
-        f"y_web{os.sep}experiments{os.sep}{experiment.db_name.split(os.sep)[1]}{os.sep}prompts.json",
-    )
+    if not experiment:
+        flash("Experiment not found", "error")
+        return redirect(url_for("experiments.settings"))
 
-    # read the prompts file
-    prompts = json.load(open(prompts_filename))
+    # Extract experiment folder using helper function
+    exp_folder = get_experiment_uid_from_db_name(experiment.db_name)
+    if not exp_folder:
+        flash("Invalid experiment database configuration", "error")
+        return redirect(url_for("experiments.settings"))
+
+    try:
+        prompts_filename = _ensure_experiment_prompts_file(
+            BASE_DIR, exp_folder, experiment.platform_type
+        )
+        with open(prompts_filename, "r") as prompts_file:
+            prompts = json.load(prompts_file)
+    except Exception as e:
+        flash(f"Could not load prompts file: {e}", "error")
+        return redirect(url_for("experiments.experiment_details", uid=uid))
 
     # update the prompts
     for key in request.form.keys():
         prompts[key] = request.form[key]
 
     # write the updated prompts
-    json.dump(prompts, open(prompts_filename, "w"), indent=4)
+    with open(prompts_filename, "w") as prompts_file:
+        json.dump(prompts, prompts_file, indent=4)
 
     return redirect(request.referrer)
+
+
+@experiments.route("/admin/rss_feeds/<int:uid>")
+@login_required
+def rss_feeds(uid):
+    """Display and edit RSS feeds for an experiment."""
+    check_privileges(current_user.username)
+
+    from y_web.utils.path_utils import get_writable_path
+
+    BASE_DIR = get_writable_path()
+    experiment = Exps.query.filter_by(idexp=uid).first()
+    if not experiment:
+        flash("Experiment not found", "error")
+        return redirect(url_for("experiments.settings"))
+
+    # Extract experiment folder using helper function
+    exp_folder = get_experiment_uid_from_db_name(experiment.db_name)
+    if not exp_folder:
+        flash("Invalid experiment database configuration", "error")
+        return redirect(url_for("experiments.settings"))
+
+    rss_feeds_path = os.path.join(
+        BASE_DIR, f"y_web{os.sep}experiments{os.sep}{exp_folder}{os.sep}rss_feeds.json"
+    )
+    url_feeds_path = os.path.join(
+        BASE_DIR, f"y_web{os.sep}experiments{os.sep}{exp_folder}{os.sep}url_feeds.txt"
+    )
+
+    # Load existing feeds
+    rss_feeds_data = []
+    if os.path.exists(rss_feeds_path):
+        try:
+            with open(rss_feeds_path, "r") as f:
+                rss_feeds_data = json.load(f)
+        except (json.JSONDecodeError, IOError):
+            rss_feeds_data = []
+
+    url_feeds_data = []
+    if os.path.exists(url_feeds_path):
+        try:
+            with open(url_feeds_path, "r") as f:
+                url_feeds_data = [line.strip() for line in f if line.strip()]
+        except IOError:
+            url_feeds_data = []
+
+    return render_template(
+        "admin/rss_feeds.html",
+        experiment=experiment,
+        rss_feeds=rss_feeds_data,
+        url_feeds=url_feeds_data,
+    )
+
+
+@experiments.route("/admin/update_rss_feeds/<int:uid>", methods=["POST"])
+@login_required
+def update_rss_feeds(uid):
+    """Update RSS feeds for an experiment."""
+    check_privileges(current_user.username)
+
+    from y_web.utils.path_utils import get_writable_path
+
+    BASE_DIR = get_writable_path()
+    experiment = Exps.query.filter_by(idexp=uid).first()
+    if not experiment:
+        flash("Experiment not found", "error")
+        return redirect(url_for("experiments.settings"))
+
+    # Extract experiment folder using helper function
+    exp_folder = get_experiment_uid_from_db_name(experiment.db_name)
+    if not exp_folder:
+        flash("Invalid experiment database configuration", "error")
+        return redirect(url_for("experiments.settings"))
+
+    rss_feeds_path = os.path.join(
+        BASE_DIR, f"y_web{os.sep}experiments{os.sep}{exp_folder}{os.sep}rss_feeds.json"
+    )
+
+    # Get feeds from form
+    feeds_json = request.form.get("rss_feeds_json", "[]")
+    try:
+        feeds = json.loads(feeds_json)
+    except json.JSONDecodeError:
+        flash("Invalid RSS feeds payload; changes were not saved.", "error")
+        return redirect(request.referrer or url_for("experiments.rss_feeds", uid=uid))
+
+    # Write the updated feeds
+    with open(rss_feeds_path, "w") as f:
+        json.dump(feeds, f, indent=2)
+
+    return redirect(request.referrer)
+
+
+@experiments.route("/admin/update_url_feeds/<int:uid>", methods=["POST"])
+@login_required
+def update_url_feeds(uid):
+    """Update URL feeds for an experiment."""
+    check_privileges(current_user.username)
+
+    from y_web.utils.path_utils import get_writable_path
+
+    BASE_DIR = get_writable_path()
+    experiment = Exps.query.filter_by(idexp=uid).first()
+    if not experiment:
+        flash("Experiment not found", "error")
+        return redirect(url_for("experiments.settings"))
+
+    # Extract experiment folder using helper function
+    exp_folder = get_experiment_uid_from_db_name(experiment.db_name)
+    if not exp_folder:
+        flash("Invalid experiment database configuration", "error")
+        return redirect(url_for("experiments.settings"))
+
+    url_feeds_path = os.path.join(
+        BASE_DIR, f"y_web{os.sep}experiments{os.sep}{exp_folder}{os.sep}url_feeds.txt"
+    )
+
+    # Get URLs from form
+    urls_text = request.form.get("url_feeds_text", "")
+    urls = [line.strip() for line in urls_text.split("\n") if line.strip()]
+
+    # Write the updated URLs
+    with open(url_feeds_path, "w") as f:
+        f.write("\n".join(urls))
+
+    return redirect(request.referrer)
+
+
+@experiments.route("/admin/api/parse_rss_feed", methods=["POST"])
+@login_required
+def parse_rss_feed():
+    """Parse an RSS feed URL and return feed info."""
+    import re
+    from urllib.parse import urlparse
+
+    import feedparser
+
+    feed_url = request.json.get("feed_url", "")
+    if not feed_url:
+        return jsonify({"error": "No URL provided"}), 400
+
+    try:
+        # Detect Reddit RSS feed
+        # Pattern: reddit.com/r/{subreddit}[/sort].rss
+        reddit_pattern = re.compile(
+            r"^https?://(?:www\.)?reddit\.com/r/([\w]+)(?:/(?:new|hot|top|rising))?\.rss$",
+            re.IGNORECASE,
+        )
+        reddit_match = reddit_pattern.match(feed_url)
+
+        feed = feedparser.parse(feed_url)
+        if feed.bozo and not feed.entries:
+            return jsonify({"error": "Invalid RSS feed URL"}), 400
+
+        parsed_url = urlparse(feed_url)
+        url_site = parsed_url.netloc
+
+        if reddit_match:
+            subreddit = reddit_match.group(1)
+            return jsonify(
+                {
+                    "name": f"r/{subreddit}",
+                    "feed_url": feed_url,
+                    "url_site": "reddit.com",
+                    "description": f"Reddit r/{subreddit} - External article links only",
+                    "entries_count": len(feed.entries),
+                    "is_reddit": True,
+                    "subreddit": subreddit,
+                }
+            )
+
+        return jsonify(
+            {
+                "name": feed.feed.get("title", url_site),
+                "feed_url": feed_url,
+                "url_site": url_site,
+                "description": feed.feed.get("description", ""),
+                "entries_count": len(feed.entries),
+                "is_reddit": False,
+            }
+        )
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
+
+
+@experiments.route("/admin/upload_rss_feeds/<int:uid>", methods=["POST"])
+@login_required
+def upload_rss_feeds(uid):
+    """Upload bulk RSS feeds from JSON file."""
+    check_privileges(current_user.username)
+
+    from y_web.utils.path_utils import get_writable_path
+
+    BASE_DIR = get_writable_path()
+    experiment = Exps.query.filter_by(idexp=uid).first()
+    if not experiment:
+        return jsonify({"error": "Experiment not found"}), 404
+
+    # Extract experiment folder using helper function
+    exp_folder = get_experiment_uid_from_db_name(experiment.db_name)
+    if not exp_folder:
+        return jsonify({"error": "Invalid experiment database configuration"}), 400
+
+    rss_feeds_path = os.path.join(
+        BASE_DIR, f"y_web{os.sep}experiments{os.sep}{exp_folder}{os.sep}rss_feeds.json"
+    )
+
+    if "file" not in request.files:
+        return jsonify({"error": "No file provided"}), 400
+
+    file = request.files["file"]
+    if file.filename == "":
+        return jsonify({"error": "No file selected"}), 400
+
+    try:
+        content = file.read().decode("utf-8")
+        new_feeds = json.loads(content)
+
+        if not isinstance(new_feeds, list):
+            return jsonify({"error": "JSON must be an array of feeds"}), 400
+
+        mode = request.form.get("mode", "replace")
+
+        if mode == "merge":
+            # Load existing feeds and merge
+            existing_feeds = []
+            if os.path.exists(rss_feeds_path):
+                with open(rss_feeds_path, "r") as f:
+                    existing_feeds = json.load(f)
+
+            # Merge by feed_url (avoid duplicates)
+            existing_urls = {f.get("feed_url") for f in existing_feeds}
+            for feed in new_feeds:
+                if feed.get("feed_url") not in existing_urls:
+                    existing_feeds.append(feed)
+            new_feeds = existing_feeds
+
+        with open(rss_feeds_path, "w") as f:
+            json.dump(new_feeds, f, indent=2)
+
+        return jsonify({"success": True, "count": len(new_feeds)})
+    except json.JSONDecodeError:
+        return jsonify({"error": "Invalid JSON format"}), 400
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
+
+
+@experiments.route("/admin/upload_url_feeds/<int:uid>", methods=["POST"])
+@login_required
+def upload_url_feeds(uid):
+    """Upload bulk URL feeds from text file."""
+    check_privileges(current_user.username)
+
+    from y_web.utils.path_utils import get_writable_path
+
+    BASE_DIR = get_writable_path()
+    experiment = Exps.query.filter_by(idexp=uid).first()
+    if not experiment:
+        return jsonify({"error": "Experiment not found"}), 404
+
+    # Extract experiment folder using helper function
+    exp_folder = get_experiment_uid_from_db_name(experiment.db_name)
+    if not exp_folder:
+        return jsonify({"error": "Invalid experiment database configuration"}), 400
+
+    url_feeds_path = os.path.join(
+        BASE_DIR, f"y_web{os.sep}experiments{os.sep}{exp_folder}{os.sep}url_feeds.txt"
+    )
+
+    if "file" not in request.files:
+        return jsonify({"error": "No file provided"}), 400
+
+    file = request.files["file"]
+    if file.filename == "":
+        return jsonify({"error": "No file selected"}), 400
+
+    try:
+        content = file.read().decode("utf-8")
+
+        # Try to parse as JSON array first
+        try:
+            urls = json.loads(content)
+            if isinstance(urls, list):
+                urls = [str(u).strip() for u in urls if u]
+            else:
+                urls = [line.strip() for line in content.split("\n") if line.strip()]
+        except json.JSONDecodeError:
+            # Parse as plain text (one URL per line)
+            urls = [line.strip() for line in content.split("\n") if line.strip()]
+
+        mode = request.form.get("mode", "replace")
+
+        if mode == "merge":
+            # Load existing URLs and merge
+            existing_urls = set()
+            if os.path.exists(url_feeds_path):
+                with open(url_feeds_path, "r") as f:
+                    existing_urls = {line.strip() for line in f if line.strip()}
+
+            urls = list(existing_urls | set(urls))
+
+        with open(url_feeds_path, "w") as f:
+            f.write("\n".join(urls))
+
+        return jsonify({"success": True, "count": len(urls)})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
+
+
+# ============================================================================
+# Image Feeds Management (for standalone image sharing from Reddit subreddits)
+# ============================================================================
+
+
+@experiments.route("/admin/image_feeds/<int:uid>")
+@login_required
+def image_feeds(uid):
+    """Display and edit image feeds for an experiment."""
+    check_privileges(current_user.username)
+
+    from y_web.utils.path_utils import get_writable_path
+
+    BASE_DIR = get_writable_path()
+    experiment = Exps.query.filter_by(idexp=uid).first()
+    if not experiment:
+        flash("Experiment not found", "error")
+        return redirect(url_for("experiments.settings"))
+
+    # Extract experiment folder using helper function
+    exp_folder = get_experiment_uid_from_db_name(experiment.db_name)
+    if not exp_folder:
+        flash("Invalid experiment database configuration", "error")
+        return redirect(url_for("experiments.settings"))
+
+    image_feeds_path = os.path.join(
+        BASE_DIR,
+        f"y_web{os.sep}experiments{os.sep}{exp_folder}{os.sep}image_feeds.json",
+    )
+
+    # Load existing image feeds
+    image_feeds_data = []
+    if os.path.exists(image_feeds_path):
+        try:
+            with open(image_feeds_path, "r") as f:
+                image_feeds_data = json.load(f)
+        except (json.JSONDecodeError, IOError):
+            image_feeds_data = []
+
+    # Default interests list
+    available_interests = [
+        "humor",
+        "entertainment",
+        "fun",
+        "memes",
+        "photography",
+        "travel",
+        "nature",
+        "general",
+        "animals",
+        "pets",
+        "wholesome",
+        "cute",
+        "technology",
+        "gaming",
+        "science",
+        "geek",
+        "art",
+        "design",
+        "creative",
+        "music",
+        "sports",
+        "fitness",
+        "food",
+        "cooking",
+        "movies",
+        "tv",
+        "celebrities",
+        "news",
+        "politics",
+        "history",
+        "education",
+        "books",
+    ]
+
+    return render_template(
+        "admin/image_feeds.html",
+        experiment=experiment,
+        image_feeds=image_feeds_data,
+        available_interests=sorted(available_interests),
+    )
+
+
+@experiments.route("/admin/update_image_feeds/<int:uid>", methods=["POST"])
+@login_required
+def update_image_feeds(uid):
+    """Update image feeds for an experiment."""
+    check_privileges(current_user.username)
+
+    from y_web.utils.path_utils import get_writable_path
+
+    BASE_DIR = get_writable_path()
+    experiment = Exps.query.filter_by(idexp=uid).first()
+    if not experiment:
+        flash("Experiment not found", "error")
+        return redirect(url_for("experiments.settings"))
+
+    # Extract experiment folder using helper function
+    exp_folder = get_experiment_uid_from_db_name(experiment.db_name)
+    if not exp_folder:
+        flash("Invalid experiment database configuration", "error")
+        return redirect(url_for("experiments.settings"))
+
+    image_feeds_path = os.path.join(
+        BASE_DIR,
+        f"y_web{os.sep}experiments{os.sep}{exp_folder}{os.sep}image_feeds.json",
+    )
+
+    # Get feeds from form
+    feeds_json = request.form.get("image_feeds_json", "[]")
+    try:
+        feeds = json.loads(feeds_json)
+    except json.JSONDecodeError:
+        flash("Invalid image feeds payload; changes were not saved.", "error")
+        return redirect(request.referrer or url_for("experiments.image_feeds", uid=uid))
+
+    # Write the updated feeds
+    with open(image_feeds_path, "w") as f:
+        json.dump(feeds, f, indent=2)
+
+    return redirect(request.referrer)
+
+
+@experiments.route("/admin/upload_image_feeds/<int:uid>", methods=["POST"])
+@login_required
+def upload_image_feeds(uid):
+    """Upload bulk image feeds from JSON file."""
+    check_privileges(current_user.username)
+
+    from y_web.utils.path_utils import get_writable_path
+
+    BASE_DIR = get_writable_path()
+    experiment = Exps.query.filter_by(idexp=uid).first()
+    if not experiment:
+        return jsonify({"error": "Experiment not found"}), 404
+
+    exp_folder = get_experiment_uid_from_db_name(experiment.db_name)
+    if not exp_folder:
+        return jsonify({"error": "Invalid experiment database configuration"}), 400
+
+    image_feeds_path = os.path.join(
+        BASE_DIR,
+        f"y_web{os.sep}experiments{os.sep}{exp_folder}{os.sep}image_feeds.json",
+    )
+
+    if "file" not in request.files:
+        return jsonify({"error": "No file provided"}), 400
+
+    file = request.files["file"]
+    if file.filename == "":
+        return jsonify({"error": "No file selected"}), 400
+
+    try:
+        content = file.read().decode("utf-8")
+        new_feeds = json.loads(content)
+        if not isinstance(new_feeds, list):
+            return jsonify({"error": "JSON must be an array of image feeds"}), 400
+
+        normalized_feeds = []
+        seen_subreddits = set()
+        for item in new_feeds:
+            if not isinstance(item, dict):
+                continue
+            subreddit = str(item.get("subreddit", "")).strip().lower()
+            subreddit = subreddit[2:] if subreddit.startswith("r/") else subreddit
+            interests = item.get("interests") or []
+            if not subreddit:
+                continue
+            if not isinstance(interests, list):
+                interests = [str(interests).strip()] if str(interests).strip() else []
+            clean_interests = []
+            seen_interests = set()
+            for interest in interests:
+                label = str(interest).strip()
+                if not label or label in seen_interests:
+                    continue
+                seen_interests.add(label)
+                clean_interests.append(label)
+            if subreddit in seen_subreddits:
+                continue
+            seen_subreddits.add(subreddit)
+            normalized_feeds.append(
+                {
+                    "subreddit": subreddit,
+                    "interests": clean_interests,
+                }
+            )
+
+        mode = request.form.get("mode", "replace")
+        if mode == "merge":
+            existing_feeds = []
+            if os.path.exists(image_feeds_path):
+                with open(image_feeds_path, "r") as f:
+                    existing_feeds = json.load(f)
+            merged = []
+            by_subreddit = {}
+            for feed in existing_feeds:
+                if not isinstance(feed, dict):
+                    continue
+                subreddit = str(feed.get("subreddit", "")).strip().lower()
+                if not subreddit:
+                    continue
+                merged_feed = {
+                    "subreddit": subreddit,
+                    "interests": list(feed.get("interests") or []),
+                }
+                merged.append(merged_feed)
+                by_subreddit[subreddit] = merged_feed
+            for feed in normalized_feeds:
+                subreddit = feed["subreddit"]
+                if subreddit in by_subreddit:
+                    existing = by_subreddit[subreddit]
+                    combined = []
+                    seen = set()
+                    for label in list(existing.get("interests") or []) + list(
+                        feed.get("interests") or []
+                    ):
+                        label = str(label).strip()
+                        if not label or label in seen:
+                            continue
+                        seen.add(label)
+                        combined.append(label)
+                    existing["interests"] = combined
+                else:
+                    merged.append(feed)
+                    by_subreddit[subreddit] = feed
+            normalized_feeds = merged
+
+        with open(image_feeds_path, "w") as f:
+            json.dump(normalized_feeds, f, indent=2)
+
+        return jsonify({"success": True, "count": len(normalized_feeds)})
+    except json.JSONDecodeError:
+        return jsonify({"error": "Invalid JSON format"}), 400
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
+
+
+# Default feed limits for when config doesn't have them
+DEFAULT_FEED_LIMITS = {
+    "rss_entries_per_feed": 100,
+    "reddit_entries_per_feed": 200,
+    "reddit_pages": 2,
+    "reddit_rate_limit_seconds": 2,
+    "db_fallback_limit": 50,
+    "image_entries_per_feed": 100,
+}
+
+
+@experiments.route("/admin/feed_limits/<uid>", methods=["GET"])
+@login_required
+def feed_limits(uid):
+    """Display and edit feed retrieval limits for an experiment."""
+    check_privileges(current_user.username)
+
+    from y_web.utils.path_utils import get_writable_path
+
+    BASE_DIR = get_writable_path()
+    experiment = Exps.query.filter_by(idexp=uid).first()
+    if not experiment:
+        flash("Experiment not found", "error")
+        return redirect(url_for("experiments.settings"))
+
+    # Extract experiment folder using helper function
+    exp_folder = get_experiment_uid_from_db_name(experiment.db_name)
+    if not exp_folder:
+        flash("Invalid experiment database configuration", "error")
+        return redirect(url_for("experiments.settings"))
+
+    config_path = os.path.join(
+        BASE_DIR, f"y_web{os.sep}experiments{os.sep}{exp_folder}{os.sep}config.json"
+    )
+
+    # Load existing config and extract feed_limits
+    feed_limits_data = dict(DEFAULT_FEED_LIMITS)  # Start with defaults
+    if os.path.exists(config_path):
+        try:
+            with open(config_path, "r") as f:
+                config = json.load(f)
+                if "feed_limits" in config:
+                    feed_limits_data.update(config["feed_limits"])
+        except (json.JSONDecodeError, IOError):
+            pass
+
+    return render_template(
+        "admin/feed_limits.html",
+        experiment=experiment,
+        feed_limits=feed_limits_data,
+    )
+
+
+@experiments.route("/admin/update_feed_limits/<uid>", methods=["POST"])
+@login_required
+def update_feed_limits(uid):
+    """Update feed limits for an experiment."""
+    check_privileges(current_user.username)
+
+    from y_web.utils.path_utils import get_writable_path
+
+    BASE_DIR = get_writable_path()
+    experiment = Exps.query.filter_by(idexp=uid).first()
+    if not experiment:
+        flash("Experiment not found", "error")
+        return redirect(url_for("experiments.settings"))
+
+    # Extract experiment folder using helper function
+    exp_folder = get_experiment_uid_from_db_name(experiment.db_name)
+    if not exp_folder:
+        flash("Invalid experiment database configuration", "error")
+        return redirect(url_for("experiments.settings"))
+
+    config_path = os.path.join(
+        BASE_DIR, f"y_web{os.sep}experiments{os.sep}{exp_folder}{os.sep}config.json"
+    )
+
+    # Load existing config
+    config = {}
+    if os.path.exists(config_path):
+        try:
+            with open(config_path, "r") as f:
+                config = json.load(f)
+        except (json.JSONDecodeError, IOError):
+            config = {}
+
+    # Update feed_limits from form
+    feed_limits = {
+        "rss_entries_per_feed": int(request.form.get("rss_entries_per_feed", 100)),
+        "reddit_entries_per_feed": int(
+            request.form.get("reddit_entries_per_feed", 200)
+        ),
+        "reddit_pages": int(request.form.get("reddit_pages", 2)),
+        "reddit_rate_limit_seconds": float(
+            request.form.get("reddit_rate_limit_seconds", 2)
+        ),
+        "db_fallback_limit": int(request.form.get("db_fallback_limit", 50)),
+        "image_entries_per_feed": int(request.form.get("image_entries_per_feed", 100)),
+    }
+
+    config["feed_limits"] = feed_limits
+
+    # Write the updated config
+    with open(config_path, "w") as f:
+        json.dump(config, f, indent=2)
+
+    flash("Feed limits updated successfully.", "success")
+    return redirect(request.referrer or f"/admin/feed_limits/{uid}")
+
+
+@experiments.route("/admin/api/parse_image_feed", methods=["POST"])
+@login_required
+def parse_image_feed():
+    """Parse a Reddit subreddit RSS feed and return image info."""
+    import re
+
+    import feedparser
+
+    subreddit = request.json.get("subreddit", "").strip().lower()
+    if not subreddit:
+        return jsonify({"error": "No subreddit provided"}), 400
+
+    # Remove r/ prefix if present
+    subreddit = subreddit.lstrip("r/")
+
+    feed_url = f"https://www.reddit.com/r/{subreddit}.rss"
+
+    try:
+        feed = feedparser.parse(feed_url)
+        if feed.bozo and not feed.entries:
+            return (
+                jsonify(
+                    {
+                        "error": f"Could not parse r/{subreddit} - subreddit may not exist"
+                    }
+                ),
+                400,
+            )
+
+        if not feed.entries:
+            return jsonify({"error": f"No posts found in r/{subreddit}"}), 400
+
+        # Image URL patterns
+        image_pattern = re.compile(r"\.(jpg|jpeg|png|gif|webp)(\?.*)?$", re.IGNORECASE)
+        image_hosts = ["i.redd.it", "i.imgur.com", "preview.redd.it"]
+
+        images = []
+        nsfw_count = 0
+
+        for entry in feed.entries[:50]:
+            # Skip NSFW posts
+            is_nsfw = False
+            # Check for NSFW in various fields
+            if hasattr(entry, "over_18") and entry.over_18:
+                is_nsfw = True
+            elif "[nsfw]" in entry.get("title", "").lower():
+                is_nsfw = True
+            elif hasattr(entry, "tags"):
+                for tag in entry.tags:
+                    if tag.get("term", "").lower() == "nsfw":
+                        is_nsfw = True
+                        break
+
+            if is_nsfw:
+                nsfw_count += 1
+                continue
+
+            # Try to extract image URL
+            image_url = None
+
+            # Method 1: Direct link to image
+            link = entry.get("link", "")
+            if image_pattern.search(link) or any(host in link for host in image_hosts):
+                image_url = link
+
+            # Method 2: media_content
+            if not image_url and hasattr(entry, "media_content"):
+                for media in entry.media_content:
+                    url = media.get("url", "")
+                    if image_pattern.search(url) or any(
+                        host in url for host in image_hosts
+                    ):
+                        image_url = url
+                        break
+
+            # Method 3: media_thumbnail
+            if not image_url and hasattr(entry, "media_thumbnail"):
+                for thumb in entry.media_thumbnail:
+                    url = thumb.get("url", "")
+                    if url:
+                        image_url = url
+                        break
+
+            if image_url:
+                images.append(image_url)
+
+        return jsonify(
+            {
+                "subreddit": subreddit,
+                "feed_url": feed_url,
+                "image_count": len(images),
+                "nsfw_filtered": nsfw_count,
+                "sample_images": images[:5],  # Return first 5 as samples
+            }
+        )
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
 
 
 @experiments.route("/admin/download_experiment/<int:eid>", methods=["POST", "GET"])
@@ -2391,24 +3464,26 @@ def download_experiment_file(eid):
 
     # get experiment details
     experiment = Exps.query.filter_by(idexp=eid).first()
+    if not experiment:
+        flash("Experiment not found", "error")
+        return redirect(url_for("experiments.settings"))
+
+    # Extract experiment folder using helper function
+    exp_folder = get_experiment_uid_from_db_name(experiment.db_name)
+    if not exp_folder:
+        flash("Invalid experiment database configuration", "error")
+        return redirect(url_for("experiments.settings"))
 
     # Determine database type
     db_type = "sqlite"
     if current_app.config["SQLALCHEMY_DATABASE_URI"].startswith("postgresql"):
         db_type = "postgresql"
 
-    # Get folder path based on database type
-    if db_type == "sqlite":
-        folder = os.path.join(
-            BASE_DIR,
-            f"y_web{os.sep}experiments{os.sep}{experiment.db_name.split(os.sep)[1]}",
-        )
-    else:
-        # PostgreSQL: extract UUID from db_name (format: experiments_uuid)
-        folder = os.path.join(
-            BASE_DIR,
-            f"y_web{os.sep}experiments{os.sep}{experiment.db_name.removeprefix('experiments_')}",
-        )
+    # Get folder path
+    folder = os.path.join(
+        BASE_DIR,
+        f"y_web{os.sep}experiments{os.sep}{exp_folder}",
+    )
 
     # For PostgreSQL, create an SQLite copy of the database
     if db_type == "postgresql":
@@ -2580,18 +3655,16 @@ def download_experiments_bulk():
             if not experiment:
                 continue
 
-            # Get folder path based on database type
-            if db_type == "sqlite":
-                folder = os.path.join(
-                    BASE_DIR,
-                    f"y_web{os.sep}experiments{os.sep}{experiment.db_name.split(os.sep)[1]}",
-                )
-            else:
-                # PostgreSQL: extract UUID from db_name (format: experiments_uuid)
-                folder = os.path.join(
-                    BASE_DIR,
-                    f"y_web{os.sep}experiments{os.sep}{experiment.db_name.removeprefix('experiments_')}",
-                )
+            # Extract experiment folder using helper function
+            exp_folder = get_experiment_uid_from_db_name(experiment.db_name)
+            if not exp_folder:
+                continue
+
+            # Get folder path
+            folder = os.path.join(
+                BASE_DIR,
+                f"y_web{os.sep}experiments{os.sep}{exp_folder}",
+            )
 
             if not os.path.exists(folder):
                 continue
@@ -2747,14 +3820,14 @@ def miscellanea():
 
     # Get telemetry and watchdog settings for the current admin user
     telemetry_enabled = getattr(user, "telemetry_enabled", True)
-    watchdog_interval = 15  # Default watchdog interval
+    watchdog_interval = 1  # Default watchdog interval
 
     # Try to get watchdog interval from the watchdog status
     try:
         from y_web.utils.process_watchdog import get_watchdog_status
 
         status = get_watchdog_status()
-        watchdog_interval = status.get("run_interval_minutes", 15)
+        watchdog_interval = status.get("run_interval_minutes", 1)
     except ImportError:
         # process_watchdog module not available
         pass
@@ -3692,20 +4765,14 @@ def _create_single_experiment_copy(source_exp, new_exp_name):
 
     # Determine database type
     db_type = "sqlite"
-    if current_app.config["SQLALCHEMY_DATABASE_URI"].startswith("postgresql"):
+    db_uri = current_app.config.get("SQLALCHEMY_DATABASE_URI", "")
+    if isinstance(db_uri, str) and db_uri.startswith("postgresql"):
         db_type = "postgresql"
 
-    # Extract source experiment folder
-    if db_type == "sqlite":
-        # Source: experiments/old_uid/database_server.db -> old_uid
-        source_parts = source_exp.db_name.split(os.sep)
-        if len(source_parts) >= 2:
-            source_uid = source_parts[1]
-        else:
-            return False
-    else:
-        # PostgreSQL: experiments_old_uid -> old_uid
-        source_uid = source_exp.db_name.replace("experiments_", "")
+    # Extract source experiment folder using helper function
+    source_uid = get_experiment_uid_from_db_name(source_exp.db_name)
+    if not source_uid:
+        return False
 
     from y_web.utils.path_utils import get_writable_path
 
@@ -3831,16 +4898,14 @@ def _create_single_experiment_copy(source_exp, new_exp_name):
                 # Insert initial admin user
                 hashed_pw = generate_password_hash("admin", method="pbkdf2:sha256")
 
-                stmt = text(
-                    """
+                stmt = text("""
                     INSERT INTO user_mgmt (username, email, password, user_type, leaning, age,
                                            language, owner, joined_on, frecsys_type,
                                            round_actions, toxicity, is_page, daily_activity_level)
                     VALUES (:username, :email, :password, :user_type, :leaning, :age,
                             :language, :owner, :joined_on, :frecsys_type,
                             :round_actions, :toxicity, :is_page, :daily_activity_level)
-                    """
-                )
+                    """)
 
                 conn.execute(
                     stmt,
@@ -3876,6 +4941,7 @@ def _create_single_experiment_copy(source_exp, new_exp_name):
 
     with open(config_path, "r") as f:
         config = json.load(f)
+    experiment_clock = ensure_experiment_clock(config)
 
     # Update all necessary fields
     config["name"] = new_exp_name
@@ -3908,6 +4974,24 @@ def _create_single_experiment_copy(source_exp, new_exp_name):
             try:
                 with open(client_config_path, "r") as f:
                     client_config = json.load(f)
+                if isinstance(client_config.get("simulation"), dict):
+                    apply_clock_to_client_simulation(
+                        client_config["simulation"], experiment_clock
+                    )
+                normalize_client_config_memory_run_id(
+                    client_config,
+                    fallback_seed=build_memory_run_seed(
+                        new_uid,
+                        str(
+                            (client_config.get("simulation") or {}).get("name")
+                            or item.removeprefix("client_").rsplit("-", 1)[0]
+                        ),
+                        str(
+                            (client_config.get("simulation") or {}).get("population")
+                            or item.rsplit("-", 1)[-1].removesuffix(".json")
+                        ),
+                    ),
+                )
 
                 # Update the API endpoint in servers section
                 if "servers" in client_config and "api" in client_config["servers"]:
@@ -3919,9 +5003,8 @@ def _create_single_experiment_copy(source_exp, new_exp_name):
 
                     new_api = re.sub(r":(\d+)(/|$)", f":{suggested_port}\\2", old_api)
                     client_config["servers"]["api"] = new_api
-
-                    with open(client_config_path, "w") as f:
-                        json.dump(client_config, f, indent=4)
+                with open(client_config_path, "w") as f:
+                    json.dump(client_config, f, indent=4)
             except Exception as e:
                 # Continue anyway - this is not critical enough to fail the entire copy
                 current_app.logger.warning(
@@ -4029,10 +5112,24 @@ def _create_single_experiment_copy(source_exp, new_exp_name):
 
     # Create Jupyter instance record
     jupyter_instance = Jupyter_instances(
-        port=-1, notebook_dir="", exp_id=new_exp.idexp, status="stopped"
+        port=-1, notebook_dir="", exp_id=new_exp.idexp, status="stopped", process=-1
     )
     db.session.add(jupyter_instance)
     db.session.commit()
+
+    # Repair copied population JSON files so runtime activity profiles always match DB.
+    # This avoids stale files causing zero-active-agent runs after copy.
+    copied_populations = (
+        db.session.query(Population)
+        .join(
+            Population_Experiment, Population_Experiment.id_population == Population.id
+        )
+        .filter(Population_Experiment.id_exp == new_exp.idexp)
+        .all()
+    )
+    for pop in copied_populations:
+        pop_file = os.path.join(new_folder, f"{pop.name.replace(' ', '')}.json")
+        _repair_population_file_activity_fields(pop_file, pop.id)
 
     return True
 
@@ -4611,7 +5708,16 @@ def start_schedule():
             db.session.commit()
 
             # Start the server
-            start_server(exp)
+            try:
+                start_server(exp)
+            except Exception as e:
+                msg = f"Failed to start server for '{exp.exp_name}': {e}"
+                logs.append(msg)
+                db.session.add(ExperimentScheduleLog(message=msg, log_type="error"))
+                exp.running = 0
+                exp.exp_status = "stopped"
+                db.session.commit()
+                continue
             started_count += 1
 
             # Wait for server to be ready
@@ -4878,7 +5984,16 @@ def check_schedule_progress():
             exp.running = 1
             exp.exp_status = "active"
             db.session.commit()
-            start_server(exp)
+            try:
+                start_server(exp)
+            except Exception as e:
+                msg = f"Failed to start server for '{exp.exp_name}': {e}"
+                logs.append(msg)
+                db.session.add(ExperimentScheduleLog(message=msg, log_type="error"))
+                exp.running = 0
+                exp.exp_status = "stopped"
+                db.session.commit()
+                continue
 
             # Wait for server to be ready
             logs.append(f"Waiting for server '{exp.exp_name}' to be ready...")
@@ -5225,749 +6340,3 @@ def cleanup_completed_groups():
         add_schedule_log(f"Cleaned up {count} completed group(s)", "info")
 
     return jsonify({"success": True, "removed_count": count})
-
-
-# ========================================
-# Opinion Dynamics Routes
-# ========================================
-
-
-@experiments.route("/admin/opinion_groups_data")
-@login_required
-def opinion_groups_data():
-    """Display opinion groups data page."""
-    query = OpinionGroup.query
-
-    # search filter
-    search = request.args.get("search")
-    if search:
-        query = query.filter(db.or_(OpinionGroup.name.like(f"%{search}%")))
-    total = query.count()
-
-    # sorting
-    sort = request.args.get("sort")
-    if sort:
-        order = []
-        for s in sort.split(","):
-            direction = s[0]
-            name = s[1:]
-            if name not in ["name", "lower_bound", "upper_bound"]:
-                name = "name"
-            col = getattr(OpinionGroup, name)
-            if direction == "-":
-                col = col.desc()
-            order.append(col)
-        if order:
-            query = query.order_by(*order)
-
-    # pagination
-    start = request.args.get("start", type=int, default=-1)
-    length = request.args.get("length", type=int, default=-1)
-    if start != -1 and length != -1:
-        query = query.offset(start).limit(length)
-
-    # response
-    res = query.all()
-
-    res = {
-        "data": [
-            {
-                "id": group.id,
-                "name": group.name,
-                "lower_bound": group.lower_bound,
-                "upper_bound": group.upper_bound,
-            }
-            for group in res
-        ],
-        "total": total,
-    }
-
-    return res
-
-
-@experiments.route("/admin/opinion_groups_data", methods=["POST"])
-@login_required
-def update_opinion_group():
-    """Update opinion group data (for inline editing)."""
-    check_privileges(current_user.username)
-
-    data = request.get_json()
-    group_id = data.get("id")
-    group = OpinionGroup.query.filter_by(id=group_id).first()
-
-    if not group:
-        return jsonify({"success": False, "message": "Opinion group not found"}), 404
-
-    # Update fields if provided
-    if "name" in data:
-        group.name = data["name"]
-    if "lower_bound" in data:
-        try:
-            lower_bound = float(data["lower_bound"])
-            if not (0 <= lower_bound <= 1):
-                return (
-                    jsonify(
-                        {"success": False, "message": "Lower bound must be in [0, 1]"}
-                    ),
-                    400,
-                )
-            group.lower_bound = lower_bound
-        except ValueError:
-            return (
-                jsonify({"success": False, "message": "Invalid lower_bound value"}),
-                400,
-            )
-    if "upper_bound" in data:
-        try:
-            upper_bound = float(data["upper_bound"])
-            if not (0 <= upper_bound <= 1):
-                return (
-                    jsonify(
-                        {"success": False, "message": "Upper bound must be in [0, 1]"}
-                    ),
-                    400,
-                )
-            group.upper_bound = upper_bound
-        except ValueError:
-            return (
-                jsonify({"success": False, "message": "Invalid upper_bound value"}),
-                400,
-            )
-
-    # Validate that lower_bound <= upper_bound
-    if group.lower_bound > group.upper_bound:
-        return (
-            jsonify(
-                {"success": False, "message": "Lower bound must be <= upper bound"}
-            ),
-            400,
-        )
-
-    # Check for overlaps with other existing groups
-    existing_groups = OpinionGroup.query.filter(OpinionGroup.id != group_id).all()
-    for existing in existing_groups:
-        # Check if the updated group overlaps with any other existing group
-        # Two ranges [a1, a2] and [b1, b2] overlap if: a1 < b2 AND b1 < a2
-        if (
-            group.lower_bound < existing.upper_bound
-            and existing.lower_bound < group.upper_bound
-        ):
-            return (
-                jsonify(
-                    {
-                        "success": False,
-                        "message": f"Overlaps with '{existing.name}' [{existing.lower_bound}, {existing.upper_bound}]",
-                    }
-                ),
-                400,
-            )
-
-    db.session.commit()
-    return jsonify({"success": True})
-
-
-@experiments.route("/admin/create_opinion_group", methods=["POST"])
-@login_required
-def create_opinion_group():
-    """Create opinion group."""
-    check_privileges(current_user.username)
-
-    name = request.form.get("name")
-    lower_bound = request.form.get("lower_bound")
-    upper_bound = request.form.get("upper_bound")
-
-    try:
-        lower_bound = float(lower_bound)
-        upper_bound = float(upper_bound)
-    except (ValueError, TypeError):
-        flash("Invalid bound values. Must be numbers.", "error")
-        return redirect(request.referrer)
-
-    # Validate bounds are in [0, 1] and lower <= upper
-    if not (0 <= lower_bound <= 1 and 0 <= upper_bound <= 1):
-        flash("Bounds must be in the range [0, 1].", "error")
-        return redirect(request.referrer)
-
-    if lower_bound > upper_bound:
-        flash("Lower bound must be less than or equal to upper bound.", "error")
-        return redirect(request.referrer)
-
-    # Check for overlaps with existing groups
-    existing_groups = OpinionGroup.query.all()
-    for existing in existing_groups:
-        # Check if the new group overlaps with any existing group
-        # Two ranges [a1, a2] and [b1, b2] overlap if: a1 < b2 AND b1 < a2
-        if lower_bound < existing.upper_bound and existing.lower_bound < upper_bound:
-            flash(
-                f"Opinion group overlaps with existing group '{existing.name}' "
-                f"[{existing.lower_bound}, {existing.upper_bound}]. "
-                "Groups must not overlap.",
-                "error",
-            )
-            return redirect(request.referrer)
-
-    group = OpinionGroup(name=name, lower_bound=lower_bound, upper_bound=upper_bound)
-    db.session.add(group)
-    db.session.commit()
-
-    return redirect(request.referrer)
-
-
-@experiments.route("/admin/delete_opinion_group/<int:group_id>", methods=["DELETE"])
-@login_required
-def delete_opinion_group(group_id):
-    """Delete opinion group."""
-    check_privileges(current_user.username)
-
-    group = OpinionGroup.query.filter_by(id=group_id).first()
-    if not group:
-        return jsonify({"success": False, "message": "Opinion group not found"}), 404
-
-    db.session.delete(group)
-    db.session.commit()
-    return jsonify({"success": True})
-
-
-@experiments.route("/admin/opinion_distributions_data")
-@login_required
-def opinion_distributions_data():
-    """Display opinion distributions data page."""
-    query = OpinionDistribution.query
-
-    # search filter
-    search = request.args.get("search")
-    if search:
-        query = query.filter(
-            db.or_(
-                OpinionDistribution.name.like(f"%{search}%"),
-                OpinionDistribution.distribution_type.like(f"%{search}%"),
-            )
-        )
-    total = query.count()
-
-    # sorting
-    sort = request.args.get("sort")
-    if sort:
-        order = []
-        for s in sort.split(","):
-            direction = s[0]
-            name = s[1:]
-            if name not in ["name", "distribution_type"]:
-                name = "name"
-            col = getattr(OpinionDistribution, name)
-            if direction == "-":
-                col = col.desc()
-            order.append(col)
-        if order:
-            query = query.order_by(*order)
-
-    # pagination
-    start = request.args.get("start", type=int, default=-1)
-    length = request.args.get("length", type=int, default=-1)
-    if start != -1 and length != -1:
-        query = query.offset(start).limit(length)
-
-    # response
-    res = query.all()
-
-    res = {
-        "data": [
-            {
-                "id": dist.id,
-                "name": dist.name,
-                "distribution_type": dist.distribution_type,
-                "parameters": dist.parameters,
-            }
-            for dist in res
-        ],
-        "total": total,
-    }
-
-    return res
-
-
-@experiments.route("/admin/opinion_distributions_data", methods=["POST"])
-@login_required
-def update_opinion_distribution():
-    """Update opinion distribution data (for inline editing)."""
-    check_privileges(current_user.username)
-
-    data = request.get_json()
-    dist_id = data.get("id")
-    dist = OpinionDistribution.query.filter_by(id=dist_id).first()
-
-    if not dist:
-        return (
-            jsonify({"success": False, "message": "Opinion distribution not found"}),
-            404,
-        )
-
-    # Update fields if provided
-    if "name" in data:
-        dist.name = data["name"]
-
-    db.session.commit()
-    return jsonify({"success": True})
-
-
-@experiments.route("/admin/create_opinion_distribution", methods=["POST"])
-@login_required
-def create_opinion_distribution():
-    """Create opinion distribution."""
-    check_privileges(current_user.username)
-
-    name = request.form.get("name")
-    distribution_type = request.form.get("distribution_type")
-    parameters = request.form.get("parameters")  # JSON string
-
-    # Validate JSON parameters
-    try:
-        json.loads(parameters)
-    except (json.JSONDecodeError, TypeError):
-        flash("Invalid parameters format. Must be valid JSON.", "error")
-        return redirect(request.referrer)
-
-    dist = OpinionDistribution(
-        name=name, distribution_type=distribution_type, parameters=parameters
-    )
-    db.session.add(dist)
-    db.session.commit()
-
-    return redirect(request.referrer)
-
-
-@experiments.route(
-    "/admin/delete_opinion_distribution/<int:dist_id>", methods=["DELETE"]
-)
-@login_required
-def delete_opinion_distribution(dist_id):
-    """Delete opinion distribution."""
-    check_privileges(current_user.username)
-
-    dist = OpinionDistribution.query.filter_by(id=dist_id).first()
-    if not dist:
-        return (
-            jsonify({"success": False, "message": "Opinion distribution not found"}),
-            404,
-        )
-
-    db.session.delete(dist)
-    db.session.commit()
-    return jsonify({"success": True})
-
-
-# ============================================================================
-# Image feeds and feed retrieval limits
-# ============================================================================
-
-DEFAULT_FEED_LIMITS = {
-    "rss_entries_per_feed": 100,
-    "reddit_entries_per_feed": 200,
-    "reddit_pages": 2,
-    "reddit_rate_limit_seconds": 2,
-    "db_fallback_limit": 50,
-    "image_entries_per_feed": 100,
-}
-
-
-@experiments.route("/admin/image_feeds/<int:uid>")
-@login_required
-def image_feeds(uid):
-    """Display and edit image feeds for an experiment."""
-    check_privileges(current_user.username)
-
-    from y_web.utils.path_utils import get_writable_path
-
-    base_dir = get_writable_path()
-    experiment = Exps.query.filter_by(idexp=uid).first()
-    if not experiment:
-        flash("Experiment not found", "error")
-        return redirect(url_for("experiments.settings"))
-
-    exp_folder = get_experiment_uid_from_db_name(experiment.db_name)
-    if not exp_folder:
-        flash("Invalid experiment database configuration", "error")
-        return redirect(url_for("experiments.settings"))
-
-    image_feeds_path = os.path.join(
-        base_dir,
-        f"y_web{os.sep}experiments{os.sep}{exp_folder}{os.sep}image_feeds.json",
-    )
-
-    image_feeds_data = []
-    if os.path.exists(image_feeds_path):
-        try:
-            with open(image_feeds_path, "r") as f:
-                image_feeds_data = json.load(f)
-        except (json.JSONDecodeError, IOError):
-            image_feeds_data = []
-
-    available_interests = [
-        "humor",
-        "entertainment",
-        "fun",
-        "memes",
-        "photography",
-        "travel",
-        "nature",
-        "general",
-        "animals",
-        "pets",
-        "wholesome",
-        "cute",
-        "technology",
-        "gaming",
-        "science",
-        "geek",
-        "art",
-        "design",
-        "creative",
-        "music",
-        "sports",
-        "fitness",
-        "food",
-        "cooking",
-        "movies",
-        "tv",
-        "celebrities",
-        "news",
-        "politics",
-        "history",
-        "education",
-        "books",
-    ]
-
-    return render_template(
-        "admin/image_feeds.html",
-        experiment=experiment,
-        image_feeds=image_feeds_data,
-        available_interests=sorted(available_interests),
-    )
-
-
-@experiments.route("/admin/update_image_feeds/<int:uid>", methods=["POST"])
-@login_required
-def update_image_feeds(uid):
-    """Update image feeds for an experiment."""
-    check_privileges(current_user.username)
-
-    from y_web.utils.path_utils import get_writable_path
-
-    base_dir = get_writable_path()
-    experiment = Exps.query.filter_by(idexp=uid).first()
-    if not experiment:
-        flash("Experiment not found", "error")
-        return redirect(url_for("experiments.settings"))
-
-    exp_folder = get_experiment_uid_from_db_name(experiment.db_name)
-    if not exp_folder:
-        flash("Invalid experiment database configuration", "error")
-        return redirect(url_for("experiments.settings"))
-
-    image_feeds_path = os.path.join(
-        base_dir,
-        f"y_web{os.sep}experiments{os.sep}{exp_folder}{os.sep}image_feeds.json",
-    )
-
-    feeds_json = request.form.get("image_feeds_json", "[]")
-    try:
-        feeds = json.loads(feeds_json)
-    except json.JSONDecodeError:
-        flash("Invalid image feeds payload; changes were not saved.", "error")
-        return redirect(request.referrer or url_for("experiments.image_feeds", uid=uid))
-
-    with open(image_feeds_path, "w") as f:
-        json.dump(feeds, f, indent=2)
-
-    return redirect(request.referrer or url_for("experiments.image_feeds", uid=uid))
-
-
-@experiments.route("/admin/upload_image_feeds/<int:uid>", methods=["POST"])
-@login_required
-def upload_image_feeds(uid):
-    """Upload bulk image feeds from a JSON file."""
-    check_privileges(current_user.username)
-
-    from y_web.utils.path_utils import get_writable_path
-
-    base_dir = get_writable_path()
-    experiment = Exps.query.filter_by(idexp=uid).first()
-    if not experiment:
-        return jsonify({"error": "Experiment not found"}), 404
-
-    exp_folder = get_experiment_uid_from_db_name(experiment.db_name)
-    if not exp_folder:
-        return jsonify({"error": "Invalid experiment database configuration"}), 400
-
-    image_feeds_path = os.path.join(
-        base_dir,
-        f"y_web{os.sep}experiments{os.sep}{exp_folder}{os.sep}image_feeds.json",
-    )
-
-    if "file" not in request.files:
-        return jsonify({"error": "No file provided"}), 400
-
-    file = request.files["file"]
-    if file.filename == "":
-        return jsonify({"error": "No file selected"}), 400
-
-    try:
-        content = file.read().decode("utf-8")
-        new_feeds = json.loads(content)
-        if not isinstance(new_feeds, list):
-            return jsonify({"error": "JSON must be an array of image feeds"}), 400
-
-        normalized_feeds = []
-        seen_subreddits = set()
-        for item in new_feeds:
-            if not isinstance(item, dict):
-                continue
-            subreddit = str(item.get("subreddit", "")).strip().lower()
-            subreddit = subreddit[2:] if subreddit.startswith("r/") else subreddit
-            interests = item.get("interests") or []
-            if not subreddit:
-                continue
-            if not isinstance(interests, list):
-                label = str(interests).strip()
-                interests = [label] if label else []
-
-            clean_interests = []
-            seen_interests = set()
-            for interest in interests:
-                label = str(interest).strip()
-                if not label or label in seen_interests:
-                    continue
-                seen_interests.add(label)
-                clean_interests.append(label)
-
-            if subreddit in seen_subreddits:
-                continue
-            seen_subreddits.add(subreddit)
-            normalized_feeds.append(
-                {"subreddit": subreddit, "interests": clean_interests}
-            )
-
-        mode = request.form.get("mode", "replace")
-        if mode == "merge":
-            existing_feeds = []
-            if os.path.exists(image_feeds_path):
-                with open(image_feeds_path, "r") as f:
-                    existing_feeds = json.load(f)
-
-            merged = []
-            by_subreddit = {}
-            for feed in existing_feeds:
-                if not isinstance(feed, dict):
-                    continue
-                subreddit = str(feed.get("subreddit", "")).strip().lower()
-                if not subreddit:
-                    continue
-                merged_feed = {
-                    "subreddit": subreddit,
-                    "interests": list(feed.get("interests") or []),
-                }
-                merged.append(merged_feed)
-                by_subreddit[subreddit] = merged_feed
-
-            for feed in normalized_feeds:
-                subreddit = feed["subreddit"]
-                if subreddit in by_subreddit:
-                    existing = by_subreddit[subreddit]
-                    combined = []
-                    seen = set()
-                    for label in list(existing.get("interests") or []) + list(
-                        feed.get("interests") or []
-                    ):
-                        label = str(label).strip()
-                        if not label or label in seen:
-                            continue
-                        seen.add(label)
-                        combined.append(label)
-                    existing["interests"] = combined
-                else:
-                    merged.append(feed)
-                    by_subreddit[subreddit] = feed
-            normalized_feeds = merged
-
-        with open(image_feeds_path, "w") as f:
-            json.dump(normalized_feeds, f, indent=2)
-
-        return jsonify({"success": True, "count": len(normalized_feeds)})
-    except json.JSONDecodeError:
-        return jsonify({"error": "Invalid JSON format"}), 400
-    except Exception as exc:
-        return jsonify({"error": str(exc)}), 400
-
-
-@experiments.route("/admin/feed_limits/<uid>", methods=["GET"])
-@login_required
-def feed_limits(uid):
-    """Display and edit feed retrieval limits for an experiment."""
-    check_privileges(current_user.username)
-
-    from y_web.utils.path_utils import get_writable_path
-
-    base_dir = get_writable_path()
-    experiment = Exps.query.filter_by(idexp=uid).first()
-    if not experiment:
-        flash("Experiment not found", "error")
-        return redirect(url_for("experiments.settings"))
-
-    exp_folder = get_experiment_uid_from_db_name(experiment.db_name)
-    if not exp_folder:
-        flash("Invalid experiment database configuration", "error")
-        return redirect(url_for("experiments.settings"))
-
-    config_path = os.path.join(
-        base_dir, f"y_web{os.sep}experiments{os.sep}{exp_folder}{os.sep}config.json"
-    )
-
-    feed_limits_data = dict(DEFAULT_FEED_LIMITS)
-    if os.path.exists(config_path):
-        try:
-            with open(config_path, "r") as f:
-                config = json.load(f)
-            if "feed_limits" in config:
-                feed_limits_data.update(config["feed_limits"])
-        except (json.JSONDecodeError, IOError):
-            pass
-
-    return render_template(
-        "admin/feed_limits.html",
-        experiment=experiment,
-        feed_limits=feed_limits_data,
-    )
-
-
-@experiments.route("/admin/update_feed_limits/<uid>", methods=["POST"])
-@login_required
-def update_feed_limits(uid):
-    """Update feed retrieval limits for an experiment."""
-    check_privileges(current_user.username)
-
-    from y_web.utils.path_utils import get_writable_path
-
-    base_dir = get_writable_path()
-    experiment = Exps.query.filter_by(idexp=uid).first()
-    if not experiment:
-        flash("Experiment not found", "error")
-        return redirect(url_for("experiments.settings"))
-
-    exp_folder = get_experiment_uid_from_db_name(experiment.db_name)
-    if not exp_folder:
-        flash("Invalid experiment database configuration", "error")
-        return redirect(url_for("experiments.settings"))
-
-    config_path = os.path.join(
-        base_dir, f"y_web{os.sep}experiments{os.sep}{exp_folder}{os.sep}config.json"
-    )
-
-    config = {}
-    if os.path.exists(config_path):
-        try:
-            with open(config_path, "r") as f:
-                config = json.load(f)
-        except (json.JSONDecodeError, IOError):
-            config = {}
-
-    feed_limits = {
-        "rss_entries_per_feed": int(request.form.get("rss_entries_per_feed", 100)),
-        "reddit_entries_per_feed": int(
-            request.form.get("reddit_entries_per_feed", 200)
-        ),
-        "reddit_pages": int(request.form.get("reddit_pages", 2)),
-        "reddit_rate_limit_seconds": float(
-            request.form.get("reddit_rate_limit_seconds", 2)
-        ),
-        "db_fallback_limit": int(request.form.get("db_fallback_limit", 50)),
-        "image_entries_per_feed": int(request.form.get("image_entries_per_feed", 100)),
-    }
-
-    config["feed_limits"] = feed_limits
-    with open(config_path, "w") as f:
-        json.dump(config, f, indent=2)
-
-    flash("Feed limits updated successfully.", "success")
-    return redirect(request.referrer or f"/admin/feed_limits/{uid}")
-
-
-@experiments.route("/admin/api/parse_image_feed", methods=["POST"])
-@login_required
-def parse_image_feed():
-    """Parse a Reddit subreddit RSS feed and return image info."""
-    import feedparser
-
-    subreddit = request.json.get("subreddit", "").strip().lower()
-    if not subreddit:
-        return jsonify({"error": "No subreddit provided"}), 400
-
-    subreddit = subreddit.lstrip("r/")
-    feed_url = f"https://www.reddit.com/r/{subreddit}.rss"
-
-    try:
-        feed = feedparser.parse(feed_url)
-        if feed.bozo and not feed.entries:
-            return jsonify(
-                {"error": f"Could not parse r/{subreddit} - subreddit may not exist"}
-            ), 400
-
-        if not feed.entries:
-            return jsonify({"error": f"No posts found in r/{subreddit}"}), 400
-
-        image_pattern = re.compile(r"\.(jpg|jpeg|png|gif|webp)(\?.*)?$", re.IGNORECASE)
-        image_hosts = ["i.redd.it", "i.imgur.com", "preview.redd.it"]
-
-        images = []
-        nsfw_count = 0
-
-        for entry in feed.entries[:50]:
-            is_nsfw = False
-            if hasattr(entry, "over_18") and entry.over_18:
-                is_nsfw = True
-            elif "[nsfw]" in entry.get("title", "").lower():
-                is_nsfw = True
-            elif hasattr(entry, "tags"):
-                for tag in entry.tags:
-                    if tag.get("term", "").lower() == "nsfw":
-                        is_nsfw = True
-                        break
-
-            if is_nsfw:
-                nsfw_count += 1
-                continue
-
-            image_url = None
-            link = entry.get("link", "")
-            if image_pattern.search(link) or any(host in link for host in image_hosts):
-                image_url = link
-
-            if not image_url and hasattr(entry, "media_content"):
-                for media in entry.media_content:
-                    url = media.get("url", "")
-                    if image_pattern.search(url) or any(
-                        host in url for host in image_hosts
-                    ):
-                        image_url = url
-                        break
-
-            if not image_url and hasattr(entry, "media_thumbnail"):
-                for thumb in entry.media_thumbnail:
-                    url = thumb.get("url", "")
-                    if url:
-                        image_url = url
-                        break
-
-            if image_url:
-                images.append(image_url)
-
-        return jsonify(
-            {
-                "subreddit": subreddit,
-                "feed_url": feed_url,
-                "image_count": len(images),
-                "nsfw_filtered": nsfw_count,
-                "sample_images": images[:5],
-            }
-        )
-    except Exception as exc:
-        return jsonify({"error": str(exc)}), 400

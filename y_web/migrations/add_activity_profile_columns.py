@@ -44,9 +44,7 @@ def migrate_sqlite(db_path):
 
         # Add activity_profile column to agents if it doesn't exist
         if "activity_profile" not in agents_columns:
-            cursor.execute(
-                "ALTER TABLE agents ADD COLUMN activity_profile INTEGER"
-            )
+            cursor.execute("ALTER TABLE agents ADD COLUMN activity_profile INTEGER")
             print("✓ Added activity_profile column to agents table in SQLite database")
         else:
             print("○ activity_profile column already exists in agents table")
@@ -57,9 +55,7 @@ def migrate_sqlite(db_path):
 
         # Add activity_profile column to pages if it doesn't exist
         if "activity_profile" not in pages_columns:
-            cursor.execute(
-                "ALTER TABLE pages ADD COLUMN activity_profile INTEGER"
-            )
+            cursor.execute("ALTER TABLE pages ADD COLUMN activity_profile INTEGER")
             print("✓ Added activity_profile column to pages table in SQLite database")
         else:
             print("○ activity_profile column already exists in pages table")
@@ -99,46 +95,42 @@ def migrate_postgresql(host, port, database, user, password):
         cursor = conn.cursor()
 
         # Check agents table columns
-        cursor.execute(
-            """
+        cursor.execute("""
             SELECT column_name
             FROM information_schema.columns
             WHERE table_name = 'agents'
-        """
-        )
+        """)
         agents_columns = [row[0] for row in cursor.fetchall()]
 
         # Add activity_profile column to agents if it doesn't exist
         if "activity_profile" not in agents_columns:
-            cursor.execute(
-                """
+            cursor.execute("""
                 ALTER TABLE agents
                 ADD COLUMN activity_profile INTEGER REFERENCES activity_profiles(id)
-            """
+            """)
+            print(
+                "✓ Added activity_profile column to agents table in PostgreSQL database"
             )
-            print("✓ Added activity_profile column to agents table in PostgreSQL database")
         else:
             print("○ activity_profile column already exists in agents table")
 
         # Check pages table columns
-        cursor.execute(
-            """
+        cursor.execute("""
             SELECT column_name
             FROM information_schema.columns
             WHERE table_name = 'pages'
-        """
-        )
+        """)
         pages_columns = [row[0] for row in cursor.fetchall()]
 
         # Add activity_profile column to pages if it doesn't exist
         if "activity_profile" not in pages_columns:
-            cursor.execute(
-                """
+            cursor.execute("""
                 ALTER TABLE pages
                 ADD COLUMN activity_profile INTEGER REFERENCES activity_profiles(id)
-            """
+            """)
+            print(
+                "✓ Added activity_profile column to pages table in PostgreSQL database"
             )
-            print("✓ Added activity_profile column to pages table in PostgreSQL database")
         else:
             print("○ activity_profile column already exists in pages table")
 

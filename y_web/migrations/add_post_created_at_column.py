@@ -14,7 +14,7 @@ import sqlite3
 
 def _sqlite_path_from_uri(db_uri_or_path: str) -> str:
     if db_uri_or_path.startswith("sqlite:///"):
-        return db_uri_or_path[len("sqlite:///"):]
+        return db_uri_or_path[len("sqlite:///") :]
     return db_uri_or_path
 
 
@@ -53,12 +53,13 @@ def migrate_sqlite_experiment_db(db_uri_or_path: str) -> bool:
             cursor.execute("ALTER TABLE post ADD COLUMN created_at DATETIME")
             print("✓ Added created_at column to post table (SQLite experiment DB)")
         else:
-            print("○ created_at column already exists in post table (SQLite experiment DB)")
+            print(
+                "○ created_at column already exists in post table (SQLite experiment DB)"
+            )
 
         # Backfill from simulation rounds when possible.
         if _table_exists(cursor, "rounds"):
-            cursor.execute(
-                """
+            cursor.execute("""
                 UPDATE post
                 SET created_at = (
                     SELECT datetime(
@@ -77,8 +78,7 @@ def migrate_sqlite_experiment_db(db_uri_or_path: str) -> bool:
                     WHERE rounds.id = post.round
                 )
                 WHERE created_at IS NULL
-                """
-            )
+                """)
 
         # Final fallback for any unresolved legacy rows.
         cursor.execute(
@@ -91,4 +91,3 @@ def migrate_sqlite_experiment_db(db_uri_or_path: str) -> bool:
     except Exception as exc:
         print(f"✗ Error migrating SQLite experiment DB post.created_at: {exc}")
         return False
-

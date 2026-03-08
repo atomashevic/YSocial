@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, Optional
@@ -13,8 +14,23 @@ from sqlalchemy.exc import SQLAlchemyError
 from y_web import db
 from y_web.models import Exps
 
-
 BASE_DIR = Path(__file__).resolve().parents[1]
+
+
+def get_experiment_uid_from_db_name(db_name: str) -> Optional[str]:
+    """
+    Extract the experiment UID (folder name) from the db_name field.
+    """
+    if not db_name:
+        return None
+
+    if db_name.startswith("experiments_"):
+        return db_name.replace("experiments_", "")
+    if db_name.startswith("experiments/") or db_name.startswith("experiments\\"):
+        parts = re.split(r"[/\\\\]", db_name)
+        if len(parts) >= 2:
+            return parts[1]
+    return None
 
 
 @dataclass
