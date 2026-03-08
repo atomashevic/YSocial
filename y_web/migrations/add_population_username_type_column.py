@@ -54,7 +54,9 @@ def migrate_sqlite(db_path: str) -> bool:
         return False
 
 
-def migrate_postgresql(host: str, port: str, database: str, user: str, password: str) -> bool:
+def migrate_postgresql(
+    host: str, port: str, database: str, user: str, password: str
+) -> bool:
     """
     Add username_type column to population table in PostgreSQL database.
 
@@ -78,22 +80,18 @@ def migrate_postgresql(host: str, port: str, database: str, user: str, password:
         )
         cursor = conn.cursor()
 
-        cursor.execute(
-            """
+        cursor.execute("""
             SELECT column_name
             FROM information_schema.columns
             WHERE table_schema = 'public' AND table_name = 'population'
-        """
-        )
+        """)
         columns = {row[0] for row in cursor.fetchall()}
 
         if "username_type" not in columns:
-            cursor.execute(
-                """
+            cursor.execute("""
                 ALTER TABLE population
                 ADD COLUMN username_type VARCHAR(20) DEFAULT 'microblogging'
-            """
-            )
+            """)
             print(
                 "✓ Added username_type column to population table in PostgreSQL database"
             )
@@ -106,4 +104,3 @@ def migrate_postgresql(host: str, port: str, database: str, user: str, password:
     except Exception as e:
         print(f"✗ Error migrating PostgreSQL database: {e}")
         return False
-

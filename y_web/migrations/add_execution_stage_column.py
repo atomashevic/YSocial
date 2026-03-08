@@ -114,36 +114,30 @@ def migrate_postgresql(host, port, database, user, password):
         cursor = conn.cursor()
 
         # Check if table exists
-        cursor.execute(
-            """
+        cursor.execute("""
             SELECT table_name
             FROM information_schema.tables
             WHERE table_name = 'client_execution'
-        """
-        )
+        """)
         if not cursor.fetchone():
             print("○ client_execution table does not exist yet")
             conn.close()
             return True
 
         # Check if column already exists
-        cursor.execute(
-            """
+        cursor.execute("""
             SELECT column_name
             FROM information_schema.columns
             WHERE table_name = 'client_execution'
-        """
-        )
+        """)
         columns = [row[0] for row in cursor.fetchall()]
 
         # Add execution_stage column if it doesn't exist
         if "execution_stage" not in columns:
-            cursor.execute(
-                """
+            cursor.execute("""
                 ALTER TABLE client_execution
                 ADD COLUMN execution_stage VARCHAR(20) DEFAULT 'initializing'
-            """
-            )
+            """)
             print("✓ Added execution_stage column to PostgreSQL database")
 
             # Update existing records based on their elapsed_time

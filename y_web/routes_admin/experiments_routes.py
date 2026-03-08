@@ -638,16 +638,14 @@ def upload_experiment():
                     # Insert initial admin user
                     hashed_pw = generate_password_hash("admin", method="pbkdf2:sha256")
 
-                    stmt = text(
-                        """
+                    stmt = text("""
                         INSERT INTO user_mgmt (username, email, password, user_type, leaning, age,
                                                language, owner, joined_on, frecsys_type,
                                                round_actions, toxicity, is_page, daily_activity_level)
                         VALUES (:username, :email, :password, :user_type, :leaning, :age,
                                 :language, :owner, :joined_on, :frecsys_type,
                                 :round_actions, :toxicity, :is_page, :daily_activity_level)
-                        """
-                    )
+                        """)
 
                     dummy_conn.execute(
                         stmt,
@@ -1283,16 +1281,14 @@ def create_experiment():
                     # Insert initial admin user
                     hashed_pw = generate_password_hash("admin", method="pbkdf2:sha256")
 
-                    stmt = text(
-                        """
+                    stmt = text("""
                                 INSERT INTO user_mgmt (username, email, password, user_type, leaning, age,
                                                        language, owner, joined_on, frecsys_type,
                                                        round_actions, toxicity, is_page, daily_activity_level)
                                 VALUES (:username, :email, :password, :user_type, :leaning, :age,
                                         :language, :owner, :joined_on, :frecsys_type,
                                         :round_actions, :toxicity, :is_page, :daily_activity_level)
-                                """
-                    )
+                                """)
 
                     dummy_conn.execute(
                         stmt,
@@ -1378,12 +1374,20 @@ def create_experiment():
         llm_agents_enabled=llm_agents_enabled,
         llm_default=llm_default,
         llm_api_key_default=llm_api_key_default,
-        llm_max_tokens_default=int(llm_max_tokens_default) if llm_max_tokens_default else -1,
-        llm_temperature_default=float(llm_temperature_default) if llm_temperature_default else 1.5,
+        llm_max_tokens_default=(
+            int(llm_max_tokens_default) if llm_max_tokens_default else -1
+        ),
+        llm_temperature_default=(
+            float(llm_temperature_default) if llm_temperature_default else 1.5
+        ),
         llm_v_default=llm_v_default,
         llm_v_api_key_default=llm_v_api_key_default,
-        llm_v_max_tokens_default=int(llm_v_max_tokens_default) if llm_v_max_tokens_default else 300,
-        llm_v_temperature_default=float(llm_v_temperature_default) if llm_v_temperature_default else 0.5,
+        llm_v_max_tokens_default=(
+            int(llm_v_max_tokens_default) if llm_v_max_tokens_default else 300
+        ),
+        llm_v_temperature_default=(
+            float(llm_v_temperature_default) if llm_v_temperature_default else 0.5
+        ),
     )
 
     db.session.add(exp)
@@ -1499,14 +1503,12 @@ def delete_simulation(exp_id):
                 ) as conn:
                     # Terminate existing connections to the database
                     conn.execute(
-                        text(
-                            f"""
+                        text(f"""
                             SELECT pg_terminate_backend(pg_stat_activity.pid)
                             FROM pg_stat_activity
                             WHERE pg_stat_activity.datname = :dbname
                             AND pid <> pg_backend_pid()
-                            """
-                        ),
+                            """),
                         {"dbname": exp.db_name},
                     )
                     # Drop the database
@@ -3849,16 +3851,14 @@ def _create_single_experiment_copy(source_exp, new_exp_name):
                 # Insert initial admin user
                 hashed_pw = generate_password_hash("admin", method="pbkdf2:sha256")
 
-                stmt = text(
-                    """
+                stmt = text("""
                     INSERT INTO user_mgmt (username, email, password, user_type, leaning, age,
                                            language, owner, joined_on, frecsys_type,
                                            round_actions, toxicity, is_page, daily_activity_level)
                     VALUES (:username, :email, :password, :user_type, :leaning, :age,
                             :language, :owner, :joined_on, :frecsys_type,
                             :round_actions, :toxicity, :is_page, :daily_activity_level)
-                    """
-                )
+                    """)
 
                 conn.execute(
                     stmt,

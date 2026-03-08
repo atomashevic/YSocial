@@ -1181,9 +1181,7 @@ def merge_populations():
         return redirect(request.referrer)
 
     merged_username_type = (
-        next(iter(source_username_types))
-        if source_username_types
-        else "microblogging"
+        next(iter(source_username_types)) if source_username_types else "microblogging"
     )
     merged_population = Population(
         name=merged_name,

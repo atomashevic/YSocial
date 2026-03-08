@@ -61,7 +61,9 @@ def _tuple_by_columns(row: dict[str, Any], columns: tuple[str, ...]) -> tuple[An
     return tuple(row[c] for c in columns)
 
 
-def _build_key_from_row(row: dict[str, Any], key_columns: tuple[str, ...]) -> tuple[str, ...]:
+def _build_key_from_row(
+    row: dict[str, Any], key_columns: tuple[str, ...]
+) -> tuple[str, ...]:
     return _normalize_key(tuple(row[c] for c in key_columns))
 
 
@@ -73,7 +75,9 @@ def _sqlite_template_path() -> str:
     return os.path.join(ysocial_root, "data_schema", "database_dashboard.db")
 
 
-def load_canonical_defaults(sqlite_path: str | None = None) -> dict[str, list[dict[str, Any]]]:
+def load_canonical_defaults(
+    sqlite_path: str | None = None,
+) -> dict[str, list[dict[str, Any]]]:
     """
     Load canonical defaults from bundled SQLite dashboard database.
 
@@ -248,7 +252,9 @@ def migrate_postgresql(
                 if key in existing_keys:
                     continue
 
-                insert_query = sql.SQL("INSERT INTO {table} ({cols}) VALUES ({vals})").format(
+                insert_query = sql.SQL(
+                    "INSERT INTO {table} ({cols}) VALUES ({vals})"
+                ).format(
                     table=sql.Identifier(spec.name),
                     cols=sql.SQL(", ").join(sql.Identifier(c) for c in spec.columns),
                     vals=sql.SQL(", ").join(sql.Placeholder() for _ in spec.columns),
@@ -266,7 +272,9 @@ def migrate_postgresql(
 
         conn.commit()
         conn.close()
-        print(f"✓ Dashboard default configuration backfill complete ({total_inserted} rows inserted)")
+        print(
+            f"✓ Dashboard default configuration backfill complete ({total_inserted} rows inserted)"
+        )
         return True
 
     except Exception as e:
