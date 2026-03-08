@@ -145,7 +145,9 @@ class ProcessWatchdog:
             heartbeat_interval_seconds: Expected client heartbeat write interval (seconds)
             enabled: Whether watchdog scheduling is enabled
         """
-        self._run_interval_minutes = max(1, min(run_interval_minutes, MAX_RUN_INTERVAL_MINUTES))
+        self._run_interval_minutes = max(
+            1, min(run_interval_minutes, MAX_RUN_INTERVAL_MINUTES)
+        )
         self._server_heartbeat_timeout = int(
             server_heartbeat_timeout
             if server_heartbeat_timeout is not None
@@ -869,7 +871,10 @@ class ProcessWatchdog:
                 is_running = self._is_process_running(info.pid)
                 last_modified = self._get_log_mtime(info.log_file)
                 if info.last_restart_error and info.last_restart_at:
-                    if latest_restart_at is None or info.last_restart_at > latest_restart_at:
+                    if (
+                        latest_restart_at is None
+                        or info.last_restart_at > latest_restart_at
+                    ):
                         latest_restart_at = info.last_restart_at
                         latest_restart_error = {
                             "process_id": info.process_id,
@@ -905,9 +910,7 @@ class ProcessWatchdog:
                     ),
                     "quarantined": info.quarantined,
                     "quarantined_at": (
-                        info.quarantined_at.isoformat()
-                        if info.quarantined_at
-                        else None
+                        info.quarantined_at.isoformat() if info.quarantined_at else None
                     ),
                     "quarantine_reason": info.quarantine_reason,
                 }
@@ -1049,7 +1052,9 @@ def _upgrade_legacy_watchdog_defaults(settings) -> None:
                 )
             )
             == 60
-            and int(getattr(settings, "max_restart_attempts", DEFAULT_MAX_RESTART_ATTEMPTS))
+            and int(
+                getattr(settings, "max_restart_attempts", DEFAULT_MAX_RESTART_ATTEMPTS)
+            )
             == 3
             and int(getattr(settings, "restart_cooldown_sec", DEFAULT_RESTART_COOLDOWN))
             == 60
@@ -1284,9 +1289,7 @@ def get_watchdog(
         effective_max_restarts = (
             max_restart_attempts
             if max_restart_attempts is not None
-            else db_settings.get(
-                "max_restart_attempts", DEFAULT_MAX_RESTART_ATTEMPTS
-            )
+            else db_settings.get("max_restart_attempts", DEFAULT_MAX_RESTART_ATTEMPTS)
         )
         effective_restart_cooldown = (
             restart_cooldown
@@ -1412,24 +1415,30 @@ def set_watchdog_settings(
         watchdog.refresh_registered_timeouts()
 
     _save_watchdog_settings(
-        run_interval_minutes=watchdog.run_interval_minutes
-        if run_interval_minutes is not None
-        else None,
-        server_heartbeat_timeout_sec=watchdog.server_heartbeat_timeout
-        if server_heartbeat_timeout_sec is not None
-        else None,
-        client_heartbeat_timeout_sec=watchdog.client_heartbeat_timeout
-        if client_heartbeat_timeout_sec is not None
-        else None,
-        heartbeat_interval_sec=watchdog.heartbeat_interval_seconds
-        if heartbeat_interval_sec is not None
-        else None,
-        max_restart_attempts=watchdog.max_restart_attempts
-        if max_restart_attempts is not None
-        else None,
-        restart_cooldown_sec=watchdog.restart_cooldown
-        if restart_cooldown_sec is not None
-        else None,
+        run_interval_minutes=(
+            watchdog.run_interval_minutes if run_interval_minutes is not None else None
+        ),
+        server_heartbeat_timeout_sec=(
+            watchdog.server_heartbeat_timeout
+            if server_heartbeat_timeout_sec is not None
+            else None
+        ),
+        client_heartbeat_timeout_sec=(
+            watchdog.client_heartbeat_timeout
+            if client_heartbeat_timeout_sec is not None
+            else None
+        ),
+        heartbeat_interval_sec=(
+            watchdog.heartbeat_interval_seconds
+            if heartbeat_interval_sec is not None
+            else None
+        ),
+        max_restart_attempts=(
+            watchdog.max_restart_attempts if max_restart_attempts is not None else None
+        ),
+        restart_cooldown_sec=(
+            watchdog.restart_cooldown if restart_cooldown_sec is not None else None
+        ),
     )
     return get_watchdog_status()
 
