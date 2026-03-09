@@ -94,6 +94,45 @@ CREATE TABLE experiment_schedule_logs (
 );
 
 -- -----------------------------
+-- Admin interview
+-- -----------------------------
+CREATE TABLE admin_interview_sessions (
+    id                      SERIAL PRIMARY KEY,
+    exp_id                  INTEGER NOT NULL,
+    admin_username          VARCHAR(50) NOT NULL,
+    agent_user_id           INTEGER NOT NULL,
+    agent_username          VARCHAR(50) NOT NULL,
+    run_id                  TEXT,
+    backend_mode            VARCHAR(20) NOT NULL DEFAULT 'agent_runtime',
+    llm_model               VARCHAR(200),
+    llm_base_url            VARCHAR(300),
+    persona_snapshot        TEXT,
+    interests_snapshot_json TEXT,
+    memory_snapshot_json    TEXT,
+    created_at              TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at              TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX ix_admin_interview_sessions_exp_id
+    ON admin_interview_sessions (exp_id);
+CREATE INDEX ix_admin_interview_sessions_admin_username
+    ON admin_interview_sessions (admin_username);
+CREATE INDEX ix_admin_interview_sessions_run_id
+    ON admin_interview_sessions (run_id);
+
+CREATE TABLE admin_interview_messages (
+    id         SERIAL PRIMARY KEY,
+    session_id INTEGER NOT NULL REFERENCES admin_interview_sessions(id),
+    role       VARCHAR(12) NOT NULL,
+    content    TEXT NOT NULL,
+    meta_json  TEXT,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX ix_admin_interview_messages_session_id
+    ON admin_interview_messages (session_id);
+
+-- -----------------------------
 -- Activity profiles
 -- -----------------------------
 CREATE TABLE activity_profiles (
