@@ -5,16 +5,17 @@ import json
 import os
 import re
 import sys
-from datetime import datetime, time, timedelta
 from dataclasses import dataclass
+from datetime import datetime, time, timedelta
 from typing import Any, Dict, Iterable, List, Optional, Tuple
-from urllib.parse import parse_qs, urlparse, urlunparse, urlencode
+from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
 from zoneinfo import ZoneInfo
 
 from bs4 import BeautifulSoup
 from sqlalchemy import case, func, or_, text
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import aliased
+
 from y_web import db
 from y_web.data_access import get_elicited_emotions, get_topics
 from y_web.experiment_context import get_current_experiment_id
@@ -22,15 +23,16 @@ from y_web.models import (
     Admin_users,
     Agent,
     Articles,
+    Exps,
     Images,
     Page,
     Post,
     Reactions,
     Rounds,
-    Exps,
     User_mgmt,
     Websites,
 )
+from y_web.reddit.hot_rank import rank_posts_longtail
 from y_web.utils.experiment_clock import (
     DEFAULT_CLOCK_MODE,
     DEFAULT_CLOCK_TIMEZONE,
@@ -46,22 +48,21 @@ from y_web.utils.text_utils import (
     strip_reproduced_article_content,
     strip_tags,
 )
-from y_web.reddit.hot_rank import rank_posts_longtail
 
 
 def clean_reddit_formatting(text: str) -> str:
     """Remove Reddit-specific formatting artifacts from text."""
     if not text:
-        return ''
+        return ""
     normalized = html.unescape(text)
     # Remove "submitted by /u/username" patterns (tolerate extra spaces)
     normalized = re.sub(
-        r'\bsubmitted\s+by\s+/?u/[A-Za-z0-9_-]+\b', '', normalized, flags=re.IGNORECASE
+        r"\bsubmitted\s+by\s+/?u/[A-Za-z0-9_-]+\b", "", normalized, flags=re.IGNORECASE
     )
     # Remove [link] [comments] patterns
-    normalized = re.sub(r'\[link\]|\[comments\]', '', normalized, flags=re.IGNORECASE)
+    normalized = re.sub(r"\[link\]|\[comments\]", "", normalized, flags=re.IGNORECASE)
     # Clean up extra whitespace
-    normalized = re.sub(r'\s+', ' ', normalized)
+    normalized = re.sub(r"\s+", " ", normalized)
     return normalized.strip()
 
 
@@ -134,6 +135,7 @@ def _fetch_and_cache_og_image(article) -> Optional[Dict[str, str]]:
     image = None
     try:
         import requests
+
         from y_web.utils.article_extractor import extract_image
 
         headers = {
@@ -199,10 +201,10 @@ def _strip_article_title_from_body(body: str, article: Optional[ArticlePreview])
 
     # Try matching with "TITLE: " prefix first
     if body_stripped.startswith(f"TITLE: {article_title}"):
-        body_stripped = body_stripped[len(f"TITLE: {article_title}"):].lstrip()
+        body_stripped = body_stripped[len(f"TITLE: {article_title}") :].lstrip()
     # Also try matching without the prefix (in case it was already partially stripped)
     elif body_stripped.startswith(article_title):
-        body_stripped = body_stripped[len(article_title):].lstrip()
+        body_stripped = body_stripped[len(article_title) :].lstrip()
 
     return body_stripped
 
@@ -483,7 +485,9 @@ def _format_display_time(day: str, hour: str) -> str:
     Simulation day/hour is mapped onto the experiment anchor date in the configured timezone.
     """
     clock = _resolve_experiment_clock()
-    timezone_name = str(clock.get("timezone", DEFAULT_CLOCK_TIMEZONE) or DEFAULT_CLOCK_TIMEZONE)
+    timezone_name = str(
+        clock.get("timezone", DEFAULT_CLOCK_TIMEZONE) or DEFAULT_CLOCK_TIMEZONE
+    )
 
     try:
         tz = ZoneInfo(timezone_name)
@@ -521,7 +525,9 @@ def _format_display_time(day: str, hour: str) -> str:
     return dt.strftime("%d-%m-%y %H:%M")
 
 
-def _format_display_time_from_created_at(created_at: Optional[datetime]) -> Optional[str]:
+def _format_display_time_from_created_at(
+    created_at: Optional[datetime],
+) -> Optional[str]:
     """
     Format a persisted post/comment timestamp as calendar datetime.
     """
@@ -529,7 +535,9 @@ def _format_display_time_from_created_at(created_at: Optional[datetime]) -> Opti
         return None
 
     clock = _resolve_experiment_clock()
-    timezone_name = str(clock.get("timezone", DEFAULT_CLOCK_TIMEZONE) or DEFAULT_CLOCK_TIMEZONE)
+    timezone_name = str(
+        clock.get("timezone", DEFAULT_CLOCK_TIMEZONE) or DEFAULT_CLOCK_TIMEZONE
+    )
 
     try:
         tz = ZoneInfo(timezone_name)
@@ -560,12 +568,17 @@ def _resolve_article(article: Optional[Articles]) -> Optional[ArticlePreview]:
     try:
         img = Images.query.filter_by(article_id=article.id).first()
         if img and img.url:
-            image = {"url": img.url, "description": getattr(img, "description", "") or ""}
+            image = {
+                "url": img.url,
+                "description": getattr(img, "description", "") or "",
+            }
     except OperationalError:
         # Handle schema mismatch for older databases
         try:
             row = db.session.execute(
-                text("SELECT url, description FROM images WHERE article_id = :article_id LIMIT 1"),
+                text(
+                    "SELECT url, description FROM images WHERE article_id = :article_id LIMIT 1"
+                ),
                 {"article_id": article.id},
             ).fetchone()
             if row and row[0]:
@@ -629,7 +642,11 @@ def _resolve_image(image_id: Optional[int]) -> Optional[str]:
                 {"image_id": image_id},
             ).fetchone()
             if row and row[0]:
-                return {"url": row[0], "description": "", "media_type": _media_type_from_url(row[0])}
+                return {
+                    "url": row[0],
+                    "description": "",
+                    "media_type": _media_type_from_url(row[0]),
+                }
             return ""
         raise
     if not image:
@@ -638,7 +655,11 @@ def _resolve_image(image_id: Optional[int]) -> Optional[str]:
     description = getattr(image, "description", "") or ""
     if not url:
         return ""
-    return {"url": url, "description": description, "media_type": _media_type_from_url(url)}
+    return {
+        "url": url,
+        "description": description,
+        "media_type": _media_type_from_url(url),
+    }
 
 
 def _media_type_from_url(url: str) -> str:
@@ -684,11 +705,14 @@ def _resolve_image_post(image_post_id: Optional[int]) -> Optional[Dict[str, str]
     try:
         # Use the current experiment's database bind
         from y_web.experiment_context import get_current_experiment_bind
+
         bind_key = get_current_experiment_bind()
         engine = db.get_engine(bind=bind_key)
         with engine.connect() as conn:
             row = conn.execute(
-                text("SELECT url, description, local_path FROM image_posts WHERE id = :id LIMIT 1"),
+                text(
+                    "SELECT url, description, local_path FROM image_posts WHERE id = :id LIMIT 1"
+                ),
                 {"id": image_post_id},
             ).fetchone()
             if row and row[0]:
@@ -697,7 +721,11 @@ def _resolve_image_post(image_post_id: Optional[int]) -> Optional[Dict[str, str]
                     url = f"/static/{row[2]}"
                 else:
                     url = _upgrade_reddit_image_url(row[0])
-                return {"url": url, "description": row[1] or "", "media_type": _media_type_from_url(url)}
+                return {
+                    "url": url,
+                    "description": row[1] or "",
+                    "media_type": _media_type_from_url(url),
+                }
     except Exception:
         pass
     return None
@@ -755,7 +783,9 @@ def _build_comment_payload(
 
         day, hour = _format_round(comment.round)
         comment_created_at = getattr(comment, "created_at", None)
-        display_time = _format_display_time_from_created_at(comment_created_at) or _format_display_time(day, hour)
+        display_time = _format_display_time_from_created_at(
+            comment_created_at
+        ) or _format_display_time(day, hour)
 
         likes, dislikes = reaction_map.get(comment.id, (0, 0))
         viewer_vote = viewer_vote_map.get(comment.id)
@@ -773,7 +803,9 @@ def _build_comment_payload(
                 "day": day,
                 "hour": hour,
                 "display_time": display_time,
-                "created_at": comment_created_at.isoformat() if comment_created_at else None,
+                "created_at": (
+                    comment_created_at.isoformat() if comment_created_at else None
+                ),
                 "likes": likes,
                 "dislikes": dislikes,
                 "is_liked": viewer_vote == "like",
@@ -830,7 +862,9 @@ def _create_feed_post(
 
     day, hour = _format_round(post.round)
     post_created_at = getattr(post, "created_at", None)
-    display_time = _format_display_time_from_created_at(post_created_at) or _format_display_time(day, hour)
+    display_time = _format_display_time_from_created_at(
+        post_created_at
+    ) or _format_display_time(day, hour)
 
     likes, dislikes = reaction_map.get(post.id, (0, 0))
     viewer_vote = viewer_vote_map.get(post.id)
@@ -839,8 +873,13 @@ def _create_feed_post(
 
     title, body = process_reddit_post(post.tweet)
 
-    article_row = Articles.query.filter_by(id=post.news_id).first() if post.news_id else None
-    article_needs_enrichment = bool(article_row and _article_summary_needs_enrichment(getattr(article_row, "summary", None)))
+    article_row = (
+        Articles.query.filter_by(id=post.news_id).first() if post.news_id else None
+    )
+    article_needs_enrichment = bool(
+        article_row
+        and _article_summary_needs_enrichment(getattr(article_row, "summary", None))
+    )
     article = _resolve_article(article_row)
 
     # Strip article title from body if it appears at the beginning (avoids duplication)
@@ -859,11 +898,19 @@ def _create_feed_post(
     exp_id = get_current_experiment_id()
     processed_body = augment_text(body, exp_id) if body else ""
 
-    image_row = Images.query.filter_by(id=post.image_id).first() if getattr(post, "image_id", None) else None
-    image_needs_enrichment = bool(image_row and not (getattr(image_row, "description", "") or "").strip())
+    image_row = (
+        Images.query.filter_by(id=post.image_id).first()
+        if getattr(post, "image_id", None)
+        else None
+    )
+    image_needs_enrichment = bool(
+        image_row and not (getattr(image_row, "description", "") or "").strip()
+    )
 
     # Check image_post_id first (new standalone images), then fall back to image_id (old format)
-    image = _resolve_image_post(getattr(post, 'image_post_id', None)) or _resolve_image(post.image_id)
+    image = _resolve_image_post(getattr(post, "image_post_id", None)) or _resolve_image(
+        post.image_id
+    )
     if not image and article and article.image:
         image = article.image
     shared_from = _shared_from(post)
@@ -951,7 +998,9 @@ def build_user_feed_posts(
 ) -> Tuple[List[FeedPost], bool]:
     from y_web.recsys_support import get_suggested_posts
 
-    sys.stderr.write(f"[DEBUG] build_user_feed_posts called with feed_type={feed_type}, target_user_id={target_user_id}\n")
+    sys.stderr.write(
+        f"[DEBUG] build_user_feed_posts called with feed_type={feed_type}, target_user_id={target_user_id}\n"
+    )
     sys.stderr.flush()
 
     recsys_posts, additional = get_suggested_posts(
@@ -984,12 +1033,20 @@ def build_user_feed_posts(
     if feed_type == "top":
         # Sort by score (likes - dislikes) descending
         reaction_map = _fetch_reaction_map([p.id for p in normalized])
-        normalized.sort(key=lambda p: (reaction_map.get(p.id, (0, 0))[0] - reaction_map.get(p.id, (0, 0))[1], p.id), reverse=True)
+        normalized.sort(
+            key=lambda p: (
+                reaction_map.get(p.id, (0, 0))[0] - reaction_map.get(p.id, (0, 0))[1],
+                p.id,
+            ),
+            reverse=True,
+        )
     elif feed_type == "most_commented":
         # Sort by comment count descending
         thread_ids = [p.thread_id or p.id for p in normalized]
         comment_map = _fetch_comment_map(thread_ids)
-        normalized.sort(key=lambda p: (comment_map.get(p.thread_id or p.id, 0), p.id), reverse=True)
+        normalized.sort(
+            key=lambda p: (comment_map.get(p.thread_id or p.id, 0), p.id), reverse=True
+        )
     else:
         # Default: Sort by post ID descending (newest first)
         normalized.sort(key=lambda p: p.id, reverse=True)
@@ -1018,7 +1075,9 @@ def fetch_feed_page(
     search_query: str = "",
     exclude_user_ids: Optional[List[int]] = None,
 ) -> FeedPage:
-    sys.stderr.write(f"[DEBUG] fetch_feed_page called with feed_type={feed_type}, page={page}, per_page={per_page}\n")
+    sys.stderr.write(
+        f"[DEBUG] fetch_feed_page called with feed_type={feed_type}, page={page}, per_page={per_page}\n"
+    )
     sys.stderr.flush()
     base_query = db.session.query(Post).filter(Post.comment_to == -1).options()
 
@@ -1074,7 +1133,9 @@ def fetch_feed_page(
         # Hot score: logarithmic order + sign * time_boost
         hot_score = log_order + sign_expr * (Post.round / round_decay)
 
-        longtail_enabled = os.getenv("YSOCIAL_FORUM_HOT_LONGTAIL", "1").strip().lower() not in {
+        longtail_enabled = os.getenv(
+            "YSOCIAL_FORUM_HOT_LONGTAIL", "1"
+        ).strip().lower() not in {
             "0",
             "false",
             "off",
@@ -1108,9 +1169,7 @@ def fetch_feed_page(
 
             post_ids = [p.id for p in candidates]
             reaction_map = _fetch_reaction_map(post_ids)
-            current_round_id = (
-                db.session.query(func.max(Rounds.id)).scalar() or 0
-            )
+            current_round_id = db.session.query(func.max(Rounds.id)).scalar() or 0
 
             ranked = rank_posts_longtail(
                 candidates,
@@ -1142,9 +1201,18 @@ def fetch_feed_page(
 
     pagination = base_query.paginate(page=page, per_page=per_page, error_out=False)
 
-    sys.stderr.write(f"[DEBUG] Found {len(pagination.items)} posts out of {pagination.total} total, feed_type={feed_type}\n")
+    sys.stderr.write(
+        f"[DEBUG] Found {len(pagination.items)} posts out of {pagination.total} total, feed_type={feed_type}\n"
+    )
     if pagination.items:
-        post_ids = [item.id if isinstance(item, Post) else item[0].id if isinstance(item, tuple) else str(item) for item in pagination.items[:10]]
+        post_ids = [
+            (
+                item.id
+                if isinstance(item, Post)
+                else item[0].id if isinstance(item, tuple) else str(item)
+            )
+            for item in pagination.items[:10]
+        ]
         sys.stderr.write(f"[DEBUG] First 10 post IDs returned: {post_ids}\n")
     sys.stderr.flush()
 
@@ -1168,12 +1236,17 @@ def _post_with_aggregates(
     profile_pic = _get_profile_pic(author) if author else ""
     day, hour = _format_round(post.round)
     post_created_at = getattr(post, "created_at", None)
-    display_time = _format_display_time_from_created_at(post_created_at) or _format_display_time(day, hour)
+    display_time = _format_display_time_from_created_at(
+        post_created_at
+    ) or _format_display_time(day, hour)
 
     title, body = process_reddit_post(post.tweet)
-    article_row = Articles.query.filter_by(id=post.news_id).first() if post.news_id else None
+    article_row = (
+        Articles.query.filter_by(id=post.news_id).first() if post.news_id else None
+    )
     article_needs_enrichment = bool(
-        article_row and _article_summary_needs_enrichment(getattr(article_row, "summary", None))
+        article_row
+        and _article_summary_needs_enrichment(getattr(article_row, "summary", None))
     )
     article = _resolve_article(article_row)
 
@@ -1193,11 +1266,19 @@ def _post_with_aggregates(
     exp_id = get_current_experiment_id()
     processed_body = augment_text(body, exp_id) if body else ""
 
-    image_row = Images.query.filter_by(id=post.image_id).first() if getattr(post, "image_id", None) else None
-    image_needs_enrichment = bool(image_row and not (getattr(image_row, "description", "") or "").strip())
+    image_row = (
+        Images.query.filter_by(id=post.image_id).first()
+        if getattr(post, "image_id", None)
+        else None
+    )
+    image_needs_enrichment = bool(
+        image_row and not (getattr(image_row, "description", "") or "").strip()
+    )
 
     # Check image_post_id first (new standalone images), then fall back to image_id (old format)
-    image_obj = _resolve_image_post(getattr(post, 'image_post_id', None)) or _resolve_image(post.image_id)
+    image_obj = _resolve_image_post(
+        getattr(post, "image_post_id", None)
+    ) or _resolve_image(post.image_id)
     if not image_obj and article and article.image:
         image_obj = article.image
 

@@ -123,16 +123,15 @@ def setup_experiment_context():
                             ] = original_db_exp
 
                     # For SQLite experiment DBs, run local schema migrations for post columns.
-                    if (
-                        current_app.config["SQLALCHEMY_DATABASE_URI"].startswith("sqlite")
-                        and exp_uri.startswith("sqlite:///")
-                    ):
+                    if current_app.config["SQLALCHEMY_DATABASE_URI"].startswith(
+                        "sqlite"
+                    ) and exp_uri.startswith("sqlite:///"):
                         try:
-                            from y_web.migrations.add_post_created_at_column import (
-                                migrate_sqlite_experiment_db,
-                            )
                             from y_web.migrations.add_comment_dedupe_columns import (
                                 migrate_sqlite_comment_dedupe_columns,
+                            )
+                            from y_web.migrations.add_post_created_at_column import (
+                                migrate_sqlite_experiment_db,
                             )
 
                             migrate_sqlite_experiment_db(exp_uri)
@@ -266,11 +265,11 @@ def initialize_active_experiment_databases(app):
                 # For SQLite experiment DBs, run local schema migration for post.created_at.
                 if not is_postgresql and exp_uri.startswith("sqlite:///"):
                     try:
-                        from y_web.migrations.add_post_created_at_column import (
-                            migrate_sqlite_experiment_db,
-                        )
                         from y_web.migrations.add_comment_dedupe_columns import (
                             migrate_sqlite_comment_dedupe_columns,
+                        )
+                        from y_web.migrations.add_post_created_at_column import (
+                            migrate_sqlite_experiment_db,
                         )
 
                         migrate_sqlite_experiment_db(exp_uri)

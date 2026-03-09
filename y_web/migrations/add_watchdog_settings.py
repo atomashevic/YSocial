@@ -51,8 +51,7 @@ def migrate_sqlite(db_path):
         table_exists = cursor.fetchone() is not None
 
         if not table_exists:
-            cursor.execute(
-                """
+            cursor.execute("""
                 CREATE TABLE watchdog_settings (
                     id                   INTEGER PRIMARY KEY AUTOINCREMENT,
                     enabled              INTEGER NOT NULL DEFAULT 1,
@@ -64,19 +63,16 @@ def migrate_sqlite(db_path):
                     restart_cooldown_sec INTEGER NOT NULL DEFAULT 60,
                     last_run             TEXT
                 )
-            """
-            )
+            """)
             # Insert default settings row
-            cursor.execute(
-                """
+            cursor.execute("""
                 INSERT INTO watchdog_settings (
                     enabled, run_interval_minutes, server_heartbeat_timeout_sec,
                     client_heartbeat_timeout_sec, heartbeat_interval_sec,
                     max_restart_attempts, restart_cooldown_sec
                 )
                 VALUES (1, 1, 300, 300, 60, 3, 60)
-            """
-            )
+            """)
             print("✓ Created watchdog_settings table in SQLite database")
         else:
             print("○ watchdog_settings table already exists in SQLite database")
@@ -157,19 +153,16 @@ def migrate_postgresql(host, port, database, user, password):
         cursor = conn.cursor()
 
         # Check if table already exists
-        cursor.execute(
-            """
+        cursor.execute("""
             SELECT table_name 
             FROM information_schema.tables 
             WHERE table_schema = 'public' 
               AND table_name = 'watchdog_settings'
-        """
-        )
+        """)
         table_exists = cursor.fetchone() is not None
 
         if not table_exists:
-            cursor.execute(
-                """
+            cursor.execute("""
                 CREATE TABLE watchdog_settings (
                     id                   SERIAL PRIMARY KEY,
                     enabled              BOOLEAN NOT NULL DEFAULT TRUE,
@@ -181,35 +174,29 @@ def migrate_postgresql(host, port, database, user, password):
                     restart_cooldown_sec INTEGER NOT NULL DEFAULT 60,
                     last_run             TIMESTAMP
                 )
-            """
-            )
+            """)
             # Insert default settings row
-            cursor.execute(
-                """
+            cursor.execute("""
                 INSERT INTO watchdog_settings (
                     enabled, run_interval_minutes, server_heartbeat_timeout_sec,
                     client_heartbeat_timeout_sec, heartbeat_interval_sec,
                     max_restart_attempts, restart_cooldown_sec
                 )
                 VALUES (TRUE, 1, 300, 300, 60, 3, 60)
-            """
-            )
+            """)
             print("✓ Created watchdog_settings table in PostgreSQL database")
         else:
             print("○ watchdog_settings table already exists in PostgreSQL database")
 
-            cursor.execute(
-                """
+            cursor.execute("""
                 ALTER TABLE watchdog_settings
                 ADD COLUMN IF NOT EXISTS server_heartbeat_timeout_sec INTEGER NOT NULL DEFAULT 300,
                 ADD COLUMN IF NOT EXISTS client_heartbeat_timeout_sec INTEGER NOT NULL DEFAULT 300,
                 ADD COLUMN IF NOT EXISTS heartbeat_interval_sec INTEGER NOT NULL DEFAULT 60,
                 ADD COLUMN IF NOT EXISTS max_restart_attempts INTEGER NOT NULL DEFAULT 3,
                 ADD COLUMN IF NOT EXISTS restart_cooldown_sec INTEGER NOT NULL DEFAULT 60
-            """
-            )
-            cursor.execute(
-                """
+            """)
+            cursor.execute("""
                 UPDATE watchdog_settings
                 SET
                     server_heartbeat_timeout_sec = COALESCE(server_heartbeat_timeout_sec, 300),
@@ -217,8 +204,7 @@ def migrate_postgresql(host, port, database, user, password):
                     heartbeat_interval_sec = COALESCE(heartbeat_interval_sec, 60),
                     max_restart_attempts = COALESCE(max_restart_attempts, 3),
                     restart_cooldown_sec = COALESCE(restart_cooldown_sec, 60)
-            """
-            )
+            """)
 
         conn.commit()
         conn.close()

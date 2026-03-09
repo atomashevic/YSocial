@@ -7,15 +7,15 @@ from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Tuple
 
 import requests
-from flask import Blueprint, jsonify, request, current_app
+from flask import Blueprint, current_app, jsonify, request
 from flask_login import current_user, login_required
 from sqlalchemy import case, desc, func, or_
 
 from y_web import db
 from y_web.models import (
+    Admin_users,
     AdminInterviewMessage,
     AdminInterviewSession,
-    Admin_users,
     Exps,
     Interests,
     Post,
@@ -28,23 +28,24 @@ from y_web.models import (
 from y_web.utils.experiment_helpers import get_experiment_uid_from_db_name
 from y_web.utils.path_utils import get_writable_path
 
-
 api_interview = Blueprint("api_interview", __name__, url_prefix="/api/interview")
 
 _MEMORY_MODE_LEGACY = "legacy"
 _MEMORY_MODE_SEMANTIC = "semantic"
 _MEMORY_MODE_LEGACY_FALLBACK = "legacy_fallback"
 _INTERVIEW_MEMORY_MODE_DEFAULT = (
-    os.environ.get("INTERVIEW_MEMORY_MODE_DEFAULT", _MEMORY_MODE_SEMANTIC).strip().lower()
+    os.environ.get("INTERVIEW_MEMORY_MODE_DEFAULT", _MEMORY_MODE_SEMANTIC)
+    .strip()
+    .lower()
 )
 if _INTERVIEW_MEMORY_MODE_DEFAULT not in {_MEMORY_MODE_LEGACY, _MEMORY_MODE_SEMANTIC}:
     _INTERVIEW_MEMORY_MODE_DEFAULT = _MEMORY_MODE_SEMANTIC
-_INTERVIEW_MEMORY_DEFAULT_QUERY = (
-    "Most important recent memories, relationships, norms, and ongoing threads for this agent."
-)
+_INTERVIEW_MEMORY_DEFAULT_QUERY = "Most important recent memories, relationships, norms, and ongoing threads for this agent."
 
 
-def _parse_timeout_series(raw: Optional[str], default: Tuple[float, ...]) -> Tuple[float, ...]:
+def _parse_timeout_series(
+    raw: Optional[str], default: Tuple[float, ...]
+) -> Tuple[float, ...]:
     values: List[float] = []
     for part in str(raw or "").split(","):
         token = part.strip()
@@ -179,7 +180,9 @@ def _build_change_db_path_for_exp(exp: Exps) -> str:
         return full_path[1:].replace("\\", "/")
 
     old_db_name = db_uri_main.split("/")[-1]
-    return db_uri_main.replace(old_db_name, str(getattr(exp, "db_name", "") or "").strip())
+    return db_uri_main.replace(
+        old_db_name, str(getattr(exp, "db_name", "") or "").strip()
+    )
 
 
 def _ensure_experiment_server_db_binding(exp: Exps) -> Dict[str, Any]:
@@ -221,7 +224,9 @@ def _iter_run_ids_from_server_log(
     if not uid:
         return []
 
-    log_path = get_writable_path(os.path.join("y_web", "experiments", uid, "_server.log"))
+    log_path = get_writable_path(
+        os.path.join("y_web", "experiments", uid, "_server.log")
+    )
     if not os.path.exists(log_path):
         return []
 
@@ -356,9 +361,14 @@ def _detect_run_id_from_server_log(
         if agent_user_id is None or not probe_memory_coverage:
             best = {"run_id": rid}
             break
-        cov = _probe_run_memory_coverage(exp, run_id=rid, agent_user_id=int(agent_user_id))
+        cov = _probe_run_memory_coverage(
+            exp, run_id=rid, agent_user_id=int(agent_user_id)
+        )
         candidates_checked.append(cov)
-        if int(cov.get("returned_k") or 0) > 0 or int(cov.get("candidate_count") or 0) > 0:
+        if (
+            int(cov.get("returned_k") or 0) > 0
+            or int(cov.get("candidate_count") or 0) > 0
+        ):
             best = {"run_id": rid, "coverage": cov}
             break
 
@@ -377,7 +387,11 @@ def _detect_run_id_from_server_log(
         "selected_reason": (
             "memory_coverage_positive"
             if best.get("coverage")
-            else ("latest_agent_run" if probe_memory_coverage else "latest_agent_run_unprobed")
+            else (
+                "latest_agent_run"
+                if probe_memory_coverage
+                else "latest_agent_run_unprobed"
+            )
         ),
         "candidates_checked": candidates_checked,
     }
@@ -391,7 +405,9 @@ def _get_current_round_id() -> int:
         return 0
 
 
-def _get_top_interests_for_user(user_id: int, *, window_rounds: int = 50, limit: int = 10) -> List[str]:
+def _get_top_interests_for_user(
+    user_id: int, *, window_rounds: int = 50, limit: int = 10
+) -> List[str]:
     cur = _get_current_round_id()
     base = max(0, cur - int(window_rounds))
 
@@ -499,7 +515,9 @@ def _interview_debug_enabled(payload: Optional[Dict[str, Any]] = None) -> bool:
     return _as_bool(os.environ.get("INTERVIEW_DEBUG_TRACE"), False)
 
 
-def _build_memory_snapshot_legacy(exp: Exps, *, run_id: Optional[str], agent_user_id: int) -> Dict[str, Any]:
+def _build_memory_snapshot_legacy(
+    exp: Exps, *, run_id: Optional[str], agent_user_id: int
+) -> Dict[str, Any]:
     snap: Dict[str, Any] = {
         "run_id": run_id,
         "agent_user_id": int(agent_user_id),
@@ -611,8 +629,16 @@ def _build_memory_snapshot_legacy(exp: Exps, *, run_id: Optional[str], agent_use
             {
                 "other_user_id": int(other_id),
                 "other_username": other_username,
-                "social_card": other_ctx.get("social_card") if isinstance(other_ctx, dict) else None,
-                "recent_pair_events": other_ctx.get("recent_pair_events") if isinstance(other_ctx, dict) else None,
+                "social_card": (
+                    other_ctx.get("social_card")
+                    if isinstance(other_ctx, dict)
+                    else None
+                ),
+                "recent_pair_events": (
+                    other_ctx.get("recent_pair_events")
+                    if isinstance(other_ctx, dict)
+                    else None
+                ),
             }
         )
 
@@ -654,7 +680,9 @@ def _build_memory_snapshot_legacy(exp: Exps, *, run_id: Optional[str], agent_use
         threads.append(
             {
                 "thread_root_id": int(thread_root_id),
-                "thread_card": tctx.get("thread_card") if isinstance(tctx, dict) else None,
+                "thread_card": (
+                    tctx.get("thread_card") if isinstance(tctx, dict) else None
+                ),
             }
         )
 
@@ -764,7 +792,9 @@ def _build_memory_snapshot(
 ) -> Dict[str, Any]:
     requested_mode = _normalize_memory_mode(memory_mode)
     if requested_mode == _MEMORY_MODE_LEGACY:
-        legacy = _build_memory_snapshot_legacy(exp, run_id=run_id, agent_user_id=agent_user_id)
+        legacy = _build_memory_snapshot_legacy(
+            exp, run_id=run_id, agent_user_id=agent_user_id
+        )
         legacy["memory_mode_requested"] = requested_mode
         legacy["memory_mode_used"] = _MEMORY_MODE_LEGACY
         return legacy
@@ -780,7 +810,9 @@ def _build_memory_snapshot(
         semantic["memory_mode_used"] = _MEMORY_MODE_SEMANTIC
         return semantic
     except Exception as exc:
-        legacy = _build_memory_snapshot_legacy(exp, run_id=run_id, agent_user_id=agent_user_id)
+        legacy = _build_memory_snapshot_legacy(
+            exp, run_id=run_id, agent_user_id=agent_user_id
+        )
         legacy["memory_mode_requested"] = requested_mode
         legacy["memory_mode_used"] = _MEMORY_MODE_LEGACY_FALLBACK
         legacy["fallback_reason"] = str(exc)
@@ -832,10 +864,14 @@ def _format_memory_pack(snapshot: Dict[str, Any], *, max_chars: int = 4500) -> s
                 score_s = f"{float(score):.2f}"
             except Exception:
                 score_s = "?"
-            text = _truncate_middle(str(it.get("text_humanized") or it.get("text") or "").strip(), 260)
+            text = _truncate_middle(
+                str(it.get("text_humanized") or it.get("text") or "").strip(), 260
+            )
             support_ids = it.get("supporting_event_ids")
             target_user_id = it.get("target_user_id")
-            target_username = _clean_username(it.get("target_username") or it.get("other_username"))
+            target_username = _clean_username(
+                it.get("target_username") or it.get("other_username")
+            )
             target_post_id = it.get("target_post_id")
             actor_user_id = it.get("actor_user_id")
             actor_username = _clean_username(it.get("actor_username"))
@@ -863,7 +899,9 @@ def _format_memory_pack(snapshot: Dict[str, Any], *, max_chars: int = 4500) -> s
                     f"- [{item_type}] round={round_id} score={score_s}{ids_s} supports={sid}: {text}"
                 )
             else:
-                parts.append(f"- [{item_type}] round={round_id} score={score_s}{ids_s}: {text}")
+                parts.append(
+                    f"- [{item_type}] round={round_id} score={score_s}{ids_s}: {text}"
+                )
 
     if retrieval_meta:
         returned_k = retrieval_meta.get("returned_k")
@@ -878,8 +916,12 @@ def _format_memory_pack(snapshot: Dict[str, Any], *, max_chars: int = 4500) -> s
         except Exception:
             returned_k_int = 0
         if bool(degraded_mode) or returned_k_int <= 0:
-            parts.append("- Reliability warning: memory retrieval is weak for this query.")
-            parts.append("- Do not infer specific prior interactions from memory alone.")
+            parts.append(
+                "- Reliability warning: memory retrieval is weak for this query."
+            )
+            parts.append(
+                "- Do not infer specific prior interactions from memory alone."
+            )
 
     # Keep legacy rendering for backward compatibility and semantic fallback mode.
     rels = snapshot.get("relationships")
@@ -896,7 +938,13 @@ def _format_memory_pack(snapshot: Dict[str, Any], *, max_chars: int = 4500) -> s
             sc = r.get("social_card") or {}
             if isinstance(sc, dict):
                 vals = []
-                for k in ["affinity", "conflict", "humor", "trust", "last_relation_label"]:
+                for k in [
+                    "affinity",
+                    "conflict",
+                    "humor",
+                    "trust",
+                    "last_relation_label",
+                ]:
                     if k in sc and sc.get(k) is not None:
                         vals.append(f"{k}={sc.get(k)}")
                 summary = (sc.get("summary_text") or "").strip()
@@ -954,7 +1002,11 @@ def _format_memory_pack(snapshot: Dict[str, Any], *, max_chars: int = 4500) -> s
                 if isinstance(participants_top, str):
                     participants_top_str = participants_top.strip()
                 else:
-                    participants_top_str = json.dumps(participants_top) if participants_top is not None else ""
+                    participants_top_str = (
+                        json.dumps(participants_top)
+                        if participants_top is not None
+                        else ""
+                    )
             except Exception:
                 participants_top_str = str(participants_top or "")
 
@@ -962,7 +1014,9 @@ def _format_memory_pack(snapshot: Dict[str, Any], *, max_chars: int = 4500) -> s
                 if isinstance(entry_points, str):
                     entry_points_str = entry_points.strip()
                 else:
-                    entry_points_str = json.dumps(entry_points) if entry_points is not None else ""
+                    entry_points_str = (
+                        json.dumps(entry_points) if entry_points is not None else ""
+                    )
             except Exception:
                 entry_points_str = str(entry_points or "")
 
@@ -970,7 +1024,9 @@ def _format_memory_pack(snapshot: Dict[str, Any], *, max_chars: int = 4500) -> s
             if my_role:
                 parts.append(f"  my_role: {my_role}")
             if participants_top_str.strip():
-                parts.append(f"  participants_top: {participants_top_str.strip()[:400]}")
+                parts.append(
+                    f"  participants_top: {participants_top_str.strip()[:400]}"
+                )
             if entry_points_str.strip():
                 parts.append(f"  entry_points: {entry_points_str.strip()[:200]}")
             if last_seen_round_id is not None:
@@ -1145,7 +1201,9 @@ def _extract_query_terms(admin_text: str, *, max_terms: int = 8) -> List[str]:
     # Expand lightweight aliases to improve lexical fallback recall.
     out: List[str] = list(base_terms)
     for t in base_terms:
-        alias_candidates = _INTERVIEW_QUERY_TERM_ALIASES.get(str(t).strip().lower()) or []
+        alias_candidates = (
+            _INTERVIEW_QUERY_TERM_ALIASES.get(str(t).strip().lower()) or []
+        )
         for alias in alias_candidates:
             alias_clean = str(alias or "").strip().lower()
             if not alias_clean or alias_clean in seen:
@@ -1202,7 +1260,9 @@ def _evaluate_query_hit_text(text: str, terms: List[str]) -> Dict[str, Any]:
         if t in text_l:
             matched_terms.append(t)
     matched_terms = list(dict.fromkeys(matched_terms))
-    informative_terms = [t for t in matched_terms if t not in _INTERVIEW_WEAK_QUERY_TERMS]
+    informative_terms = [
+        t for t in matched_terms if t not in _INTERVIEW_WEAK_QUERY_TERMS
+    ]
     score = (2 * len(informative_terms)) + len(matched_terms)
     return {
         "matched_terms": matched_terms,
@@ -1232,7 +1292,9 @@ def _build_contextual_admin_query_text(
 
     try:
         rows = (
-            AdminInterviewMessage.query.filter_by(session_id=int(session_id), role="admin")
+            AdminInterviewMessage.query.filter_by(
+                session_id=int(session_id), role="admin"
+            )
             .order_by(AdminInterviewMessage.id.desc())
             .limit(max(1, int(max_admin_msgs) + 1))
             .all()
@@ -1271,14 +1333,18 @@ def _get_reaction_counts_for_posts(post_ids: List[int]) -> Dict[int, Dict[str, i
         return {}
 
     # Default to 0/0 for requested ids.
-    counts: Dict[int, Dict[str, int]] = {int(pid): {"likes": 0, "dislikes": 0} for pid in ids}
+    counts: Dict[int, Dict[str, int]] = {
+        int(pid): {"likes": 0, "dislikes": 0} for pid in ids
+    }
 
     try:
         q = (
             db.session.query(
                 Reactions.post_id.label("post_id"),
                 func.sum(case((Reactions.type == "like", 1), else_=0)).label("likes"),
-                func.sum(case((Reactions.type == "dislike", 1), else_=0)).label("dislikes"),
+                func.sum(case((Reactions.type == "dislike", 1), else_=0)).label(
+                    "dislikes"
+                ),
             )
             .filter(Reactions.post_id.in_(ids))
             .group_by(Reactions.post_id)
@@ -1312,7 +1378,9 @@ def _post_to_fact(
         "post_id": pid,
         "thread_root_id": int(getattr(p, "thread_id", 0) or 0) or None,
         "comment_to": (
-            int(getattr(p, "comment_to", -1) or -1) if getattr(p, "comment_to", None) is not None else None
+            int(getattr(p, "comment_to", -1) or -1)
+            if getattr(p, "comment_to", None) is not None
+            else None
         ),
         "round": int(getattr(p, "round", 0) or 0) or None,
         "reaction_count": int(getattr(p, "reaction_count", 0) or 0),
@@ -1353,7 +1421,9 @@ def _build_facts_snapshot(
         if not parent_ids:
             return []
 
-        parent_map = {int(getattr(p, "id")): p for p in parent_list if getattr(p, "id", None)}
+        parent_map = {
+            int(getattr(p, "id")): p for p in parent_list if getattr(p, "id", None)
+        }
 
         # Reading signal: replies up to this cursor were seen in notifications inbox.
         last_seen_reply_id = 0
@@ -1393,7 +1463,11 @@ def _build_facts_snapshot(
         except Exception:
             reply_posts = []
 
-        reply_ids = [int(getattr(rp, "id", 0) or 0) for rp in reply_posts if int(getattr(rp, "id", 0) or 0) > 0]
+        reply_ids = [
+            int(getattr(rp, "id", 0) or 0)
+            for rp in reply_posts
+            if int(getattr(rp, "id", 0) or 0) > 0
+        ]
         reacted_ids: set[int] = set()
         direct_reply_ids: set[int] = set()
 
@@ -1406,7 +1480,9 @@ def _build_facts_snapshot(
                     .all()
                 )
                 reacted_ids = {
-                    int(getattr(r, "post_id", 0) or 0) for r in reacted_rows if int(getattr(r, "post_id", 0) or 0) > 0
+                    int(getattr(r, "post_id", 0) or 0)
+                    for r in reacted_rows
+                    if int(getattr(r, "post_id", 0) or 0) > 0
                 }
             except Exception:
                 reacted_ids = set()
@@ -1428,16 +1504,30 @@ def _build_facts_snapshot(
 
         try:
             author_ids = sorted(
-                {int(getattr(rp, "user_id", 0) or 0) for rp in reply_posts if int(getattr(rp, "user_id", 0) or 0) > 0}
+                {
+                    int(getattr(rp, "user_id", 0) or 0)
+                    for rp in reply_posts
+                    if int(getattr(rp, "user_id", 0) or 0) > 0
+                }
             )
-            users = User_mgmt.query.filter(User_mgmt.id.in_(author_ids)).all() if author_ids else []
-            author_name_by_id = {int(u.id): getattr(u, "username", None) for u in users if u is not None}
+            users = (
+                User_mgmt.query.filter(User_mgmt.id.in_(author_ids)).all()
+                if author_ids
+                else []
+            )
+            author_name_by_id = {
+                int(u.id): getattr(u, "username", None) for u in users if u is not None
+            }
         except Exception:
             author_name_by_id = {}
 
         seen_counts: Dict[int, int] = {pid: 0 for pid in parent_ids}
-        seen_examples_map: Dict[int, List[Dict[str, Any]]] = {pid: [] for pid in parent_ids}
-        seen_reply_ids_by_parent: Dict[int, set[int]] = {pid: set() for pid in parent_ids}
+        seen_examples_map: Dict[int, List[Dict[str, Any]]] = {
+            pid: [] for pid in parent_ids
+        }
+        seen_reply_ids_by_parent: Dict[int, set[int]] = {
+            pid: set() for pid in parent_ids
+        }
 
         for rp in reply_posts:
             rid = int(getattr(rp, "id", 0) or 0)
@@ -1483,9 +1573,12 @@ def _build_facts_snapshot(
             out.append(
                 {
                     "post_id": pid,
-                    "thread_root_id": int(getattr(parent_post, "thread_id", 0) or 0) or None,
+                    "thread_root_id": int(getattr(parent_post, "thread_id", 0) or 0)
+                    or None,
                     "round": int(getattr(parent_post, "round", 0) or 0) or None,
-                    "text": _truncate_middle(str(getattr(parent_post, "tweet", "") or ""), 220),
+                    "text": _truncate_middle(
+                        str(getattr(parent_post, "tweet", "") or ""), 220
+                    ),
                     "total_reply_count": int(total_counts.get(pid, 0) or 0),
                     "seen_reply_count": int(seen_counts.get(pid, 0) or 0),
                     "seen_reply_examples": seen_examples_map.get(pid) or [],
@@ -1536,7 +1629,11 @@ def _build_facts_snapshot(
     query_hits = []
     if terms:
         try:
-            conds = [Post.tweet.ilike(f"%{t}%") for t in terms[:8] if isinstance(t, str) and t.strip()]
+            conds = [
+                Post.tweet.ilike(f"%{t}%")
+                for t in terms[:8]
+                if isinstance(t, str) and t.strip()
+            ]
             if conds:
                 q_hits = (
                     Post.query.filter(Post.user_id == int(agent_user_id))
@@ -1553,7 +1650,9 @@ def _build_facts_snapshot(
     try:
         thread_ids = [int(x) for x in (query_ids.get("thread_ids") or []) if int(x) > 0]
         post_ids = [int(x) for x in (query_ids.get("post_ids") or []) if int(x) > 0]
-        comment_ids = [int(x) for x in (query_ids.get("comment_ids") or []) if int(x) > 0]
+        comment_ids = [
+            int(x) for x in (query_ids.get("comment_ids") or []) if int(x) > 0
+        ]
     except Exception:
         thread_ids, post_ids, comment_ids = [], [], []
 
@@ -1623,10 +1722,18 @@ def _build_facts_snapshot(
         reverse=True,
     )
     if hit_eval_rows:
-        pid_order = [int(r.get("post_id") or 0) for r in hit_eval_rows if int(r.get("post_id") or 0) > 0]
+        pid_order = [
+            int(r.get("post_id") or 0)
+            for r in hit_eval_rows
+            if int(r.get("post_id") or 0) > 0
+        ]
         by_pid = {int(getattr(p, "id", 0) or 0): p for p in query_hits if p is not None}
-        query_hits = [by_pid[pid] for pid in pid_order if pid in by_pid][: max(int(query_hits_limit), 8)]
-    query_hits_viable_count = sum(1 for r in hit_eval_rows if int(r.get("informative_matches") or 0) > 0)
+        query_hits = [by_pid[pid] for pid in pid_order if pid in by_pid][
+            : max(int(query_hits_limit), 8)
+        ]
+    query_hits_viable_count = sum(
+        1 for r in hit_eval_rows if int(r.get("informative_matches") or 0) > 0
+    )
     snap["query_hit_evaluations"] = hit_eval_rows[:8]
     snap["query_hits_viable_count"] = int(query_hits_viable_count)
 
@@ -1635,7 +1742,7 @@ def _build_facts_snapshot(
     comment_context: Dict[int, Dict[str, Any]] = {}
     try:
         comment_posts = []
-        for p in (recent_comments or []):
+        for p in recent_comments or []:
             if p is None:
                 continue
             try:
@@ -1643,7 +1750,7 @@ def _build_facts_snapshot(
                     comment_posts.append(p)
             except Exception:
                 continue
-        for p in (query_hits or []):
+        for p in query_hits or []:
             if p is None:
                 continue
             try:
@@ -1677,12 +1784,18 @@ def _build_facts_snapshot(
             parent_map: Dict[int, Post] = {}
             if parent_ids:
                 parents = Post.query.filter(Post.id.in_(parent_ids)).all()
-                parent_map = {int(getattr(pp, "id", 0) or 0): pp for pp in parents if pp is not None}
+                parent_map = {
+                    int(getattr(pp, "id", 0) or 0): pp
+                    for pp in parents
+                    if pp is not None
+                }
 
             op_map: Dict[int, Post] = {}
             if thread_root_ids:
                 ops = Post.query.filter(Post.id.in_(thread_root_ids)).all()
-                op_map = {int(getattr(op, "id", 0) or 0): op for op in ops if op is not None}
+                op_map = {
+                    int(getattr(op, "id", 0) or 0): op for op in ops if op is not None
+                }
 
             user_ids = set()
             for pp in parent_map.values():
@@ -1703,7 +1816,11 @@ def _build_facts_snapshot(
             username_by_id: Dict[int, Optional[str]] = {}
             if user_ids:
                 users = User_mgmt.query.filter(User_mgmt.id.in_(sorted(user_ids))).all()
-                username_by_id = {int(u.id): getattr(u, "username", None) for u in users if u is not None}
+                username_by_id = {
+                    int(u.id): getattr(u, "username", None)
+                    for u in users
+                    if u is not None
+                }
 
             for pid, p in comment_posts_by_id.items():
                 parent_id = int(getattr(p, "comment_to", -1) or -1)
@@ -1730,19 +1847,31 @@ def _build_facts_snapshot(
                 comment_context[pid] = {
                     "parent_post_id": int(parent_id) if parent_id > 0 else None,
                     "parent_user_id": parent_user_id,
-                    "parent_username": username_by_id.get(parent_user_id) if parent_user_id is not None else None,
+                    "parent_username": (
+                        username_by_id.get(parent_user_id)
+                        if parent_user_id is not None
+                        else None
+                    ),
                     "parent_text": (
-                        _truncate_middle(str(getattr(parent_post, "tweet", "") or ""), 220)
+                        _truncate_middle(
+                            str(getattr(parent_post, "tweet", "") or ""), 220
+                        )
                         if parent_post is not None
                         else None
                     ),
-                    "thread_op_post_id": int(thread_root_id) if thread_root_id > 0 else None,
+                    "thread_op_post_id": (
+                        int(thread_root_id) if thread_root_id > 0 else None
+                    ),
                     "thread_op_user_id": thread_op_user_id,
                     "thread_op_username": (
-                        username_by_id.get(thread_op_user_id) if thread_op_user_id is not None else None
+                        username_by_id.get(thread_op_user_id)
+                        if thread_op_user_id is not None
+                        else None
                     ),
                     "thread_op_text": (
-                        _truncate_middle(str(getattr(thread_op_post, "tweet", "") or ""), 180)
+                        _truncate_middle(
+                            str(getattr(thread_op_post, "tweet", "") or ""), 180
+                        )
                         if thread_op_post is not None
                         else None
                     ),
@@ -1756,14 +1885,26 @@ def _build_facts_snapshot(
         for p in lst:
             if p is not None:
                 all_posts.append(p)
-    post_ids = sorted({int(getattr(p, "id", 0) or 0) for p in all_posts if getattr(p, "id", None) is not None})
+    post_ids = sorted(
+        {
+            int(getattr(p, "id", 0) or 0)
+            for p in all_posts
+            if getattr(p, "id", None) is not None
+        }
+    )
     counts = _get_reaction_counts_for_posts(post_ids)
 
-    snap["top_posts"] = [_post_to_fact(p, counts, comment_context) for p in (top_posts or [])]
-    snap["recent_comments"] = [_post_to_fact(p, counts, comment_context) for p in (recent_comments or [])]
+    snap["top_posts"] = [
+        _post_to_fact(p, counts, comment_context) for p in (top_posts or [])
+    ]
+    snap["recent_comments"] = [
+        _post_to_fact(p, counts, comment_context) for p in (recent_comments or [])
+    ]
     snap["replies_to_recent_comments"] = replies_to_recent_comments
     snap["replies_to_top_posts"] = replies_to_top_posts
-    snap["query_hits"] = [_post_to_fact(p, counts, comment_context) for p in (query_hits or [])]
+    snap["query_hits"] = [
+        _post_to_fact(p, counts, comment_context) for p in (query_hits or [])
+    ]
     return snap
 
 
@@ -1775,7 +1916,9 @@ def _format_facts_pack(snapshot: Dict[str, Any], *, max_chars: int = 3500) -> st
 
     terms = snapshot.get("query_terms") or []
     if isinstance(terms, list) and terms:
-        parts.append("Query terms: " + ", ".join([str(t) for t in terms[:8] if str(t).strip()]))
+        parts.append(
+            "Query terms: " + ", ".join([str(t) for t in terms[:8] if str(t).strip()])
+        )
     query_ids = snapshot.get("query_id_filters") or {}
     if isinstance(query_ids, dict):
         tids = query_ids.get("thread_ids") or []
@@ -1818,7 +1961,11 @@ def _format_facts_pack(snapshot: Dict[str, Any], *, max_chars: int = 3500) -> st
                 f"likes={likes} dislikes={dislikes} reactions={rc}: {txt}"
             )
             if parent_post_id is not None or op_post_id is not None:
-                parent_label = f"@{parent_username}" if parent_username else f"user_id={parent_user_id}"
+                parent_label = (
+                    f"@{parent_username}"
+                    if parent_username
+                    else f"user_id={parent_user_id}"
+                )
                 op_label = f"@{op_username}" if op_username else f"user_id={op_user_id}"
                 parts.append(
                     f"  reply_target: parent_post_id={parent_post_id} parent={parent_label} "
@@ -1857,20 +2004,32 @@ def _format_facts_pack(snapshot: Dict[str, Any], *, max_chars: int = 3500) -> st
                         continue
                     who = ex.get("username") or f"user_id={ex.get('user_id')}"
                     via = ex.get("seen_via") or []
-                    via_s = ",".join([str(v) for v in via if str(v).strip()]) if isinstance(via, list) else ""
+                    via_s = (
+                        ",".join([str(v) for v in via if str(v).strip()])
+                        if isinstance(via, list)
+                        else ""
+                    )
                     parts.append(
                         f"  - by @{who} reply_post_id={ex.get('reply_post_id')} "
                         f"round={ex.get('round')} seen_via={via_s}: {ex.get('text')}"
                     )
 
-    _fmt_seen_replies("Replies you've seen to your top threads", snapshot.get("replies_to_top_posts"), limit=3)
+    _fmt_seen_replies(
+        "Replies you've seen to your top threads",
+        snapshot.get("replies_to_top_posts"),
+        limit=3,
+    )
     _fmt_seen_replies(
         "Replies you've seen to your recent comments",
         snapshot.get("replies_to_recent_comments"),
         limit=5,
     )
 
-    _fmt_posts("Your posts/comments matching the admin's question", snapshot.get("query_hits"), limit=5)
+    _fmt_posts(
+        "Your posts/comments matching the admin's question",
+        snapshot.get("query_hits"),
+        limit=5,
+    )
 
     out = "\n".join([p for p in parts if p is not None]).strip()
     if len(out) <= max_chars:
@@ -1914,7 +2073,9 @@ def _build_evidence_guard(
         memory_returned_k = 0
     memory_degraded = bool(retrieval_meta.get("degraded_mode", False))
 
-    strict_no_inference = bool(memory_degraded or (memory_returned_k <= 0 and query_hits_viable_n <= 0))
+    strict_no_inference = bool(
+        memory_degraded or (memory_returned_k <= 0 and query_hits_viable_n <= 0)
+    )
 
     lines = ["EVIDENCE STATUS (for this answer):"]
     lines.append(
@@ -1930,7 +2091,7 @@ def _build_evidence_guard(
     lines.append(f"- strict_no_inference={strict_no_inference}")
     if strict_no_inference:
         lines.append(
-            "- For activity-specific questions, answer \"can't confirm\" unless exact evidence is present."
+            '- For activity-specific questions, answer "can\'t confirm" unless exact evidence is present.'
         )
         lines.append(
             "- Do not introduce new movie/book titles, usernames, or thread narratives not in evidence."
@@ -1984,7 +2145,7 @@ def _extract_semantic_candidates(
         return []
 
     query_terms = []
-    for t in (facts.get("query_terms") or []):
+    for t in facts.get("query_terms") or []:
         ts = str(t or "").strip().lower()
         if ts:
             query_terms.append(ts)
@@ -2018,11 +2179,16 @@ def _extract_semantic_candidates(
             }
         )
 
-    rows.sort(key=lambda r: (int(r.get("term_hits") or 0), float(r.get("score") or 0.0)), reverse=True)
+    rows.sort(
+        key=lambda r: (int(r.get("term_hits") or 0), float(r.get("score") or 0.0)),
+        reverse=True,
+    )
     return rows[: max(1, int(max_candidates))]
 
 
-def _extract_facts_candidates(*, facts_snapshot: Dict[str, Any], max_candidates: int = 2) -> List[Dict[str, Any]]:
+def _extract_facts_candidates(
+    *, facts_snapshot: Dict[str, Any], max_candidates: int = 2
+) -> List[Dict[str, Any]]:
     facts = facts_snapshot if isinstance(facts_snapshot, dict) else {}
     rows = facts.get("query_hits")
     if not isinstance(rows, list) or not rows:
@@ -2102,7 +2268,9 @@ def _build_retrieval_trace(
                 "round_id": it.get("round_id"),
                 "thread_root_id": it.get("thread_root_id"),
                 "target_post_id": it.get("target_post_id"),
-                "text": _truncate_middle(str(it.get("text_humanized") or it.get("text") or ""), 120),
+                "text": _truncate_middle(
+                    str(it.get("text_humanized") or it.get("text") or ""), 120
+                ),
             }
         )
 
@@ -2220,7 +2388,9 @@ def _sanitize_interview_reply(
                     "candidate_count": len(semantic_candidates),
                     "known_ids_count": len(known_ids),
                 }
-            facts_candidates = _extract_facts_candidates(facts_snapshot=facts_snapshot, max_candidates=2)
+            facts_candidates = _extract_facts_candidates(
+                facts_snapshot=facts_snapshot, max_candidates=2
+            )
             if facts_candidates:
                 candidate_bits = []
                 for c in facts_candidates:
@@ -2278,7 +2448,9 @@ def _sanitize_interview_reply(
                 "candidate_count": len(semantic_candidates),
                 "known_ids_count": len(known_ids),
             }
-        facts_candidates = _extract_facts_candidates(facts_snapshot=facts_snapshot, max_candidates=2)
+        facts_candidates = _extract_facts_candidates(
+            facts_snapshot=facts_snapshot, max_candidates=2
+        )
         if facts_candidates:
             candidate_bits = []
             for c in facts_candidates:
@@ -2297,7 +2469,11 @@ def _sanitize_interview_reply(
                 "known_ids_count": len(known_ids),
             }
 
-    return text, {"sanitized": False, "reason": "pass", "known_ids_count": len(known_ids)}
+    return text, {
+        "sanitized": False,
+        "reason": "pass",
+        "known_ids_count": len(known_ids),
+    }
 
 
 def _resolve_llm_backend(
@@ -2517,7 +2693,9 @@ def api_interview_create_session(exp_id: int):
         db.session.commit()
     except Exception as exc:
         db.session.rollback()
-        return _json_error(f"Failed to create interview session: {exc}", 500, code="db_error")
+        return _json_error(
+            f"Failed to create interview session: {exc}", 500, code="db_error"
+        )
 
     sys_msg = AdminInterviewMessage(
         session_id=sess.id,
@@ -2560,7 +2738,9 @@ def api_interview_create_session(exp_id: int):
             "db_binding": db_binding,
             "backend_mode": mode,
             "memory_preloaded": preload_memory,
-            "memory_mode_requested": memory_snapshot.get("memory_mode_requested", memory_mode),
+            "memory_mode_requested": memory_snapshot.get(
+                "memory_mode_requested", memory_mode
+            ),
             "memory_mode_used": memory_snapshot.get("memory_mode_used"),
             "llm_model": model,
             "llm_base_url": base_url,
@@ -2568,7 +2748,11 @@ def api_interview_create_session(exp_id: int):
             "interests": interests,
             "memory_snapshot": memory_snapshot,
             "messages": [
-                {"id": int(sys_msg.id), "role": sys_msg.role, "content": sys_msg.content}
+                {
+                    "id": int(sys_msg.id),
+                    "role": sys_msg.role,
+                    "content": sys_msg.content,
+                }
             ],
         }
     )
@@ -2644,7 +2828,9 @@ def api_interview_refresh_context(exp_id: int, session_id: int):
     db_binding = _ensure_experiment_server_db_binding(exp)
 
     payload = request.get_json(silent=True) or {}
-    query_text = (payload.get("query_text") or "").strip() or _INTERVIEW_MEMORY_DEFAULT_QUERY
+    query_text = (
+        payload.get("query_text") or ""
+    ).strip() or _INTERVIEW_MEMORY_DEFAULT_QUERY
     memory_mode = _extract_requested_memory_mode(sess.memory_snapshot_json)
 
     memory_snapshot = _build_memory_snapshot(
@@ -2705,7 +2891,9 @@ def api_interview_send_message(exp_id: int, session_id: int):
         if not agent_user:
             return _json_error("Agent not found", 404, code="not_found")
 
-        contextual_query_text = _build_contextual_admin_query_text(int(sess.id), content)
+        contextual_query_text = _build_contextual_admin_query_text(
+            int(sess.id), content
+        )
 
         if auto_refresh:
             memory_snapshot = _build_memory_snapshot(
@@ -2757,50 +2945,48 @@ def api_interview_send_message(exp_id: int, session_id: int):
 
         persona = (sess.persona_snapshot or "").strip()
         system_message = (
-        "You are being interviewed by a researcher (the experiment admin).\n"
-        "They are evaluating your persona, memory, and social behavior in the simulation.\n"
-        "Stay fully in character. Speak casually and naturally (Reddit-style, not corporate).\n\n"
-        "Truthfulness rules (very important):\n"
-        "- Do NOT guess or invent actions, posts, comments, votes, or other users' replies.\n"
-        "- Use FACTS PACK as ground truth for what you posted/commented, who replied to you, and how many likes/dislikes it got.\n"
-        "- Reply sections in FACTS PACK are \"replies you've seen\" (read/commented/voted), so treat them as seen evidence only.\n"
-        "- For \"who did you reply to / who was OP\" questions, use reply_target fields in FACTS PACK "
-        "(parent=..., thread_op=...). If username is present, answer with it.\n"
-        "- For \"what was their original comment\" questions, use parent_text when available.\n"
-        "- Treat AGENT_UNVERIFIED transcript lines as potentially wrong prior drafts. Never use them as evidence.\n"
-        "- When the admin asks about a specific topic/person/keyword, use the 'matching the admin's question' section.\n"
-        "  If that section is empty, you have no evidence that you wrote about it.\n"
-        "- If FACTS PACK shows '(none)' for a section, treat it as no evidence. Do not invent.\n"
-        "- Use MEMORY PACK for subjective context: retrieved memories, relationships, community vibe, and thread summaries.\n"
-        "- If you cannot find evidence in FACTS PACK or MEMORY PACK, say you don't remember / can't confirm.\n"
-        "- Never introduce a new specific title/name/event unless it appears in evidence or the admin's latest message.\n"
-        "- If you previously said something wrong in this interview, explicitly correct yourself.\n\n"
-        "Style:\n"
-        "- Answer the admin directly.\n"
-        "- For questions about your actions (\"Did you post/comment/vote…?\"), start with a direct yes/no (or \"can't confirm\"), then justify.\n"
-        "- Keep it concise.\n"
-        "- If the admin's question is ambiguous, ask ONE short clarifying question to help you identify the right evidence "
-        "(e.g., which username/topic/thread_root_id/approx round range they mean).\n"
-        "- End your reply with ONE short follow-up question that helps the researcher continue the interview.\n"
-        "  Prefer clarification questions when needed; otherwise ask if they want you to expand on a specific detail.\n"
-        "- Avoid generic small-talk questions; only ask interview-relevant questions.\n"
-        "- Prefer @username in natural prose when a username is present in evidence.\n"
-        "- Include ids only when the admin asks for verification or when ids are needed to disambiguate "
-        "(e.g., post_id=123, thread_root_id=123).\n"
-        "- If you say you *didn't* do something, do not list random ids. Only cite ids as 'checked recent comments: …'.\n"
-        "- Do not ask other users to 'chime in' or join the interview; only you and the admin are talking.\n"
-        "- Do not mention 'FACTS PACK' or 'MEMORY PACK' explicitly.\n\n"
-        "PERSONA:\n"
-        f"{persona}\n"
-    )
+            "You are being interviewed by a researcher (the experiment admin).\n"
+            "They are evaluating your persona, memory, and social behavior in the simulation.\n"
+            "Stay fully in character. Speak casually and naturally (Reddit-style, not corporate).\n\n"
+            "Truthfulness rules (very important):\n"
+            "- Do NOT guess or invent actions, posts, comments, votes, or other users' replies.\n"
+            "- Use FACTS PACK as ground truth for what you posted/commented, who replied to you, and how many likes/dislikes it got.\n"
+            '- Reply sections in FACTS PACK are "replies you\'ve seen" (read/commented/voted), so treat them as seen evidence only.\n'
+            '- For "who did you reply to / who was OP" questions, use reply_target fields in FACTS PACK '
+            "(parent=..., thread_op=...). If username is present, answer with it.\n"
+            '- For "what was their original comment" questions, use parent_text when available.\n'
+            "- Treat AGENT_UNVERIFIED transcript lines as potentially wrong prior drafts. Never use them as evidence.\n"
+            "- When the admin asks about a specific topic/person/keyword, use the 'matching the admin's question' section.\n"
+            "  If that section is empty, you have no evidence that you wrote about it.\n"
+            "- If FACTS PACK shows '(none)' for a section, treat it as no evidence. Do not invent.\n"
+            "- Use MEMORY PACK for subjective context: retrieved memories, relationships, community vibe, and thread summaries.\n"
+            "- If you cannot find evidence in FACTS PACK or MEMORY PACK, say you don't remember / can't confirm.\n"
+            "- Never introduce a new specific title/name/event unless it appears in evidence or the admin's latest message.\n"
+            "- If you previously said something wrong in this interview, explicitly correct yourself.\n\n"
+            "Style:\n"
+            "- Answer the admin directly.\n"
+            '- For questions about your actions ("Did you post/comment/vote…?"), start with a direct yes/no (or "can\'t confirm"), then justify.\n'
+            "- Keep it concise.\n"
+            "- If the admin's question is ambiguous, ask ONE short clarifying question to help you identify the right evidence "
+            "(e.g., which username/topic/thread_root_id/approx round range they mean).\n"
+            "- End your reply with ONE short follow-up question that helps the researcher continue the interview.\n"
+            "  Prefer clarification questions when needed; otherwise ask if they want you to expand on a specific detail.\n"
+            "- Avoid generic small-talk questions; only ask interview-relevant questions.\n"
+            "- Prefer @username in natural prose when a username is present in evidence.\n"
+            "- Include ids only when the admin asks for verification or when ids are needed to disambiguate "
+            "(e.g., post_id=123, thread_root_id=123).\n"
+            "- If you say you *didn't* do something, do not list random ids. Only cite ids as 'checked recent comments: …'.\n"
+            "- Do not ask other users to 'chime in' or join the interview; only you and the admin are talking.\n"
+            "- Do not mention 'FACTS PACK' or 'MEMORY PACK' explicitly.\n\n"
+            "PERSONA:\n"
+            f"{persona}\n"
+        )
 
         user_message = (
             f"{facts_pack}\n\n"
             f"{memory_pack}\n\n"
             f"{evidence_guard}\n\n"
-            "CONVERSATION SO FAR (most recent last):\n"
-            + "\n".join(transcript)
-            + "\n\n"
+            "CONVERSATION SO FAR (most recent last):\n" + "\n".join(transcript) + "\n\n"
             f"LATEST ADMIN MESSAGE:\n{content}\n\n"
             "Respond to the admin's latest message."
         )
@@ -2824,7 +3010,9 @@ def api_interview_send_message(exp_id: int, session_id: int):
             "llm_model": model,
             "llm_base_url": base_url,
             "contextual_query_text": contextual_query_text,
-            "memory_mode_requested": memory_snapshot.get("memory_mode_requested", memory_mode),
+            "memory_mode_requested": memory_snapshot.get(
+                "memory_mode_requested", memory_mode
+            ),
             "memory_mode_used": memory_snapshot.get("memory_mode_used"),
             "memory_fallback_reason": memory_snapshot.get("fallback_reason"),
             "memory_pack_chars": len(memory_pack or ""),
@@ -2856,7 +3044,9 @@ def api_interview_send_message(exp_id: int, session_id: int):
             meta["error"] = str(exc)
 
         try:
-            strict_no_inference = bool(evidence_guard_meta.get("strict_no_inference", False))
+            strict_no_inference = bool(
+                evidence_guard_meta.get("strict_no_inference", False)
+            )
         except Exception:
             strict_no_inference = False
         reply, sanitize_meta = _sanitize_interview_reply(
@@ -2889,13 +3079,17 @@ def api_interview_send_message(exp_id: int, session_id: int):
             .order_by(AdminInterviewMessage.id.asc())
             .all()
         )
-        out_messages = [{"id": int(m.id), "role": m.role, "content": m.content} for m in msgs]
+        out_messages = [
+            {"id": int(m.id), "role": m.role, "content": m.content} for m in msgs
+        ]
 
         return _json_success(
             {
                 "reply": reply,
                 "meta": meta,
-                "memory_mode_requested": memory_snapshot.get("memory_mode_requested", memory_mode),
+                "memory_mode_requested": memory_snapshot.get(
+                    "memory_mode_requested", memory_mode
+                ),
                 "memory_mode_used": memory_snapshot.get("memory_mode_used"),
                 "memory_snapshot": memory_snapshot,
                 "messages": out_messages,
@@ -2903,4 +3097,6 @@ def api_interview_send_message(exp_id: int, session_id: int):
         )
     except Exception as exc:
         db.session.rollback()
-        return _json_error(f"Failed to send interview message: {exc}", 500, code="interview_send_error")
+        return _json_error(
+            f"Failed to send interview message: {exc}", 500, code="interview_send_error"
+        )

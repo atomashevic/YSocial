@@ -5,42 +5,43 @@ import os
 import re
 import time
 import uuid
-from typing import Tuple, Optional
+from typing import Optional, Tuple
 from urllib.parse import parse_qs, unquote, urlparse
 
 import requests
-
 from flask import current_app, g
 from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
 
 from y_web import db
+from y_web.experiment_context import (
+    get_db_bind_key_for_exp,
+    register_experiment_database,
+)
+from y_web.llm_annotations import Annotator, ContentAnnotator
 from y_web.models import (
+    Admin_users,
+    Articles,
+    Emotions,
+    Exps,
+    Hashtags,
+    Images,
+    Interests,
+    Mentions,
     Post,
+    Post_emotions,
+    Post_hashtags,
+    Post_Sentiment,
+    Post_topics,
     Reactions,
     Rounds,
-    User_mgmt,
-    Images,
-    Articles,
-    Websites,
-    Emotions,
-    Post_emotions,
-    Hashtags,
-    Post_hashtags,
-    Mentions,
-    Interests,
-    User_interest,
-    Post_topics,
-    Post_Sentiment,
-    Admin_users,
     User_Experiment,
-    Exps,
+    User_interest,
+    User_mgmt,
+    Websites,
 )
-from y_web.utils.text_utils import vader_sentiment, toxicity
 from y_web.utils.article_extractor import extract_article_info
-from y_web.llm_annotations import ContentAnnotator, Annotator
-from y_web.experiment_context import register_experiment_database, get_db_bind_key_for_exp
-
+from y_web.utils.text_utils import toxicity, vader_sentiment
 
 _IMAGE_EXTENSIONS = (".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp", ".svg")
 _VIDEO_EXTENSIONS = (".mp4",)
@@ -161,7 +162,9 @@ def _remote_looks_like_image(url: str) -> bool:
         resp = requests.head(
             url, headers=headers, timeout=_DOWNLOAD_TIMEOUT, allow_redirects=True
         )
-        content_type = resp.headers.get("Content-Type", "").split(";")[0].strip().lower()
+        content_type = (
+            resp.headers.get("Content-Type", "").split(";")[0].strip().lower()
+        )
         if content_type.startswith("image/"):
             return True
     except Exception:
@@ -175,7 +178,9 @@ def _remote_looks_like_image(url: str) -> bool:
             stream=True,
             allow_redirects=True,
         )
-        content_type = resp.headers.get("Content-Type", "").split(";")[0].strip().lower()
+        content_type = (
+            resp.headers.get("Content-Type", "").split(";")[0].strip().lower()
+        )
         return content_type.startswith("image/")
     except Exception:
         return False
@@ -233,7 +238,9 @@ def _download_image_to_uploads(remote_url: str, exp_id: int) -> Optional[str]:
             return None
 
         # Determine file extension: prefer Content-Type, fall back to URL path.
-        content_type = resp.headers.get("Content-Type", "").split(";")[0].strip().lower()
+        content_type = (
+            resp.headers.get("Content-Type", "").split(";")[0].strip().lower()
+        )
         ext = _CONTENT_TYPE_TO_EXT.get(content_type)
         if not ext:
             path = urlparse(remote_url).path.lower()
@@ -245,7 +252,10 @@ def _download_image_to_uploads(remote_url: str, exp_id: int) -> Optional[str]:
             return None
 
         from y_web.utils.path_utils import get_writable_path
-        out_dir = os.path.join(get_writable_path(), "y_web", "uploads", "reddit", str(exp_id))
+
+        out_dir = os.path.join(
+            get_writable_path(), "y_web", "uploads", "reddit", str(exp_id)
+        )
         os.makedirs(out_dir, exist_ok=True)
 
         filename = f"{uuid.uuid4().hex}{ext}"
@@ -267,13 +277,12 @@ def _ensure_experiment_context(user) -> None:
     It looks up the user's active experiment and sets up the database binding.
     """
     # Check if context is already set up
-    if hasattr(g, 'current_exp_id') and g.current_exp_id is not None:
+    if hasattr(g, "current_exp_id") and g.current_exp_id is not None:
         return
 
     # Find the user's experiment - prefer active experiments (status=1)
     user_exp = (
-        User_Experiment.query
-        .join(Exps, User_Experiment.exp_id == Exps.idexp)
+        User_Experiment.query.join(Exps, User_Experiment.exp_id == Exps.idexp)
         .filter(User_Experiment.user_id == user.id, Exps.status == 1)
         .first()
     )
@@ -307,8 +316,12 @@ def _ensure_experiment_context(user) -> None:
     # Override db_exp bind to point to this experiment's database
     if bind_key in current_app.config["SQLALCHEMY_BINDS"]:
         if not hasattr(g, "original_db_exp_bind"):
-            g.original_db_exp_bind = current_app.config["SQLALCHEMY_BINDS"].get("db_exp")
-        current_app.config["SQLALCHEMY_BINDS"]["db_exp"] = current_app.config["SQLALCHEMY_BINDS"][bind_key]
+            g.original_db_exp_bind = current_app.config["SQLALCHEMY_BINDS"].get(
+                "db_exp"
+            )
+        current_app.config["SQLALCHEMY_BINDS"]["db_exp"] = current_app.config[
+            "SQLALCHEMY_BINDS"
+        ][bind_key]
 
 
 def _get_current_round() -> int:
@@ -707,10 +720,14 @@ def create_post_reddit(user, content: str, url: Optional[str] = None) -> Post:
             if looks_like_media:
                 stored_url = candidate_media_url
                 # Download only remote images to avoid CDN gated rendering issues.
-                if _looks_like_image_url(candidate_media_url) and candidate_media_url.startswith(("http://", "https://")):
+                if _looks_like_image_url(
+                    candidate_media_url
+                ) and candidate_media_url.startswith(("http://", "https://")):
                     exp_id = getattr(g, "current_exp_id", None)
                     if exp_id is not None:
-                        local_path = _download_image_to_uploads(candidate_media_url, exp_id)
+                        local_path = _download_image_to_uploads(
+                            candidate_media_url, exp_id
+                        )
                         if local_path:
                             stored_url = local_path
 
@@ -736,7 +753,9 @@ def create_post_reddit(user, content: str, url: Optional[str] = None) -> Post:
 
                 img = Images.query.filter_by(url=stored_url).first()
                 if img is None:
-                    img = Images(url=stored_url, description=annotation, article_id=None)
+                    img = Images(
+                        url=stored_url, description=annotation, article_id=None
+                    )
                     db.session.add(img)
                     db.session.commit()
                 img_id = img.id
@@ -748,7 +767,9 @@ def create_post_reddit(user, content: str, url: Optional[str] = None) -> Post:
                 else:
                     article_info = extract_article_info(normalized_url)
 
-                    source = (article_info.get("source") or "").strip() or urlparse(normalized_url).netloc
+                    source = (article_info.get("source") or "").strip() or urlparse(
+                        normalized_url
+                    ).netloc
                     website = Websites.query.filter_by(name=source).first()
                     if not website:
                         website = Websites(
@@ -763,8 +784,12 @@ def create_post_reddit(user, content: str, url: Optional[str] = None) -> Post:
                         db.session.add(website)
                         db.session.commit()
 
-                    title = (article_info.get("title") or f"Shared Link: {source}").strip()
-                    summary = (article_info.get("summary") or "User shared article").strip()
+                    title = (
+                        article_info.get("title") or f"Shared Link: {source}"
+                    ).strip()
+                    summary = (
+                        article_info.get("summary") or "User shared article"
+                    ).strip()
 
                     article = Articles(
                         title=title[:200],
@@ -779,9 +804,13 @@ def create_post_reddit(user, content: str, url: Optional[str] = None) -> Post:
 
                     image_url = (article_info.get("image") or "").strip()
                     if image_url and len(image_url) <= 200:
-                        existing_image = Images.query.filter_by(article_id=article.id).first()
+                        existing_image = Images.query.filter_by(
+                            article_id=article.id
+                        ).first()
                         if existing_image is None:
-                            existing_image = Images.query.filter_by(url=image_url).first()
+                            existing_image = Images.query.filter_by(
+                                url=image_url
+                            ).first()
                         if existing_image is None:
                             db.session.add(Images(url=image_url, article_id=article.id))
                             db.session.commit()

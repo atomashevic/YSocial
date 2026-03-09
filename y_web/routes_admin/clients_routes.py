@@ -59,11 +59,11 @@ from y_web.utils.experiment_clock import (
     validate_timezone,
 )
 from y_web.utils.experiment_helpers import get_experiment_uid_from_db_name
-from y_web.utils.miscellanea import check_privileges, llm_backend_status, ollama_status
 from y_web.utils.memory_run_id import (
     build_memory_run_seed,
     normalize_memory_run_id,
 )
+from y_web.utils.miscellanea import check_privileges, llm_backend_status, ollama_status
 from y_web.utils.path_utils import get_resource_path, get_writable_path
 
 clientsr = Blueprint("clientsr", __name__)
@@ -424,19 +424,28 @@ def create_client():
     if memory_enabled_raw is None:
         memory_enabled = True
     else:
-        memory_enabled = str(memory_enabled_raw).strip().lower() in {"1", "true", "on", "yes"}
+        memory_enabled = str(memory_enabled_raw).strip().lower() in {
+            "1",
+            "true",
+            "on",
+            "yes",
+        }
 
     memory_pair_limit = request.form.get("memory_pair_limit", 5)
     memory_prompt_max_chars = request.form.get(
         "memory_prompt_max_chars", DEFAULT_MEMORY_PROMPT_MAX_CHARS
     )
     memory_social_decay_lambda = request.form.get("memory_social_decay_lambda", 0.05)
-    memory_social_corruption_rate = request.form.get("memory_social_corruption_rate", 0.02)
+    memory_social_corruption_rate = request.form.get(
+        "memory_social_corruption_rate", 0.02
+    )
     memory_social_resummarize_every_events = request.form.get(
         "memory_social_resummarize_every_events", 4
     )
     memory_thread_decay_lambda = request.form.get("memory_thread_decay_lambda", 0.03)
-    memory_thread_corruption_rate = request.form.get("memory_thread_corruption_rate", 0.01)
+    memory_thread_corruption_rate = request.form.get(
+        "memory_thread_corruption_rate", 0.01
+    )
     memory_thread_resummarize_every_events = request.form.get(
         "memory_thread_resummarize_every_events", 4
     )
@@ -450,9 +459,12 @@ def create_client():
     if memory_semantic_enabled_raw is None:
         memory_semantic_enabled = True
     else:
-        memory_semantic_enabled = (
-            str(memory_semantic_enabled_raw).strip().lower() in {"1", "true", "on", "yes"}
-        )
+        memory_semantic_enabled = str(memory_semantic_enabled_raw).strip().lower() in {
+            "1",
+            "true",
+            "on",
+            "yes",
+        }
     memory_search_k = request.form.get("memory_search_k", 8)
     memory_search_max_chars = request.form.get(
         "memory_search_max_chars", DEFAULT_MEMORY_SEARCH_MAX_CHARS
@@ -490,9 +502,12 @@ def create_client():
     if memory_embedding_async_raw is None:
         memory_embedding_async = True
     else:
-        memory_embedding_async = (
-            str(memory_embedding_async_raw).strip().lower() in {"1", "true", "on", "yes"}
-        )
+        memory_embedding_async = str(memory_embedding_async_raw).strip().lower() in {
+            "1",
+            "true",
+            "on",
+            "yes",
+        }
     memory_importance_mode = request.form.get(
         "memory_importance_mode", "heuristic_then_batch_llm"
     )
@@ -639,18 +654,26 @@ def create_client():
         errors.append("Memory Thread Corruption Rate must be a valid number")
 
     try:
-        memory_social_resummarize_every_events = int(memory_social_resummarize_every_events)
+        memory_social_resummarize_every_events = int(
+            memory_social_resummarize_every_events
+        )
         if memory_social_resummarize_every_events < 1:
             errors.append("Memory Social Resummarize Every (events) must be at least 1")
     except (ValueError, TypeError):
-        errors.append("Memory Social Resummarize Every (events) must be a valid integer")
+        errors.append(
+            "Memory Social Resummarize Every (events) must be a valid integer"
+        )
 
     try:
-        memory_thread_resummarize_every_events = int(memory_thread_resummarize_every_events)
+        memory_thread_resummarize_every_events = int(
+            memory_thread_resummarize_every_events
+        )
         if memory_thread_resummarize_every_events < 1:
             errors.append("Memory Thread Resummarize Every (events) must be at least 1")
     except (ValueError, TypeError):
-        errors.append("Memory Thread Resummarize Every (events) must be a valid integer")
+        errors.append(
+            "Memory Thread Resummarize Every (events) must be a valid integer"
+        )
 
     try:
         memory_evidence_tail_max = int(memory_evidence_tail_max)
@@ -761,9 +784,7 @@ def create_client():
         )
     ):
         tiers_total = (
-            memory_tier_a_max_chars
-            + memory_tier_b_max_chars
-            + memory_tier_c_max_chars
+            memory_tier_a_max_chars + memory_tier_b_max_chars + memory_tier_c_max_chars
         )
         if tiers_total > memory_total_max_chars:
             errors.append(
@@ -795,7 +816,9 @@ def create_client():
         errors.append("Memory Reflection Min Events must be a valid integer")
 
     try:
-        memory_reflection_trigger_importance_sum = float(memory_reflection_trigger_importance_sum)
+        memory_reflection_trigger_importance_sum = float(
+            memory_reflection_trigger_importance_sum
+        )
         if memory_reflection_trigger_importance_sum < 0:
             errors.append("Memory Reflection Trigger Sum must be >= 0")
     except (ValueError, TypeError):
@@ -1059,9 +1082,7 @@ def create_client():
         f"{BASE_DIR}{os.sep}y_web{os.sep}experiments{os.sep}{uid}{os.sep}"
         f"client_{name}-{population.name}.json"
     )
-    experiment_config_path = (
-        f"{BASE_DIR}{os.sep}y_web{os.sep}experiments{os.sep}{uid}{os.sep}config_server.json"
-    )
+    experiment_config_path = f"{BASE_DIR}{os.sep}y_web{os.sep}experiments{os.sep}{uid}{os.sep}config_server.json"
 
     resolved_clock = {
         "mode": clock_mode,
@@ -1119,7 +1140,9 @@ def create_client():
                             existing_client_config["simulation"], resolved_clock
                         )
                         with open(client_path, "w") as existing_client_file:
-                            json.dump(existing_client_config, existing_client_file, indent=4)
+                            json.dump(
+                                existing_client_config, existing_client_file, indent=4
+                            )
                         clock_sync_applied = True
                 except Exception:
                     continue
@@ -1162,7 +1185,7 @@ def create_client():
         },
         "simulation": {
             "name": name,
-            "population": population.name.replace(' ', ''),
+            "population": population.name.replace(" ", ""),
             "client": "YClientWeb",
             "days": int(days),
             "slots": 24,
@@ -1177,14 +1200,30 @@ def create_client():
                 "post": float(post),
                 "image": float(image) if image is not None else 0,
                 # Enforce action restrictions per platform type
-                "news": 0.0 if exp.platform_type == "forum" else (float(news) if news is not None else 0),
+                "news": (
+                    0.0
+                    if exp.platform_type == "forum"
+                    else (float(news) if news is not None else 0)
+                ),
                 "comment": float(comment) if comment is not None else 0,
                 "read": float(read) if read is not None else 0,
-                "share": 0.0 if exp.platform_type == "forum" else (float(share) if share is not None else 0),
+                "share": (
+                    0.0
+                    if exp.platform_type == "forum"
+                    else (float(share) if share is not None else 0)
+                ),
                 "search": float(search) if search is not None else 0,
                 "cast": float(vote) if vote is not None else 0,
-                "share_link": 0.0 if exp.platform_type == "microblogging" else (float(share_link) if share_link is not None else 0),
-                "share_image": 0.0 if exp.platform_type == "microblogging" else (float(share_image) if share_image is not None else 0),
+                "share_link": (
+                    0.0
+                    if exp.platform_type == "microblogging"
+                    else (float(share_link) if share_link is not None else 0)
+                ),
+                "share_image": (
+                    0.0
+                    if exp.platform_type == "microblogging"
+                    else (float(share_image) if share_image is not None else 0)
+                ),
             },
             "emotion_annotation": emotion_annotation,
         },
@@ -1263,12 +1302,18 @@ def create_client():
             "memory_prompt_max_chars": int(memory_prompt_max_chars),
             "memory_social_decay_lambda": float(memory_social_decay_lambda),
             "memory_social_corruption_rate": float(memory_social_corruption_rate),
-            "memory_social_resummarize_every_events": int(memory_social_resummarize_every_events),
+            "memory_social_resummarize_every_events": int(
+                memory_social_resummarize_every_events
+            ),
             "memory_thread_decay_lambda": float(memory_thread_decay_lambda),
             "memory_thread_corruption_rate": float(memory_thread_corruption_rate),
-            "memory_thread_resummarize_every_events": int(memory_thread_resummarize_every_events),
+            "memory_thread_resummarize_every_events": int(
+                memory_thread_resummarize_every_events
+            ),
             "memory_evidence_tail_max": int(memory_evidence_tail_max),
-            "memory_digest_update_cadence_rounds": int(memory_digest_update_cadence_rounds),
+            "memory_digest_update_cadence_rounds": int(
+                memory_digest_update_cadence_rounds
+            ),
             "memory_digest_events_limit": int(memory_digest_events_limit),
             "memory_cold_start_window": int(memory_cold_start_window),
             "memory_semantic_enabled": bool(memory_semantic_enabled),
@@ -1279,11 +1324,17 @@ def create_client():
             "memory_tier_b_max_chars": int(memory_tier_b_max_chars),
             "memory_tier_c_max_chars": int(memory_tier_c_max_chars),
             "memory_total_max_chars": int(memory_total_max_chars),
-            "memory_tier_c_uncertainty_threshold": float(memory_tier_c_uncertainty_threshold),
+            "memory_tier_c_uncertainty_threshold": float(
+                memory_tier_c_uncertainty_threshold
+            ),
             "memory_reflection_cadence_rounds": int(memory_reflection_cadence_rounds),
             "memory_reflection_min_events": int(memory_reflection_min_events),
-            "memory_reflection_trigger_importance_sum": float(memory_reflection_trigger_importance_sum),
-            "memory_reflection_max_items_per_run": int(memory_reflection_max_items_per_run),
+            "memory_reflection_trigger_importance_sum": float(
+                memory_reflection_trigger_importance_sum
+            ),
+            "memory_reflection_max_items_per_run": int(
+                memory_reflection_max_items_per_run
+            ),
             "memory_embedding_model": str(memory_embedding_model).strip(),
             "memory_embedding_async": bool(memory_embedding_async),
             "memory_importance_mode": str(memory_importance_mode).strip(),
@@ -1701,9 +1752,9 @@ def delete_client(uid):
 
     # Delete association of population and experiment if no other client uses it.
     # Important: only delete for this experiment, not globally for the population.
-    remaining_clients = (
-        Client.query.filter_by(id_exp=exp_id, population_id=pop_id).count()
-    )
+    remaining_clients = Client.query.filter_by(
+        id_exp=exp_id, population_id=pop_id
+    ).count()
     if remaining_clients == 0:
         Population_Experiment.query.filter_by(
             id_population=pop_id, id_exp=exp_id
@@ -1831,6 +1882,7 @@ def get_progress(client_id):
     Also includes process health status and error detection.
     """
     import psutil
+
     from y_web.utils.path_utils import get_writable_path
 
     # get client and experiment info for log path
@@ -1845,7 +1897,9 @@ def get_progress(client_id):
     if client and client.pid:
         try:
             process = psutil.Process(client.pid)
-            process_alive = process.is_running() and process.status() != psutil.STATUS_ZOMBIE
+            process_alive = (
+                process.is_running() and process.status() != psutil.STATUS_ZOMBIE
+            )
         except (psutil.NoSuchProcess, psutil.AccessDenied):
             process_alive = False
 
@@ -1858,7 +1912,9 @@ def get_progress(client_id):
             # Extract experiment folder using helper function
             exp_folder = get_experiment_uid_from_db_name(exp.db_name)
             if exp_folder:
-                log_dir = os.path.join(writable_base, "y_web", "experiments", exp_folder)
+                log_dir = os.path.join(
+                    writable_base, "y_web", "experiments", exp_folder
+                )
             else:
                 log_dir = None
             if not log_dir:
@@ -1874,7 +1930,9 @@ def get_progress(client_id):
                             # Get the error message (next line after ERROR)
                             idx = lines.index(line)
                             if idx + 1 < len(lines):
-                                last_error = lines[idx].strip() + " " + lines[idx + 1].strip()
+                                last_error = (
+                                    lines[idx].strip() + " " + lines[idx + 1].strip()
+                                )
                             else:
                                 last_error = line.strip()
                             break
@@ -1882,13 +1940,15 @@ def get_progress(client_id):
             pass  # Ignore log reading errors
 
     if client_execution is None:
-        return json.dumps({
-            "progress": 0,
-            "infinite": False,
-            "process_alive": process_alive,
-            "has_error": has_error,
-            "last_error": last_error,
-        })
+        return json.dumps(
+            {
+                "progress": 0,
+                "infinite": False,
+                "process_alive": process_alive,
+                "has_error": has_error,
+                "last_error": last_error,
+            }
+        )
 
     # Check if this is an infinite client (expected_duration_rounds = -1)
     if client_execution.expected_duration_rounds == -1:
@@ -1923,13 +1983,15 @@ def get_progress(client_id):
     else:
         progress = 0
 
-    return json.dumps({
-        "progress": progress,
-        "infinite": False,
-        "process_alive": process_alive,
-        "has_error": has_error,
-        "last_error": last_error,
-    })
+    return json.dumps(
+        {
+            "progress": progress,
+            "infinite": False,
+            "process_alive": process_alive,
+            "has_error": has_error,
+            "last_error": last_error,
+        }
+    )
 
 
 @clientsr.route("/admin/set_network/<int:uid>", methods=["POST"])

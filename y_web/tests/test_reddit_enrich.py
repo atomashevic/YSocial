@@ -72,7 +72,9 @@ def app(tmp_path):
         )
         db.session.add(article)
 
-        image = Images(url="/uploads/reddit/1/test.png", description=None, article_id=None)
+        image = Images(
+            url="/uploads/reddit/1/test.png", description=None, article_id=None
+        )
         db.session.add(image)
         db.session.commit()
 
@@ -154,7 +156,9 @@ def test_enrich_image_disabled_without_llm(client):
     assert payload["data"]["enabled"] is False
 
 
-def test_enrich_image_maps_upload_to_local_path_and_updates_description(client, tmp_path):
+def test_enrich_image_maps_upload_to_local_path_and_updates_description(
+    client, tmp_path
+):
     from y_web import db
     from y_web.models import Admin_users, Images
 

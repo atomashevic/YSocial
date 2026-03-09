@@ -78,18 +78,18 @@ from y_web.utils.experiment_clock import (
     default_clock_config,
     ensure_experiment_clock,
 )
+from y_web.utils.experiment_helpers import get_experiment_uid_from_db_name
 from y_web.utils.jupyter_utils import stop_process
+from y_web.utils.memory_run_id import (
+    build_memory_run_seed,
+    normalize_client_config_memory_run_id,
+)
 from y_web.utils.miscellanea import (
     check_privileges,
     llm_backend_status,
     ollama_status,
     reload_current_user,
 )
-from y_web.utils.memory_run_id import (
-    build_memory_run_seed,
-    normalize_client_config_memory_run_id,
-)
-from y_web.utils.experiment_helpers import get_experiment_uid_from_db_name
 from y_web.utils.path_utils import get_resource_path
 
 experiments = Blueprint("experiments", __name__)
@@ -760,16 +760,14 @@ def upload_experiment():
                     # Insert initial admin user
                     hashed_pw = generate_password_hash("admin", method="pbkdf2:sha256")
 
-                    stmt = text(
-                        """
+                    stmt = text("""
                         INSERT INTO user_mgmt (username, email, password, user_type, leaning, age,
                                                language, owner, joined_on, frecsys_type,
                                                round_actions, toxicity, is_page, daily_activity_level)
                         VALUES (:username, :email, :password, :user_type, :leaning, :age,
                                 :language, :owner, :joined_on, :frecsys_type,
                                 :round_actions, :toxicity, :is_page, :daily_activity_level)
-                        """
-                    )
+                        """)
 
                     dummy_conn.execute(
                         stmt,
@@ -1461,16 +1459,14 @@ def create_experiment():
                     # Insert initial admin user
                     hashed_pw = generate_password_hash("admin", method="pbkdf2:sha256")
 
-                    stmt = text(
-                        """
+                    stmt = text("""
                                 INSERT INTO user_mgmt (username, email, password, user_type, leaning, age,
                                                        language, owner, joined_on, frecsys_type,
                                                        round_actions, toxicity, is_page, daily_activity_level)
                                 VALUES (:username, :email, :password, :user_type, :leaning, :age,
                                         :language, :owner, :joined_on, :frecsys_type,
                                         :round_actions, :toxicity, :is_page, :daily_activity_level)
-                                """
-                    )
+                                """)
 
                     dummy_conn.execute(
                         stmt,
@@ -1557,17 +1553,17 @@ def create_experiment():
         llm_default=llm_default,
         llm_api_key_default=llm_api_key_default,
         llm_max_tokens_default=_normalize_llm_max_tokens(llm_max_tokens_default),
-        llm_temperature_default=float(llm_temperature_default)
-        if llm_temperature_default
-        else 1.5,
+        llm_temperature_default=(
+            float(llm_temperature_default) if llm_temperature_default else 1.5
+        ),
         llm_v_default=llm_v_default,
         llm_v_api_key_default=llm_v_api_key_default,
-        llm_v_max_tokens_default=int(llm_v_max_tokens_default)
-        if llm_v_max_tokens_default
-        else 300,
-        llm_v_temperature_default=float(llm_v_temperature_default)
-        if llm_v_temperature_default
-        else 0.5,
+        llm_v_max_tokens_default=(
+            int(llm_v_max_tokens_default) if llm_v_max_tokens_default else 300
+        ),
+        llm_v_temperature_default=(
+            float(llm_v_temperature_default) if llm_v_temperature_default else 0.5
+        ),
     )
 
     db.session.add(exp)
@@ -1695,14 +1691,12 @@ def delete_simulation(exp_id):
                 ) as conn:
                     # Terminate existing connections to the database
                     conn.execute(
-                        text(
-                            f"""
+                        text(f"""
                             SELECT pg_terminate_backend(pg_stat_activity.pid)
                             FROM pg_stat_activity
                             WHERE pg_stat_activity.datname = :dbname
                             AND pid <> pg_backend_pid()
-                            """
-                        ),
+                            """),
                         {"dbname": exp.db_name},
                     )
                     # Drop the database
@@ -2448,9 +2442,11 @@ def client_logs(client_id):
                     "call_volume": {},
                     "mean_execution_time": {},
                     "raw_log": raw_log_lines,
-                    "error": "Structured log data not available"
-                    if raw_log_lines
-                    else "Log file not found",
+                    "error": (
+                        "Structured log data not available"
+                        if raw_log_lines
+                        else "Log file not found"
+                    ),
                 }
             )
 
@@ -2827,9 +2823,10 @@ def update_url_feeds(uid):
 @login_required
 def parse_rss_feed():
     """Parse an RSS feed URL and return feed info."""
-    import feedparser
     import re
     from urllib.parse import urlparse
+
+    import feedparser
 
     feed_url = request.json.get("feed_url", "")
     if not feed_url:
@@ -3217,7 +3214,9 @@ def upload_image_feeds(uid):
                     existing = by_subreddit[subreddit]
                     combined = []
                     seen = set()
-                    for label in list(existing.get("interests") or []) + list(feed.get("interests") or []):
+                    for label in list(existing.get("interests") or []) + list(
+                        feed.get("interests") or []
+                    ):
                         label = str(label).strip()
                         if not label or label in seen:
                             continue
@@ -3353,8 +3352,9 @@ def update_feed_limits(uid):
 @login_required
 def parse_image_feed():
     """Parse a Reddit subreddit RSS feed and return image info."""
-    import feedparser
     import re
+
+    import feedparser
 
     subreddit = request.json.get("subreddit", "").strip().lower()
     if not subreddit:
@@ -3368,9 +3368,14 @@ def parse_image_feed():
     try:
         feed = feedparser.parse(feed_url)
         if feed.bozo and not feed.entries:
-            return jsonify(
-                {"error": f"Could not parse r/{subreddit} - subreddit may not exist"}
-            ), 400
+            return (
+                jsonify(
+                    {
+                        "error": f"Could not parse r/{subreddit} - subreddit may not exist"
+                    }
+                ),
+                400,
+            )
 
         if not feed.entries:
             return jsonify({"error": f"No posts found in r/{subreddit}"}), 400
@@ -4893,16 +4898,14 @@ def _create_single_experiment_copy(source_exp, new_exp_name):
                 # Insert initial admin user
                 hashed_pw = generate_password_hash("admin", method="pbkdf2:sha256")
 
-                stmt = text(
-                    """
+                stmt = text("""
                     INSERT INTO user_mgmt (username, email, password, user_type, leaning, age,
                                            language, owner, joined_on, frecsys_type,
                                            round_actions, toxicity, is_page, daily_activity_level)
                     VALUES (:username, :email, :password, :user_type, :leaning, :age,
                             :language, :owner, :joined_on, :frecsys_type,
                             :round_actions, :toxicity, :is_page, :daily_activity_level)
-                    """
-                )
+                    """)
 
                 conn.execute(
                     stmt,

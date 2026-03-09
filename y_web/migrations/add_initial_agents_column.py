@@ -85,24 +85,22 @@ def migrate_postgresql(host, port, database, user, password):
         cursor = conn.cursor()
 
         # Check client table columns
-        cursor.execute(
-            """
+        cursor.execute("""
             SELECT column_name
             FROM information_schema.columns
             WHERE table_name = 'client'
-        """
-        )
+        """)
         client_columns = [row[0] for row in cursor.fetchall()]
 
         # Add initial_agents column to client if it doesn't exist
         if "initial_agents" not in client_columns:
-            cursor.execute(
-                """
+            cursor.execute("""
                 ALTER TABLE client
                 ADD COLUMN initial_agents INTEGER DEFAULT NULL
-            """
+            """)
+            print(
+                "✓ Added initial_agents column to client table in PostgreSQL database"
             )
-            print("✓ Added initial_agents column to client table in PostgreSQL database")
         else:
             print("○ initial_agents column already exists in client table")
 

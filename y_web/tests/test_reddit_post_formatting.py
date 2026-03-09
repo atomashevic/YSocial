@@ -31,4 +31,6 @@ def test_process_reddit_post_comment_mode_skips_legacy_blankline_split():
 def test_normalize_punctuation_spacing_preserves_urls():
     text = "Hi!How are you?Fine,thanks. Visit https://example.com/a,b?x=1"
     normalized = normalize_punctuation_spacing(text)
-    assert normalized == "Hi! How are you? Fine, thanks. Visit https://example.com/a,b?x=1"
+    assert (
+        normalized == "Hi! How are you? Fine, thanks. Visit https://example.com/a,b?x=1"
+    )

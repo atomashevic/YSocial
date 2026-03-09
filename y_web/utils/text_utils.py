@@ -251,18 +251,20 @@ def strip_markdown_artifacts(text):
     # Remove markdown headers with common article section names
     # Patterns: # Conclusion:, # Call to Action, # Key Points, etc.
     text = re.sub(
-        r'^#+\s*(Conclusion|Call to Action|Key Points?|Summary|Overview|'
-        r'Introduction|Background|TL;?DR|Final Thoughts?|Takeaway|'
-        r'What\'s Next|Next Steps?|Resources?)[:\s]*',
-        '', text, flags=re.MULTILINE | re.IGNORECASE
+        r"^#+\s*(Conclusion|Call to Action|Key Points?|Summary|Overview|"
+        r"Introduction|Background|TL;?DR|Final Thoughts?|Takeaway|"
+        r"What\'s Next|Next Steps?|Resources?)[:\s]*",
+        "",
+        text,
+        flags=re.MULTILINE | re.IGNORECASE,
     )
 
     # Remove any isolated markdown header at the very start of text
     # (e.g., "# Some random header" at the beginning)
-    text = re.sub(r'^#+\s+', '', text)
+    text = re.sub(r"^#+\s+", "", text)
 
     # Clean up multiple consecutive newlines
-    text = re.sub(r'\n{3,}', '\n\n', text)
+    text = re.sub(r"\n{3,}", "\n\n", text)
 
     return text.strip()
 
@@ -282,8 +284,8 @@ def calculate_text_similarity(text1, text2):
         return 0.0
 
     # Normalize texts: lowercase and extract words
-    words1 = set(re.findall(r'\b\w+\b', text1.lower()))
-    words2 = set(re.findall(r'\b\w+\b', text2.lower()))
+    words1 = set(re.findall(r"\b\w+\b", text1.lower()))
+    words2 = set(re.findall(r"\b\w+\b", text2.lower()))
 
     if not words1 or not words2:
         return 0.0
@@ -295,7 +297,9 @@ def calculate_text_similarity(text1, text2):
     return intersection / union if union > 0 else 0.0
 
 
-def strip_reproduced_article_content(post_body, article_summary, similarity_threshold=0.6):
+def strip_reproduced_article_content(
+    post_body, article_summary, similarity_threshold=0.6
+):
     """
     Detect and strip content that appears to be reproduced from the article summary.
 
@@ -314,7 +318,7 @@ def strip_reproduced_article_content(post_body, article_summary, similarity_thre
         return post_body, False
 
     # Normalize article summary for substring checking
-    article_words = set(re.findall(r'\b\w+\b', article_summary.lower()))
+    article_words = set(re.findall(r"\b\w+\b", article_summary.lower()))
 
     # Check overall similarity
     similarity = calculate_text_similarity(post_body, article_summary)
@@ -322,7 +326,7 @@ def strip_reproduced_article_content(post_body, article_summary, similarity_thre
     if similarity >= similarity_threshold:
         # Content is too similar to article - try to find and remove the reproduced portion
         # Split into sentences and check each one
-        sentences = re.split(r'(?<=[.!?])\s+', post_body)
+        sentences = re.split(r"(?<=[.!?])\s+", post_body)
         filtered_sentences = []
 
         # Use lower threshold for per-sentence matching since each sentence
@@ -333,10 +337,12 @@ def strip_reproduced_article_content(post_body, article_summary, similarity_thre
             sentence_similarity = calculate_text_similarity(sentence, article_summary)
 
             # Also check if sentence words are mostly from article
-            sentence_words = set(re.findall(r'\b\w+\b', sentence.lower()))
+            sentence_words = set(re.findall(r"\b\w+\b", sentence.lower()))
             if sentence_words:
                 # What percentage of sentence words appear in article?
-                overlap_ratio = len(sentence_words & article_words) / len(sentence_words)
+                overlap_ratio = len(sentence_words & article_words) / len(
+                    sentence_words
+                )
             else:
                 overlap_ratio = 0
 
@@ -346,7 +352,7 @@ def strip_reproduced_article_content(post_body, article_summary, similarity_thre
                 filtered_sentences.append(sentence)
 
         if filtered_sentences:
-            return ' '.join(filtered_sentences), True
+            return " ".join(filtered_sentences), True
         else:
             # All content was reproduced - return empty
             return "", True
@@ -383,11 +389,13 @@ def process_reddit_post(text, allow_legacy_blankline_title=True):
     # Match TITLE: prefix with variations (case-insensitive, typos, optional space)
     # Handles: TITLE:, TITTLE:, TITEL:, Title:, title:, etc.
     # Also handles markdown formatting: **TITLE:, *TITLE:, __TITLE:, _TITLE:
-    title_match = re.match(r'^[\*_]{0,2}(TITLE|TITTLE|TITEL)\s*:\s*', text, re.IGNORECASE)
+    title_match = re.match(
+        r"^[\*_]{0,2}(TITLE|TITTLE|TITEL)\s*:\s*", text, re.IGNORECASE
+    )
 
     if title_match:
         # Remove the matched prefix
-        remaining = text[title_match.end():]
+        remaining = text[title_match.end() :]
 
         # Split on first newline to separate title from body.
         # Some generations forget the newline after TITLE: and produce a single long line.
@@ -396,7 +404,7 @@ def process_reddit_post(text, allow_legacy_blankline_title=True):
         title = lines[0].strip()
 
         # Strip trailing markdown bold/italic markers from title
-        title = re.sub(r'[\*_]{1,2}$', '', title).strip()
+        title = re.sub(r"[\*_]{1,2}$", "", title).strip()
 
         if len(lines) > 1:
             content = lines[1].lstrip()
@@ -443,11 +451,7 @@ def process_reddit_post(text, allow_legacy_blankline_title=True):
             if len(blocks) > 1:
                 candidate_title = blocks[0].strip()
                 candidate_body = blocks[1].lstrip()
-                if (
-                    candidate_title
-                    and candidate_body
-                    and len(candidate_title) <= 300
-                ):
+                if candidate_title and candidate_body and len(candidate_title) <= 300:
                     title = candidate_title
                     content = candidate_body
 

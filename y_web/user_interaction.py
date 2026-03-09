@@ -665,8 +665,13 @@ def publish_comment(exp_id):
             db.session.commit()
 
     # Mirror agent behavior for replies: notify parent author even without explicit @mention.
-    if parent_post.user_id != current_user.id and parent_post.user_id not in mentioned_user_ids:
-        mn = Mentions(user_id=parent_post.user_id, post_id=post.id, round=current_round.id)
+    if (
+        parent_post.user_id != current_user.id
+        and parent_post.user_id not in mentioned_user_ids
+    ):
+        mn = Mentions(
+            user_id=parent_post.user_id, post_id=post.id, round=current_round.id
+        )
         db.session.add(mn)
         db.session.commit()
 

@@ -548,7 +548,9 @@ def interview(exp_id: int):
     # When admins join experiments, they may still be logged-in as Admin_users.
     # Resolve the corresponding experiment-side user for header links.
     exp_user = User_mgmt.query.filter_by(username=current_user.username).first()
-    logged_id = int(exp_user.id) if exp_user else int(getattr(current_user, "id", 0) or 0)
+    logged_id = (
+        int(exp_user.id) if exp_user else int(getattr(current_user, "id", 0) or 0)
+    )
 
     mentions = []
     try:
@@ -879,11 +881,15 @@ def get_thread(exp_id, post_id):
 
     # Check image_post_id first (standalone images), then fall back to image_id
     from y_web.reddit.service import _resolve_image_post
-    image = _resolve_image_post(getattr(posts[0], 'image_post_id', None))
+
+    image = _resolve_image_post(getattr(posts[0], "image_post_id", None))
     if not image and posts[0].image_id:
         img = Images.query.filter_by(id=posts[0].image_id).first()
         if img and img.url:
-            image = {"url": img.url, "description": getattr(img, "description", "") or ""}
+            image = {
+                "url": img.url,
+                "description": getattr(img, "description", "") or "",
+            }
 
     user = User_mgmt.query.filter_by(id=posts[0].user_id).first()
     profile_pic = ""
@@ -1104,8 +1110,7 @@ def __get_discussions(posts, username, page, exp_id):
         # Just count comments - feed only needs the count, not full details
         # Full comment data is loaded in thread view, not feed view
         comment_count = Post.query.filter(
-            Post.thread_id == post.id,
-            Post.id != post.id
+            Post.thread_id == post.id, Post.id != post.id
         ).count()
         cms = []  # Empty list - comment details not used in feed template
 
@@ -1115,26 +1120,33 @@ def __get_discussions(posts, username, page, exp_id):
         else:
             if is_reddit:
                 from y_web.reddit.service import _article_payload, _resolve_article
+
                 art = _article_payload(_resolve_article(article))
             else:
                 # Non-Reddit feeds: keep existing behavior
                 article_image = None
                 article_img = Images.query.filter_by(article_id=article.id).first()
                 if article_img and article_img.url:
-                    article_image = {"url": article_img.url, "description": getattr(article_img, "description", "") or ""}
+                    article_image = {
+                        "url": article_img.url,
+                        "description": getattr(article_img, "description", "") or "",
+                    }
 
                 art = {
                     "title": article.title,
                     "summary": strip_tags(article.summary),
                     "url": article.link,
-                    "source": (lambda w: w.name if w else "Unknown")(Websites.query.filter_by(id=article.website_id).first()),
+                    "source": (lambda w: w.name if w else "Unknown")(
+                        Websites.query.filter_by(id=article.website_id).first()
+                    ),
                     "image": article_image,
                 }
 
         # Check image_post_id first (standalone images from image_posts table)
-        image_post_id = getattr(post, 'image_post_id', None)
+        image_post_id = getattr(post, "image_post_id", None)
         if image_post_id:
             from y_web.reddit.service import _resolve_image_post
+
             image = _resolve_image_post(image_post_id)
             if image is None:
                 image = ""
@@ -1142,6 +1154,7 @@ def __get_discussions(posts, username, page, exp_id):
             # Fall back to legacy image_id (from Images table)
             if is_reddit:
                 from y_web.reddit.service import _resolve_image
+
                 image = _resolve_image(post.image_id) if post.image_id else ""
             else:
                 image = Images.query.filter_by(id=post.image_id).first()
@@ -1174,7 +1187,9 @@ def __get_discussions(posts, username, page, exp_id):
                 profile_pic = (
                     ag.profile_pic
                     if ag is not None and ag.profile_pic is not None
-                    else (lambda u: u.profile_pic if u else "")(Admin_users.query.filter_by(username=aa.username).first())
+                    else (lambda u: u.profile_pic if u else "")(
+                        Admin_users.query.filter_by(username=aa.username).first()
+                    )
                 )
             except:
                 profile_pic = ""
@@ -1192,9 +1207,9 @@ def __get_discussions(posts, username, page, exp_id):
             if article_title:
                 body_stripped = post_body.strip()
                 if body_stripped.startswith(f"TITLE: {article_title}"):
-                    post_body = body_stripped[len(f"TITLE: {article_title}"):].lstrip()
+                    post_body = body_stripped[len(f"TITLE: {article_title}") :].lstrip()
                 elif body_stripped.startswith(article_title):
-                    post_body = body_stripped[len(article_title):].lstrip()
+                    post_body = body_stripped[len(article_title) :].lstrip()
 
         res.append(
             {
@@ -1334,9 +1349,11 @@ def get_thread_reddit(exp_id, post_id):
 
     # Check image_post_id first (standalone images), then fall back to image_id
     from y_web.reddit.service import _resolve_image_post
-    image = _resolve_image_post(getattr(posts[0], 'image_post_id', None))
+
+    image = _resolve_image_post(getattr(posts[0], "image_post_id", None))
     if not image and posts[0].image_id:
         from y_web.reddit.service import _resolve_image
+
         image = _resolve_image(posts[0].image_id)
 
     user = User_mgmt.query.filter_by(id=posts[0].user_id).first()
@@ -1386,6 +1403,7 @@ def get_thread_reddit(exp_id, post_id):
         art = 0
     else:
         from y_web.reddit.service import _article_payload, _resolve_article
+
         art = _article_payload(_resolve_article(article))
 
     discussion_tree = {
@@ -1475,7 +1493,9 @@ def get_thread_reddit(exp_id, post_id):
 
         # Strip reproduced article content from body (catches LLM copying summary)
         if article and article.summary and comment_content:
-            comment_content, _ = strip_reproduced_article_content(comment_content, article.summary)
+            comment_content, _ = strip_reproduced_article_content(
+                comment_content, article.summary
+            )
 
         is_agent_or_page_comment_author = bool(
             user is not None
@@ -1497,6 +1517,7 @@ def get_thread_reddit(exp_id, post_id):
             art = 0
         else:
             from y_web.reddit.service import _article_payload, _resolve_article
+
             art = _article_payload(_resolve_article(article))
         data = {
             "title": comment_title,
@@ -2070,13 +2091,19 @@ def api_feed_reddit(exp_id, user_id="all", timeline="timeline", mode="rf", page=
             reaction_sub = (
                 db.session.query(
                     Reactions.post_id.label("post_id"),
-                    func.sum(case((Reactions.type == "like", 1), else_=0)).label("like_count"),
-                    func.sum(case((Reactions.type == "dislike", 1), else_=0)).label("dislike_count"),
+                    func.sum(case((Reactions.type == "like", 1), else_=0)).label(
+                        "like_count"
+                    ),
+                    func.sum(case((Reactions.type == "dislike", 1), else_=0)).label(
+                        "dislike_count"
+                    ),
                 )
                 .group_by(Reactions.post_id)
                 .subquery()
             )
-            net_score = func.coalesce(reaction_sub.c.like_count, 0) - func.coalesce(reaction_sub.c.dislike_count, 0)
+            net_score = func.coalesce(reaction_sub.c.like_count, 0) - func.coalesce(
+                reaction_sub.c.dislike_count, 0
+            )
             sign_expr = case((net_score > 0, 1), (net_score < 0, -1), else_=0)
             abs_score = func.abs(net_score)
             max_score = case((abs_score >= 1, abs_score), else_=1)
@@ -2149,13 +2176,19 @@ def api_feed_reddit(exp_id, user_id="all", timeline="timeline", mode="rf", page=
             reaction_sub = (
                 db.session.query(
                     Reactions.post_id.label("post_id"),
-                    func.sum(case((Reactions.type == "like", 1), else_=0)).label("like_count"),
-                    func.sum(case((Reactions.type == "dislike", 1), else_=0)).label("dislike_count"),
+                    func.sum(case((Reactions.type == "like", 1), else_=0)).label(
+                        "like_count"
+                    ),
+                    func.sum(case((Reactions.type == "dislike", 1), else_=0)).label(
+                        "dislike_count"
+                    ),
                 )
                 .group_by(Reactions.post_id)
                 .subquery()
             )
-            net_score = func.coalesce(reaction_sub.c.like_count, 0) - func.coalesce(reaction_sub.c.dislike_count, 0)
+            net_score = func.coalesce(reaction_sub.c.like_count, 0) - func.coalesce(
+                reaction_sub.c.dislike_count, 0
+            )
             sign_expr = case((net_score > 0, 1), (net_score < 0, -1), else_=0)
             abs_score = func.abs(net_score)
             max_score = case((abs_score >= 1, abs_score), else_=1)

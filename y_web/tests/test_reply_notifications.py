@@ -9,9 +9,8 @@ from werkzeug.security import generate_password_hash
 
 @pytest.fixture
 def app(tmp_path):
-    from y_web import db
-
     import y_web
+    from y_web import db
 
     templates_dir = os.path.join(os.path.dirname(y_web.__file__), "templates")
     static_dir = os.path.join(os.path.dirname(y_web.__file__), "static")
@@ -48,15 +47,21 @@ def app(tmp_path):
         except Exception:
             return None
 
-    from y_web.main import main as main_blueprint
     from y_web.auth import auth as auth_blueprint
+    from y_web.main import main as main_blueprint
 
     app.register_blueprint(main_blueprint)
     app.register_blueprint(auth_blueprint)
 
     with app.app_context():
-        from y_web.models import Admin_users, Exps
-        from y_web.models import Post, ReplyInboxState, Rounds, User_mgmt
+        from y_web.models import (
+            Admin_users,
+            Exps,
+            Post,
+            ReplyInboxState,
+            Rounds,
+            User_mgmt,
+        )
 
         db.create_all(bind="db_admin")
         db.create_all(bind="db_exp")
@@ -190,12 +195,16 @@ def test_notifications_mark_read_and_exclude_self_reply(app, client):
         assert alice is not None
 
         root = Post.query.filter_by(user_id=alice.id, tweet="root").first()
-        alice_comment = Post.query.filter_by(user_id=alice.id, tweet="alice comment").first()
+        alice_comment = Post.query.filter_by(
+            user_id=alice.id, tweet="alice comment"
+        ).first()
         assert root is not None
         assert alice_comment is not None
 
         # Grab the self-reply id so we can ensure it doesn't appear.
-        self_reply = Post.query.filter_by(user_id=alice.id, tweet="alice self reply").first()
+        self_reply = Post.query.filter_by(
+            user_id=alice.id, tweet="alice self reply"
+        ).first()
         assert self_reply is not None
 
         expected_max_reply_id = (

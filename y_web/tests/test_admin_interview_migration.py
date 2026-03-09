@@ -72,8 +72,7 @@ def test_sqlite_migration_creates_admin_interview_tables_and_indexes(tmp_path):
 def test_sqlite_migration_backfills_additive_columns_on_existing_tables(tmp_path):
     db_path = tmp_path / "dashboard.db"
     conn = sqlite3.connect(db_path)
-    conn.execute(
-        """
+    conn.execute("""
         CREATE TABLE admin_interview_sessions (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             exp_id INTEGER NOT NULL,
@@ -82,31 +81,24 @@ def test_sqlite_migration_backfills_additive_columns_on_existing_tables(tmp_path
             agent_username TEXT NOT NULL,
             run_id VARCHAR(64)
         )
-        """
-    )
-    conn.execute(
-        """
+        """)
+    conn.execute("""
         INSERT INTO admin_interview_sessions (
             exp_id, admin_username, agent_user_id, agent_username, run_id
         ) VALUES (1, 'admin', 7, 'agent', 'legacy-run')
-        """
-    )
-    conn.execute(
-        """
+        """)
+    conn.execute("""
         CREATE TABLE admin_interview_messages (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             session_id INTEGER NOT NULL,
             role TEXT NOT NULL,
             content TEXT NOT NULL
         )
-        """
-    )
-    conn.execute(
-        """
+        """)
+    conn.execute("""
         INSERT INTO admin_interview_messages (session_id, role, content)
         VALUES (1, 'admin', 'hello')
-        """
-    )
+        """)
     conn.commit()
     conn.close()
 
@@ -128,24 +120,20 @@ def test_sqlite_migration_backfills_additive_columns_on_existing_tables(tmp_path
     }.issubset(session_columns)
     assert {"meta_json", "created_at"}.issubset(message_columns)
 
-    row = conn.execute(
-        """
+    row = conn.execute("""
         SELECT backend_mode, created_at, updated_at
         FROM admin_interview_sessions
         WHERE id = 1
-        """
-    ).fetchone()
+        """).fetchone()
     assert row[0] == "agent_runtime"
     assert row[1] is not None
     assert row[2] is not None
 
-    message_row = conn.execute(
-        """
+    message_row = conn.execute("""
         SELECT meta_json, created_at
         FROM admin_interview_messages
         WHERE id = 1
-        """
-    ).fetchone()
+        """).fetchone()
     assert message_row[0] is None
     assert message_row[1] is not None
 
