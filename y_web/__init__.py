@@ -1084,6 +1084,33 @@ def create_app(db_type="sqlite", desktop_mode=False):
         except Exception as e:
             print(f"Failed to run blog_posts table migration: {e}")
 
+        # Ensure admin interview tables and additive columns exist
+        try:
+            if db_type == "sqlite":
+                from y_web.migrations.add_admin_interview_tables import (
+                    migrate_sqlite as migrate_admin_interview_tables_sqlite,
+                )
+
+                dashboard_db_path = app.config.get("DASHBOARD_DB_PATH")
+                if dashboard_db_path:
+                    migrate_admin_interview_tables_sqlite(dashboard_db_path)
+            elif db_type == "postgresql":
+                from y_web.migrations.add_admin_interview_tables import (
+                    migrate_postgresql as migrate_admin_interview_tables_postgresql,
+                )
+
+                pg_host = os.getenv("PG_HOST", "localhost")
+                pg_port = os.getenv("PG_PORT", "5432")
+                pg_database = os.getenv("PG_DBNAME", "dashboard")
+                pg_user = os.getenv("PG_USER", "postgres")
+                pg_password = os.getenv("PG_PASSWORD", "password")
+                if pg_password:
+                    migrate_admin_interview_tables_postgresql(
+                        pg_host, pg_port, pg_database, pg_user, pg_password
+                    )
+        except Exception as e:
+            print(f"Failed to run admin interview tables migration: {e}")
+
         # Ensure admin interview run_id supports long run-scoped identifiers
         try:
             if db_type == "sqlite":
